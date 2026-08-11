@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.1.8';
+export const APP_VERSION = '0.1.9';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,12 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.1.9',
+      items: [
+        'Уведомление о заявке теперь исчезает у всех получателей сразу, как только кто-то её обработал',
+      ],
+    },
     {
       version: '0.1.8',
       items: [
@@ -109,6 +115,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.1.9',
+      items: [
+        "Ariza haqidagi bildirishnoma endi kimdir uni ko'rib chiqishi bilan barcha qabul qiluvchilarda darhol yo'qoladi",
+      ],
+    },
+    {
       version: '0.1.8',
       items: [
         "Ilova endi krestik orqali ishonchli yopiladi, osilib qolmaydi",
@@ -201,6 +213,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.1.9',
+      items: [
+        'Ариза ҳақидаги билдиришнома энди кимдир уни кўриб чиқиши билан барча қабул қилувчиларда дарҳол йўқолади',
+      ],
+    },
     {
       version: '0.1.8',
       items: [

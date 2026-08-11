@@ -709,6 +709,19 @@ impl Db {
         Ok(())
     }
 
+    // Заявку могли увидеть несколько человек (руководитель + его заместитель,
+    // либо сразу все админы) — у каждого своя копия уведомления со своим id.
+    // Когда заявка решена ЛЮБЫМ из них, у остальных получателей уведомление
+    // всё равно оставалось непрочитанным (раньше mark_notification_read
+    // помечал только ту копию, по которой кликнули) — из-за этого badge
+    // "висел" даже после того, как заявка уже была обработана кем-то другим.
+    fn mark_notifications_for_entity_read(&self, related_entity_id: &str) {
+        let _ = self.conn.execute(
+            "UPDATE notifications SET is_read = 1 WHERE related_entity_id = ?1",
+            params![related_entity_id],
+        );
+    }
+
     // ---- Заявки на редактирование профиля ----
 
     pub fn create_edit_request(
@@ -863,6 +876,8 @@ impl Db {
                 params![resolved_status, admin_id, request_id],
             )
             .map_err(|e| e.to_string())?;
+
+        self.mark_notifications_for_entity_read(request_id);
 
         Ok(())
     }
@@ -1115,6 +1130,8 @@ impl Db {
 
         let title = if approve { "Заявка на отсутствие одобрена" } else { "Заявка на отсутствие отклонена" };
         self.notify(&employee_id, "absence_request_resolved", title, None, None, None);
+
+        self.mark_notifications_for_entity_read(request_id);
 
         Ok(())
     }

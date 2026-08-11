@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { RefreshCw, ChevronDown, CheckCircle2 } from 'lucide-react';
 import Modal from './Modal';
+import LoadingScreen from './LoadingScreen';
 import { changelog } from '../lib/changelog';
 import { useLocale } from '../lib/i18n';
 import { checkForAppUpdate, restartApp, type UpdateCheckResult, type UpdateProgress } from '../lib/updater';
@@ -85,8 +86,10 @@ export default function UpdatesButton() {
           <>
             <div className="updates-online-check">
               <button className="modal-btn" onClick={handleCheckOnline} disabled={onlineCheck === 'checking'}>
+                <RefreshCw size={14} className={onlineCheck === 'checking' ? 'spin' : ''} />
                 {onlineCheck === 'checking' ? t('updates.checking') : t('updates.checkOnline')}
               </button>
+              {onlineCheck === 'checking' && <LoadingScreen compact />}
               {onlineCheck !== 'idle' && onlineCheck !== 'checking' && (
                 <>
                   <p className="settings-hint updates-online-status">

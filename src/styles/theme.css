@@ -693,9 +693,22 @@ button.primary:hover { filter: brightness(0.95); }
   border: 1px solid var(--color-border);
   background: var(--color-surface-2);
   color: var(--color-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .modal-btn:hover { background: var(--color-border); }
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 
 .modal-btn.danger {
   background: var(--color-accent);

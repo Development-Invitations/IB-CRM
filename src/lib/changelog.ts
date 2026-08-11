@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.1.9';
+export const APP_VERSION = '0.1.10';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,13 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.1.10',
+      items: [
+        'Старые "зависшие" уведомления по уже решённым заявкам теперь чистятся автоматически',
+        'Проверка обновлений — красивый индикатор загрузки вместо простого текста',
+      ],
+    },
     {
       version: '0.1.9',
       items: [
@@ -115,6 +122,13 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.1.10',
+      items: [
+        "Allaqachon ko'rib chiqilgan arizalar bo'yicha eski \"osilib qolgan\" bildirishnomalar endi avtomatik tozalanadi",
+        "Yangilanishlarni tekshirish — oddiy matn o'rniga chiroyli yuklanish indikatori",
+      ],
+    },
+    {
       version: '0.1.9',
       items: [
         "Ariza haqidagi bildirishnoma endi kimdir uni ko'rib chiqishi bilan barcha qabul qiluvchilarda darhol yo'qoladi",
@@ -213,6 +227,13 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.1.10',
+      items: [
+        'Аллақачон кўриб чиқилган аризалар бўйича эски "осилиб қолган" билдиришномалар энди автоматик тозаланади',
+        'Янгиланишларни текшириш — оддий матн ўрнига чиройли юкланиш индикатори',
+      ],
+    },
     {
       version: '0.1.9',
       items: [

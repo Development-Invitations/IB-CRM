@@ -209,6 +209,23 @@ impl Db {
         add_column_if_missing(&conn, "absence_requests", "makeup_slots TEXT");
         add_column_if_missing(&conn, "departments", "deputy_employee_id TEXT REFERENCES employees(id)");
 
+        // Разовая (но безвредная при повторных запусках) ретроактивная чистка:
+        // раньше уведомления по заявкам не помечались прочитанными при решении
+        // (эта логика появилась только в v0.1.9, см. mark_notifications_for_entity_read).
+        // Из-за этого в базах, созданных до этой версии, могли остаться "зависшие"
+        // непрочитанные уведомления по заявкам, которые на самом деле уже давно
+        // одобрены/отклонены. Чистим их сразу при старте, чтобы не тянуть старый
+        // мусор — новые заявки и так будут чиститься автоматически по ходу дела.
+        let _ = conn.execute(
+            "UPDATE notifications SET is_read = 1
+             WHERE related_entity_id IN (
+                 SELECT id FROM edit_requests WHERE status != 'pending'
+                 UNION
+                 SELECT id FROM absence_requests WHERE status != 'pending'
+             )",
+            [],
+        );
+
         Db { conn }
     }
 

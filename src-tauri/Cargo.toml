@@ -1,7 +1,8 @@
 [package]
 name = "ib-crm"
-version = "0.1.10"
+version = "0.1.11"
 description = "IB CRM — desktop приложение"
+authors = ["IB - Команда"]
 edition = "2021"
 
 [build-dependencies]

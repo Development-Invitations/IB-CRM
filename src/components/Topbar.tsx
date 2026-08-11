@@ -29,7 +29,8 @@ export default function Topbar({ employee }: { employee: Employee }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employee.id]);
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const unreadNotifications = notifications.filter((n) => !n.isRead);
+  const unreadCount = unreadNotifications.length;
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -91,11 +92,11 @@ export default function Topbar({ employee }: { employee: Employee }) {
           {open && (
             <div className="notifications-panel">
               <div className="notifications-panel-title">{t('topbar.notifications')}</div>
-              {notifications.length === 0 ? (
+              {unreadNotifications.length === 0 ? (
                 <div className="notifications-empty">{t('topbar.noNotifications')}</div>
               ) : (
-                notifications.map((n) => (
-                  <div className={`notification-item ${n.isRead ? '' : 'unread'}`} key={n.id}>
+                unreadNotifications.map((n) => (
+                  <div className="notification-item unread" key={n.id}>
                     <div className="notification-item-title">{n.title}</div>
                     {n.body && <div className="notification-item-body">{n.body}</div>}
                     <button className="notification-item-action" onClick={() => handleOpenNotification(n)}>

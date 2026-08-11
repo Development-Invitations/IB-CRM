@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.1.10';
+export const APP_VERSION = '0.1.11';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,15 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.1.11',
+      items: [
+        'Бейдж "Заместитель подразделения" стал заметнее — раньше сливался с тёмным фоном',
+        'Обработанные уведомления теперь пропадают из списка автоматически',
+        'Логотип на фоне страниц сделан чуть заметнее',
+        'Установщик приложения — на русском языке, с указанием издателя',
+      ],
+    },
     {
       version: '0.1.10',
       items: [
@@ -122,6 +131,15 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.1.11',
+      items: [
+        "\"Bo'lim o'rinbosari\" belgisi endi yaxshiroq ko'rinadi — avval qorong'i fon bilan qo'shilib ketardi",
+        "Ko'rib chiqilgan bildirishnomalar endi ro'yxatdan avtomatik yo'qoladi",
+        'Sahifalar fonidagi logotip biroz aniqroq qilindi',
+        "Ilova o'rnatuvchisi — rus tilida, noshir ko'rsatilgan holda",
+      ],
+    },
+    {
       version: '0.1.10',
       items: [
         "Allaqachon ko'rib chiqilgan arizalar bo'yicha eski \"osilib qolgan\" bildirishnomalar endi avtomatik tozalanadi",
@@ -227,6 +245,15 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.1.11',
+      items: [
+        '"Бўлим ўринбосари" белгиси энди яхшироқ кўринади — аввал қоронғи фон билан қўшилиб кетарди',
+        'Кўриб чиқилган билдиришномалар энди рўйхатдан автоматик йўқолади',
+        'Саҳифалар фонидаги логотип бироз аниқроқ қилинди',
+        'Илова ўрнатувчиси — рус тилида, нашир кўрсатилган ҳолда',
+      ],
+    },
     {
       version: '0.1.10',
       items: [

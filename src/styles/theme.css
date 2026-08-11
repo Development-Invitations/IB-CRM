@@ -543,7 +543,7 @@ button.primary:hover { filter: brightness(0.95); }
   background-repeat: no-repeat;
   background-position: center;
   background-size: 420px 420px;
-  opacity: 0.06;
+  opacity: 0.09;
   pointer-events: none;
   z-index: -1;
 }
@@ -551,11 +551,11 @@ button.primary:hover { filter: brightness(0.95); }
 [data-theme='dark'] .content::before,
 [data-theme='graphite'] .content::before,
 [data-theme='classicBlue'] .content::before {
-  opacity: 0.045;
+  opacity: 0.075;
 }
 
 [data-theme='pastel'] .content::before {
-  opacity: 0.08;
+  opacity: 0.11;
 }
 
 .content h1 { margin-top: 0; }
@@ -1568,11 +1568,11 @@ button.employees-add-btn {
 }
 
 .role-badge-head {
-  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
-  color: var(--color-accent);
+  background: var(--color-accent);
+  color: #14213D;
 }
 
 .role-badge-deputy {
-  background: color-mix(in srgb, var(--color-primary) 22%, transparent);
-  color: var(--color-primary);
+  background: var(--color-primary);
+  color: #FFFFFF;
 }

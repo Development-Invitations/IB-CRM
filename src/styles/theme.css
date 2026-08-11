@@ -95,6 +95,30 @@ html, body, #root {
   color: var(--color-text-muted);
 }
 
+.loading-logo {
+  width: 72px;
+  height: 72px;
+  animation: loading-pulse 1.4s ease-in-out infinite;
+}
+
+.loading-inline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+.loading-logo-sm {
+  width: 36px;
+  height: 36px;
+  animation: loading-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes loading-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.92); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
 .auth-screen {
   display: flex;
   align-items: center;
@@ -141,6 +165,18 @@ html, body, #root {
   background: var(--color-surface-2);
   color: var(--color-text);
   font-size: 14px;
+}
+
+.field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
 }
 
 .checkbox-row {
@@ -620,7 +656,7 @@ button.primary:hover { filter: brightness(0.95); }
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  padding: 26px;
+  padding: 26px 0 26px 26px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
 }
 
@@ -629,6 +665,7 @@ button.primary:hover { filter: brightness(0.95); }
   font-weight: 700;
   margin-bottom: 10px;
   flex-shrink: 0;
+  padding-right: 26px;
 }
 
 .modal-body {
@@ -637,7 +674,7 @@ button.primary:hover { filter: brightness(0.95); }
   margin-bottom: 20px;
   overflow-y: auto;
   min-height: 0;
-  padding-right: 6px;
+  padding-right: 26px;
 }
 
 .modal-actions {
@@ -645,6 +682,7 @@ button.primary:hover { filter: brightness(0.95); }
   gap: 10px;
   justify-content: flex-end;
   flex-shrink: 0;
+  padding-right: 26px;
 }
 
 .modal-btn {
@@ -664,6 +702,44 @@ button.primary:hover { filter: brightness(0.95); }
   color: #14213D;
   border-color: var(--color-accent);
   font-weight: 600;
+}
+
+/* ---- Прогресс загрузки обновления ---- */
+
+.update-progress {
+  padding: 8px 0 4px;
+}
+
+.update-progress-label {
+  font-size: 13px;
+  color: var(--color-text);
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.progress-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-surface-2);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+  transition: width 0.25s ease;
+}
+
+.progress-fill.indeterminate {
+  width: 40%;
+  animation: progress-indeterminate 1.1s ease-in-out infinite;
+}
+
+@keyframes progress-indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
 }
 
 /* ---- Toast ---- */
@@ -1065,6 +1141,83 @@ button.employees-add-btn {
 
 .sessions-list li span:first-child { color: var(--color-text-muted); }
 
+/* ---- Ручной статус сотрудника (Отошёл/Обед/Отпуск/Отгул) ---- */
+
+.manual-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.manual-status-badge.manual-status-sm {
+  padding: 2px 7px;
+  font-size: 10px;
+}
+
+.manual-status-until {
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+.manual-status-away15 {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  color: var(--color-accent);
+}
+
+.manual-status-lunch {
+  background: color-mix(in srgb, #F97316 18%, transparent);
+  color: #F97316;
+}
+
+.manual-status-vacation {
+  background: color-mix(in srgb, var(--color-success) 18%, transparent);
+  color: var(--color-success);
+}
+
+.manual-status-dayoff {
+  background: color-mix(in srgb, var(--color-text-muted) 20%, transparent);
+  color: var(--color-text-muted);
+}
+
+.status-picker {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.status-picker-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.status-picker-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.status-picker-option:hover { background: var(--color-border); }
+
+.status-picker-option.active {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
 /* ---- Декоративный баннер сверху карточки кабинета ---- */
 
 .profile-card-banner {
@@ -1171,4 +1324,198 @@ button.employees-add-btn {
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+}
+
+/* ---- Заявки на отсутствие ---- */
+
+.absence-form-dates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.absence-new-btn {
+  margin-left: auto;
+}
+
+.absence-status {
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.absence-status-pending {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  color: var(--color-accent);
+}
+
+.absence-status-approved {
+  background: color-mix(in srgb, var(--color-success) 18%, transparent);
+  color: var(--color-success);
+}
+
+.absence-status-rejected {
+  background: color-mix(in srgb, var(--color-danger) 18%, transparent);
+  color: var(--color-danger);
+}
+
+/* ---- Недельный пикер рабочих дней ---- */
+
+.week-day-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.week-day-btn {
+  width: 42px;
+  height: 36px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.week-day-btn:hover { background: var(--color-border); }
+
+.week-day-btn.active {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+/* ---- Блок отработки для типа "Отгул с отработкой" ---- */
+
+.absence-makeup-block {
+  margin-top: 4px;
+  padding: 14px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface-2);
+}
+
+.absence-makeup-slot {
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.absence-makeup-slot:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 8px;
+}
+
+.absence-makeup-remove {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--color-danger);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 4px;
+}
+
+/* ---- Секции страницы "Заявки" ---- */
+
+.absence-section {
+  margin-bottom: 32px;
+}
+
+.absence-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.absence-section-header h2 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.absence-export-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.absence-export-row select,
+.absence-export-row input[type="month"] {
+  padding: 9px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.absence-pending-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.absence-pending-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.absence-pending-item-info { font-size: 13px; }
+.absence-pending-item-info strong { display: block; margin-bottom: 2px; }
+
+.absence-pending-item-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.absence-pending-item-actions .modal-btn {
+  width: auto;
+  padding: 7px 14px;
+  font-size: 12px;
+}
+
+/* ---- Значки "Руководитель/Заместитель подразделения" ---- */
+
+.role-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.role-badge-head {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  color: var(--color-accent);
+}
+
+.role-badge-deputy {
+  background: color-mix(in srgb, var(--color-primary) 22%, transparent);
+  color: var(--color-primary);
 }

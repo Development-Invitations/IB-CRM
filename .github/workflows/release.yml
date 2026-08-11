@@ -1,0 +1,62 @@
+name: 'publish'
+
+# Запускается при пуше тега вида v0.1.7, v0.2.0 и т.д.
+# Собирает, ПОДПИСЫВАЕТ (ключом из секретов репозитория) и публикует релиз
+# в GitHub Releases — включая обязательный latest.json, без которого
+# автообновление внутри приложения не может ничего найти.
+#
+# Перед первым использованием обязательно:
+#   1. Сгенерировать ключ подписи (см. docs/TZ.md, раздел про автообновление).
+#   2. Добавить в Settings → Secrets and variables → Actions репозитория:
+#        TAURI_SIGNING_PRIVATE_KEY          — содержимое приватного ключа
+#        TAURI_SIGNING_PRIVATE_KEY_PASSWORD — пароль, заданный при генерации
+#   3. Вставить публичный ключ в src-tauri/tauri.conf.json → plugins.updater.pubkey
+#
+# Дальше просто: подняли версию (package.json, Cargo.toml, tauri.conf.json,
+# src/lib/changelog.ts) → закоммитили → запушили тег с той же версией:
+#   git tag v0.1.7
+#   git push origin v0.1.7
+# — и через несколько минут релиз с установщиком и latest.json появится сам.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'windows-latest'
+            args: ''
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: install frontend dependencies
+        run: npm install
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'IB CRM ${{ github.ref_name }}'
+          releaseBody: 'Полный список изменений — внутри приложения, кнопка "Проверить обновления".'
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}

@@ -3,6 +3,7 @@ import { Plus, Camera, X } from 'lucide-react';
 import { api, type Employee, type Position, type Department } from '../lib/api';
 import { formatUzPhone } from '../lib/phone';
 import { compressImageFile } from '../lib/photo';
+import { WEEK_DAYS, WEEK_DAY_KEYS } from '../lib/schedule';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
 import Modal from './Modal';
@@ -50,6 +51,14 @@ export default function EmployeeFormModal({
   const [avatarBusy, setAvatarBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [workDays, setWorkDays] = useState<number[]>([]);
+  const [workStart, setWorkStart] = useState('');
+  const [workEnd, setWorkEnd] = useState('');
+
+  const toggleWorkDay = (day: number) => {
+    setWorkDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort((a, b) => a - b)));
+  };
+
   const [addingPosition, setAddingPosition] = useState(false);
   const [newPositionTitle, setNewPositionTitle] = useState('');
   const [positionBusy, setPositionBusy] = useState(false);
@@ -68,6 +77,9 @@ export default function EmployeeFormModal({
       setManagerId(employee.managerId ?? '');
       setDeputyId(employee.deputyId ?? '');
       setAvatarData(employee.avatarData ?? null);
+      setWorkDays(employee.workDays ? employee.workDays.split(',').map(Number).filter((n) => n >= 1 && n <= 7) : []);
+      setWorkStart(employee.workStart ?? '');
+      setWorkEnd(employee.workEnd ?? '');
     } else {
       setFullName('');
       setLogin('');
@@ -78,6 +90,9 @@ export default function EmployeeFormModal({
       setManagerId('');
       setDeputyId('');
       setAvatarData(null);
+      setWorkDays([]);
+      setWorkStart('');
+      setWorkEnd('');
     }
     setAddingPosition(false);
     setNewPositionTitle('');
@@ -140,13 +155,26 @@ export default function EmployeeFormModal({
 
     setBusy(true);
     try {
+      let savedEmployee: Employee;
       if (mode === 'create') {
-        await api.createEmployee({ adminId: currentEmployeeId, login: login.trim(), password, ...shared });
+        savedEmployee = await api.createEmployee({ adminId: currentEmployeeId, login: login.trim(), password, ...shared });
         showToast('success', t('employees.added'));
       } else if (employee) {
-        await api.updateEmployee({ adminId: currentEmployeeId, employeeId: employee.id, ...shared });
+        savedEmployee = await api.updateEmployee({ adminId: currentEmployeeId, employeeId: employee.id, ...shared });
         showToast('success', t('employees.updated'));
+      } else {
+        setBusy(false);
+        return;
       }
+
+      await api.setEmployeeSchedule({
+        adminId: currentEmployeeId,
+        employeeId: savedEmployee.id,
+        workDays: workDays.length ? workDays.join(',') : null,
+        workStart: workStart || null,
+        workEnd: workEnd || null,
+      });
+
       onSaved();
       onClose();
     } catch (err: any) {
@@ -303,6 +331,33 @@ export default function EmployeeFormModal({
             searchPlaceholder={t('employees.searchPlaceholder')}
             emptyLabel={t('employees.searchEmpty')}
           />
+        </div>
+
+        <div className="field">
+          <label>{t('schedule.daysLabel')}</label>
+          <div className="week-day-picker">
+            {WEEK_DAYS.map((day, i) => (
+              <button
+                type="button"
+                key={day}
+                className={`week-day-btn ${workDays.includes(day) ? 'active' : ''}`}
+                onClick={() => toggleWorkDay(day)}
+              >
+                {t(`schedule.${WEEK_DAY_KEYS[i]}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="absence-form-dates">
+          <div className="field">
+            <label>{t('schedule.startLabel')}</label>
+            <input type="time" value={workStart} onChange={(e) => setWorkStart(e.target.value)} />
+          </div>
+          <div className="field">
+            <label>{t('schedule.endLabel')}</label>
+            <input type="time" value={workEnd} onChange={(e) => setWorkEnd(e.target.value)} />
+          </div>
         </div>
       </form>
     </Modal>

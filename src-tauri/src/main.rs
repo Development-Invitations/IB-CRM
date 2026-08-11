@@ -45,6 +45,20 @@ struct Employee {
     is_online: bool,
     #[serde(rename = "lastSeenAt")]
     last_seen_at: Option<String>,
+    #[serde(rename = "manualStatus")]
+    manual_status: Option<String>,
+    #[serde(rename = "manualStatusUntil")]
+    manual_status_until: Option<String>,
+    #[serde(rename = "workDays")]
+    work_days: Option<String>,
+    #[serde(rename = "workStart")]
+    work_start: Option<String>,
+    #[serde(rename = "workEnd")]
+    work_end: Option<String>,
+    #[serde(rename = "headOfDepartmentName")]
+    head_of_department_name: Option<String>,
+    #[serde(rename = "deputyOfDepartmentName")]
+    deputy_of_department_name: Option<String>,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -64,6 +78,10 @@ struct Department {
     head_employee_id: Option<String>,
     #[serde(rename = "headName")]
     head_name: Option<String>,
+    #[serde(rename = "deputyEmployeeId")]
+    deputy_employee_id: Option<String>,
+    #[serde(rename = "deputyName")]
+    deputy_name: Option<String>,
     #[serde(rename = "memberCount")]
     member_count: i64,
 }
@@ -102,6 +120,35 @@ struct EditRequest {
     status: String,
     #[serde(rename = "createdAt")]
     created_at: String,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct AbsenceRequest {
+    id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+    #[serde(rename = "employeeName")]
+    employee_name: String,
+    #[serde(rename = "type")]
+    request_type: String,
+    #[serde(rename = "startDate")]
+    start_date: String,
+    #[serde(rename = "endDate")]
+    end_date: String,
+    reason: Option<String>,
+    #[serde(rename = "makeupSlots")]
+    makeup_slots: Option<String>,
+    status: String,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+    #[serde(rename = "resolvedBy")]
+    resolved_by: Option<String>,
+    #[serde(rename = "resolvedByName")]
+    resolved_by_name: Option<String>,
+    #[serde(rename = "resolvedByIsAdmin")]
+    resolved_by_is_admin: bool,
+    #[serde(rename = "resolvedAt")]
+    resolved_at: Option<String>,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -183,6 +230,8 @@ struct CreateDepartmentPayload {
     name: String,
     #[serde(rename = "headEmployeeId")]
     head_employee_id: Option<String>,
+    #[serde(rename = "deputyEmployeeId")]
+    deputy_employee_id: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -193,6 +242,8 @@ struct UpdateDepartmentPayload {
     name: String,
     #[serde(rename = "headEmployeeId")]
     head_employee_id: Option<String>,
+    #[serde(rename = "deputyEmployeeId")]
+    deputy_employee_id: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -223,12 +274,66 @@ struct ResolveEditRequestPayload {
 }
 
 #[derive(serde::Deserialize)]
+struct CreateAbsenceRequestPayload {
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+    #[serde(rename = "type")]
+    request_type: String,
+    #[serde(rename = "startDate")]
+    start_date: String,
+    #[serde(rename = "endDate")]
+    end_date: String,
+    reason: Option<String>,
+    #[serde(rename = "makeupSlots")]
+    makeup_slots: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct GetAbsenceRequestPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "requestId")]
+    request_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct ResolveAbsenceRequestPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "requestId")]
+    request_id: String,
+    approve: bool,
+}
+
+#[derive(serde::Deserialize)]
+struct SetEmployeeSchedulePayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+    #[serde(rename = "workDays")]
+    work_days: Option<String>,
+    #[serde(rename = "workStart")]
+    work_start: Option<String>,
+    #[serde(rename = "workEnd")]
+    work_end: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
 struct SelfUpdateEmployeePayload {
     #[serde(rename = "employeeId")]
     employee_id: String,
     #[serde(rename = "fullName")]
     full_name: String,
     phone: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct SetEmployeeStatusPayload {
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+    // null/отсутствие — снять статус; иначе одно из: "away15" | "lunch" | "vacation" | "dayoff"
+    status: Option<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -262,6 +367,32 @@ fn to_employee(e: db::EmployeeRecord) -> Employee {
         created_at: e.created_at,
         is_online: e.is_online,
         last_seen_at: e.last_seen_at,
+        manual_status: e.manual_status,
+        manual_status_until: e.manual_status_until,
+        work_days: e.work_days,
+        work_start: e.work_start,
+        work_end: e.work_end,
+        head_of_department_name: e.head_of_department_name,
+        deputy_of_department_name: e.deputy_of_department_name,
+    }
+}
+
+fn to_absence_request(r: db::AbsenceRequestRecord) -> AbsenceRequest {
+    AbsenceRequest {
+        id: r.id,
+        employee_id: r.employee_id,
+        employee_name: r.employee_name,
+        request_type: r.request_type,
+        start_date: r.start_date,
+        end_date: r.end_date,
+        reason: r.reason,
+        makeup_slots: r.makeup_slots,
+        status: r.status,
+        created_at: r.created_at,
+        resolved_by: r.resolved_by,
+        resolved_by_name: r.resolved_by_name,
+        resolved_by_is_admin: r.resolved_by_is_admin,
+        resolved_at: r.resolved_at,
     }
 }
 
@@ -279,6 +410,8 @@ fn to_department(d: db::DepartmentRecord) -> Department {
         name: d.name,
         head_employee_id: d.head_employee_id,
         head_name: d.head_name,
+        deputy_employee_id: d.deputy_employee_id,
+        deputy_name: d.deputy_name,
         member_count: d.member_count,
     }
 }
@@ -406,15 +539,26 @@ fn list_departments(state: tauri::State<AppState>) -> Vec<Department> {
 #[tauri::command]
 fn create_department(payload: CreateDepartmentPayload, state: tauri::State<AppState>) -> Result<Department, String> {
     let db = state.0.lock().unwrap();
-    db.create_department(&payload.admin_id, &payload.name, payload.head_employee_id.as_deref())
-        .map(to_department)
+    db.create_department(
+        &payload.admin_id,
+        &payload.name,
+        payload.head_employee_id.as_deref(),
+        payload.deputy_employee_id.as_deref(),
+    )
+    .map(to_department)
 }
 
 #[tauri::command]
 fn update_department(payload: UpdateDepartmentPayload, state: tauri::State<AppState>) -> Result<Department, String> {
     let db = state.0.lock().unwrap();
-    db.update_department(&payload.admin_id, &payload.id, &payload.name, payload.head_employee_id.as_deref())
-        .map(to_department)
+    db.update_department(
+        &payload.admin_id,
+        &payload.id,
+        &payload.name,
+        payload.head_employee_id.as_deref(),
+        payload.deputy_employee_id.as_deref(),
+    )
+    .map(to_department)
 }
 
 #[tauri::command]
@@ -467,6 +611,70 @@ fn self_update_employee(payload: SelfUpdateEmployeePayload, state: tauri::State<
 }
 
 #[tauri::command]
+fn set_employee_status(payload: SetEmployeeStatusPayload, state: tauri::State<AppState>) -> Result<Employee, String> {
+    let db = state.0.lock().unwrap();
+    db.set_employee_status(&payload.employee_id, payload.status.as_deref())
+        .map(to_employee)
+}
+
+#[tauri::command]
+fn set_employee_schedule(payload: SetEmployeeSchedulePayload, state: tauri::State<AppState>) -> Result<Employee, String> {
+    let db = state.0.lock().unwrap();
+    db.set_employee_schedule(
+        &payload.admin_id,
+        &payload.employee_id,
+        payload.work_days.as_deref(),
+        payload.work_start.as_deref(),
+        payload.work_end.as_deref(),
+    )
+    .map(to_employee)
+}
+
+#[tauri::command]
+fn create_absence_request(payload: CreateAbsenceRequestPayload, state: tauri::State<AppState>) -> Result<AbsenceRequest, String> {
+    let db = state.0.lock().unwrap();
+    db.create_absence_request(
+        &payload.employee_id,
+        &payload.request_type,
+        &payload.start_date,
+        &payload.end_date,
+        payload.reason.as_deref(),
+        payload.makeup_slots.as_deref(),
+    )
+    .map(to_absence_request)
+}
+
+#[tauri::command]
+fn list_absence_requests_for_employee(employee_id: String, state: tauri::State<AppState>) -> Vec<AbsenceRequest> {
+    let db = state.0.lock().unwrap();
+    db.list_absence_requests_for_employee(&employee_id).into_iter().map(to_absence_request).collect()
+}
+
+#[tauri::command]
+fn list_pending_approvals(actor_id: String, state: tauri::State<AppState>) -> Vec<AbsenceRequest> {
+    let db = state.0.lock().unwrap();
+    db.list_pending_approvals(&actor_id).into_iter().map(to_absence_request).collect()
+}
+
+#[tauri::command]
+fn list_all_absence_requests(admin_id: String, state: tauri::State<AppState>) -> Result<Vec<AbsenceRequest>, String> {
+    let db = state.0.lock().unwrap();
+    db.list_all_absence_requests(&admin_id).map(|rows| rows.into_iter().map(to_absence_request).collect())
+}
+
+#[tauri::command]
+fn get_absence_request(payload: GetAbsenceRequestPayload, state: tauri::State<AppState>) -> Result<AbsenceRequest, String> {
+    let db = state.0.lock().unwrap();
+    db.get_absence_request(&payload.actor_id, &payload.request_id).map(to_absence_request)
+}
+
+#[tauri::command]
+fn resolve_absence_request(payload: ResolveAbsenceRequestPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.resolve_absence_request(&payload.actor_id, &payload.request_id, payload.approve)
+}
+
+#[tauri::command]
 fn record_login(employee_id: String, state: tauri::State<AppState>) -> Result<(), String> {
     let db = state.0.lock().unwrap();
     db.record_login(&employee_id)
@@ -516,6 +724,14 @@ fn main() {
             list_edit_requests,
             resolve_edit_request,
             self_update_employee,
+            set_employee_status,
+            set_employee_schedule,
+            create_absence_request,
+            list_absence_requests_for_employee,
+            list_pending_approvals,
+            list_all_absence_requests,
+            get_absence_request,
+            resolve_absence_request,
             record_login,
             record_logout,
             list_recent_sessions

@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Pencil, ArrowRight } from 'lucide-react';
-import { api, type Employee, type Position, type Department } from '../lib/api';
+import { api, type Employee, type Position, type Department, type AbsenceRequest } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { parseSqliteUtc } from '../lib/date';
+import { formatWorkDays } from '../lib/schedule';
+import { ABSENCE_TYPE_LABEL_KEYS, formatDate } from '../lib/absenceTypes';
 import Drawer from '../components/Drawer';
 import EmployeeFormModal from '../components/EmployeeFormModal';
 import Avatar from '../components/Avatar';
+import StatusBadge from '../components/StatusBadge';
+import LoadingScreen from '../components/LoadingScreen';
 
 export default function Employees({ currentEmployee }: { currentEmployee: Employee }) {
   const { t } = useLocale();
@@ -18,8 +22,17 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
   const [loading, setLoading] = useState(true);
 
   const [selected, setSelected] = useState<Employee | null>(null);
+  const [selectedAbsences, setSelectedAbsences] = useState<AbsenceRequest[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
+
+  useEffect(() => {
+    if (selected) {
+      api.listAbsenceRequestsForEmployee(selected.id).then(setSelectedAbsences);
+    } else {
+      setSelectedAbsences([]);
+    }
+  }, [selected?.id]);
 
   const load = () => {
     setLoading(true);
@@ -60,7 +73,7 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
       </div>
 
       {loading ? (
-        <p className="settings-hint">{t('common.loading')}</p>
+        <LoadingScreen compact />
       ) : (
         <table className="employees-table">
           <thead>
@@ -84,6 +97,7 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
                       {emp.isOnline && <span className="avatar-online-dot" title={t('employees.onlineNow')} />}
                     </span>
                     <span>{emp.fullName || '—'}</span>
+                    <StatusBadge status={emp.manualStatus} until={emp.manualStatusUntil} size="sm" />
                   </div>
                 </td>
                 <td>{emp.login}</td>
@@ -127,6 +141,20 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
               <div>
                 <div className="employee-card-name">{selected.fullName || selected.login}</div>
                 <div className="settings-hint">{selected.employeeNumber}</div>
+                {(selected.headOfDepartmentName || selected.deputyOfDepartmentName) && (
+                  <div className="role-badges">
+                    {selected.headOfDepartmentName && (
+                      <span className="role-badge role-badge-head">
+                        {t('employees.headOfDepartmentLabel')}: {selected.headOfDepartmentName}
+                      </span>
+                    )}
+                    {selected.deputyOfDepartmentName && (
+                      <span className="role-badge role-badge-deputy">
+                        {t('employees.deputyOfDepartmentLabel')}: {selected.deputyOfDepartmentName}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -151,6 +179,14 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
               <span>{selected.phone || '—'}</span>
             </div>
             <div className="employee-card-row">
+              <span className="settings-hint">{t('schedule.title')}</span>
+              <span>
+                {selected.workDays
+                  ? `${formatWorkDays(selected.workDays, t)}, ${selected.workStart ?? ''}–${selected.workEnd ?? ''}`
+                  : t('schedule.notSet')}
+              </span>
+            </div>
+            <div className="employee-card-row">
               <span className="settings-hint">{t('employees.statusLabel')}</span>
               <span className={`status-value ${selected.isOnline ? 'online' : 'offline'}`}>
                 <span className="status-dot" />
@@ -160,7 +196,24 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
                     ? t('employees.lastSeenLabel', { time: parseSqliteUtc(selected.lastSeenAt).toLocaleString() })
                     : t('employees.neverLoggedIn')}
               </span>
+              <StatusBadge status={selected.manualStatus} until={selected.manualStatusUntil} size="sm" />
             </div>
+
+            <div className="department-members-title">{t('absence.myTitle')}</div>
+            {selectedAbsences.length === 0 ? (
+              <p className="settings-hint">{t('absence.empty')}</p>
+            ) : (
+              <ul className="department-members-list">
+                {selectedAbsences.map((r) => (
+                  <li key={r.id}>
+                    {t(ABSENCE_TYPE_LABEL_KEYS[r.type])} · {formatDate(r.startDate)} – {formatDate(r.endDate)}{' '}
+                    <span className={`absence-status absence-status-${r.status}`}>
+                      {t(r.status === 'pending' ? 'absence.statusPending' : r.status === 'approved' ? 'absence.statusApproved' : 'absence.statusRejected')}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </Drawer>

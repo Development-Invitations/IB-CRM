@@ -28,9 +28,11 @@ import { relaunch } from '@tauri-apps/plugin-process';
 // продакшеном: https://v2.tauri.app/plugin/updater/
 // ============================================================================
 
+export type UpdateProgress = { downloaded: number; total: number | null };
+
 export type UpdateCheckResult =
   | { status: 'up-to-date' }
-  | { status: 'available'; version: string; notes?: string; install: () => Promise<void> }
+  | { status: 'available'; version: string; notes?: string; install: (onProgress?: (p: UpdateProgress) => void) => Promise<void> }
   | { status: 'error'; message: string };
 
 export async function checkForAppUpdate(): Promise<UpdateCheckResult> {
@@ -41,8 +43,26 @@ export async function checkForAppUpdate(): Promise<UpdateCheckResult> {
         status: 'available',
         version: update.version,
         notes: update.body,
-        install: async () => {
-          await update.downloadAndInstall();
+        install: async (onProgress) => {
+          let downloaded = 0;
+          let total: number | null = null;
+
+          await update.downloadAndInstall((event) => {
+            switch (event.event) {
+              case 'Started':
+                total = event.data.contentLength ?? null;
+                onProgress?.({ downloaded, total });
+                break;
+              case 'Progress':
+                downloaded += event.data.chunkLength;
+                onProgress?.({ downloaded, total });
+                break;
+              case 'Finished':
+                onProgress?.({ downloaded: total ?? downloaded, total: total ?? downloaded });
+                break;
+            }
+          });
+
           await relaunch();
         },
       };

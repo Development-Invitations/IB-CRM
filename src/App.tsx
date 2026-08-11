@@ -4,6 +4,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import FirstRunSetup from './pages/FirstRunSetup';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import LoadingScreen from './components/LoadingScreen';
 import { api, type Employee } from './lib/api';
 import { session } from './lib/session';
 import { useLocale } from './lib/i18n';
@@ -74,7 +75,7 @@ export default function App() {
     };
   }, [currentEmployee?.id]);
 
-  if (loading) return <div className="loading-screen">{t('common.loading')}</div>;
+  if (loading) return <LoadingScreen />;
 
   return (
     <Routes>

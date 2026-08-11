@@ -10,6 +10,7 @@ import {
   Cake,
   Server,
   LogOut,
+  ClipboardList,
 } from 'lucide-react';
 import Topbar from '../components/Topbar';
 import Modal from '../components/Modal';
@@ -20,6 +21,7 @@ import SettingsPage from './Settings';
 import EmployeesPage from './Employees';
 import EmployeeProfile from './EmployeeProfile';
 import DepartmentsPage from './Departments';
+import AbsenceRequestsPage from './AbsenceRequests';
 import type { Employee } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { APP_VERSION } from '../lib/changelog';
@@ -57,6 +59,10 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
               </span>
             )
           )}
+          <NavLink to="absence-requests" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <ClipboardList size={16} className="nav-icon" />
+            {t('sidebar.absenceRequests')}
+          </NavLink>
           {employee.isAdmin && (
             <span className="nav-disabled">
               <Server size={16} className="nav-icon" />
@@ -87,6 +93,7 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
             <Route path="employees" element={<EmployeesPage currentEmployee={employee} />} />
             <Route path="employees/:id" element={<EmployeeProfile currentEmployee={employee} />} />
             <Route path="departments" element={<DepartmentsPage currentEmployee={employee} />} />
+            <Route path="absence-requests" element={<AbsenceRequestsPage currentEmployee={employee} />} />
             <Route path="settings" element={<SettingsPage employee={employee} />} />
           </Routes>
         </main>

@@ -1,13 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Phone, Briefcase, Building2, UserCog, Users, Clock, Send, Calendar, History } from 'lucide-react';
-import { api, type Employee, type Session } from '../lib/api';
+import { ArrowLeft, Phone, Briefcase, Building2, UserCog, Users, Clock, Send, Calendar, History, CalendarPlus } from 'lucide-react';
+import { api, type Employee, type Session, type AbsenceRequest } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
 import { formatUzPhone } from '../lib/phone';
 import { parseSqliteUtc } from '../lib/date';
+import { ABSENCE_TYPE_LABEL_KEYS, formatDate } from '../lib/absenceTypes';
+import { formatWorkDays } from '../lib/schedule';
 import Avatar from '../components/Avatar';
 import Checkbox from '../components/Checkbox';
+import StatusBadge from '../components/StatusBadge';
+import StatusPicker from '../components/StatusPicker';
+import AbsenceRequestFormModal from '../components/AbsenceRequestFormModal';
+import LoadingScreen from '../components/LoadingScreen';
 
 export default function EmployeeProfile({ currentEmployee }: { currentEmployee: Employee }) {
   const { id } = useParams<{ id: string }>();
@@ -17,16 +23,21 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
 
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [absenceRequests, setAbsenceRequests] = useState<AbsenceRequest[]>([]);
+  const [absenceFormOpen, setAbsenceFormOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const load = () => {
     if (!id) return;
     setLoading(true);
-    Promise.all([api.getEmployee(id), api.listRecentSessions(id)]).then(([emp, sess]) => {
-      setEmployee(emp);
-      setSessions(sess);
-      setLoading(false);
-    });
+    Promise.all([api.getEmployee(id), api.listRecentSessions(id), api.listAbsenceRequestsForEmployee(id)]).then(
+      ([emp, sess, absences]) => {
+        setEmployee(emp);
+        setSessions(sess);
+        setAbsenceRequests(absences);
+        setLoading(false);
+      }
+    );
   };
 
   useEffect(() => {
@@ -113,7 +124,7 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
       </button>
 
       {loading ? (
-        <p className="settings-hint">{t('common.loading')}</p>
+        <LoadingScreen compact />
       ) : !employee ? (
         <p className="settings-hint">{t('employees.notFound')}</p>
       ) : (
@@ -126,6 +137,20 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
               <p className="settings-hint">
                 {employee.employeeNumber} · {employee.isAdmin ? t('sidebar.admin') : t('employees.roleEmployee')}
               </p>
+              {(employee.headOfDepartmentName || employee.deputyOfDepartmentName) && (
+                <div className="role-badges">
+                  {employee.headOfDepartmentName && (
+                    <span className="role-badge role-badge-head">
+                      {t('employees.headOfDepartmentLabel')}: {employee.headOfDepartmentName}
+                    </span>
+                  )}
+                  {employee.deputyOfDepartmentName && (
+                    <span className="role-badge role-badge-deputy">
+                      {t('employees.deputyOfDepartmentLabel')}: {employee.deputyOfDepartmentName}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -171,6 +196,16 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
               <span>{parseSqliteUtc(employee.createdAt).toLocaleDateString()}</span>
             </div>
             <div className="profile-field">
+              <span className="settings-hint">
+                <Clock size={13} /> {t('schedule.title')}
+              </span>
+              <span>
+                {employee.workDays
+                  ? `${formatWorkDays(employee.workDays, t)}, ${employee.workStart ?? ''}–${employee.workEnd ?? ''}`
+                  : t('schedule.notSet')}
+              </span>
+            </div>
+            <div className="profile-field">
               <span className="settings-hint">{t('employees.statusLabel')}</span>
               <span className={`status-value ${employee.isOnline ? 'online' : 'offline'}`}>
                 <span className="status-dot" />
@@ -180,7 +215,39 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
                     ? t('employees.lastSeenLabel', { time: parseSqliteUtc(employee.lastSeenAt).toLocaleString() })
                     : t('employees.neverLoggedIn')}
               </span>
+              <StatusBadge status={employee.manualStatus} until={employee.manualStatusUntil} />
             </div>
+          </div>
+
+          {isOwnProfile && <StatusPicker employee={employee} onChanged={setEmployee} />}
+
+          <div className="profile-sessions-block">
+            <div className="profile-edit-request-title">
+              <CalendarPlus size={14} /> {t('absence.myTitle')}
+              {isOwnProfile && (
+                <button type="button" className="link-btn absence-new-btn" onClick={() => setAbsenceFormOpen(true)}>
+                  {t('absence.newBtn')}
+                </button>
+              )}
+            </div>
+            {absenceRequests.length === 0 ? (
+              <p className="settings-hint">{t('absence.empty')}</p>
+            ) : (
+              <ul className="sessions-list">
+                {absenceRequests.map((r) => (
+                  <li key={r.id}>
+                    <span>{t(ABSENCE_TYPE_LABEL_KEYS[r.type])}</span>
+                    <span>
+                      {formatDate(r.startDate)} – {formatDate(r.endDate)}
+                      {' · '}
+                      <span className={`absence-status absence-status-${r.status}`}>
+                        {t(r.status === 'pending' ? 'absence.statusPending' : r.status === 'approved' ? 'absence.statusApproved' : 'absence.statusRejected')}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className="profile-sessions-block">
@@ -260,6 +327,15 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
             </div>
           )}
         </div>
+      )}
+
+      {employee && (
+        <AbsenceRequestFormModal
+          open={absenceFormOpen}
+          onClose={() => setAbsenceFormOpen(false)}
+          employee={employee}
+          onSubmitted={load}
+        />
       )}
     </div>
   );

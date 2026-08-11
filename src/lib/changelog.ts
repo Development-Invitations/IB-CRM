@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.1.6';
+export const APP_VERSION = '0.1.7';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,19 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.1.7',
+      items: [
+        'Статусы "Отошёл на 15 мин / Обед / Отпуск / Отгул" — виден всем в списке, карточке и кабинете',
+        'Заявки на отсутствие (5 типов, включая работу из дома) — доступно всем сотрудникам, согласование у руководителя, его заместителя или админа',
+        'Отчёт по заявкам для админа с экспортом в Excel за месяц',
+        'Подразделения: можно назначить заместителя, он автоматически становится сотрудником подразделения',
+        'Роль "Руководитель/Заместитель подразделения" теперь видна прямо в карточке и кабинете сотрудника',
+        'Рабочий график сотрудника (дни и часы работы)',
+        'Отгул с отработкой — теперь можно указать сразу несколько дат/периодов отработки',
+        'Прокрутка в формах и модальных окнах исправлена',
+      ],
+    },
     {
       version: '0.1.6',
       items: [
@@ -87,6 +100,19 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.1.7',
+      items: [
+        "\"15 daqiqaga chiqdi / Tushlik / Ta'til / Dam olish kuni\" holatlari — ro'yxatda, kartochkada va kabinetda hammaga ko'rinadi",
+        "Yo'qlik arizalari (5 turi, jumladan uydan ishlash) — barcha xodimlarga ochiq, rahbar, uning o'rinbosari yoki administrator tomonidan tasdiqlanadi",
+        "Administrator uchun arizalar bo'yicha oyiga Excelga eksport qilinadigan hisobot",
+        "Bo'limlar: o'rinbosar tayinlash mumkin, u avtomatik ravishda shu bo'lim xodimiga aylanadi",
+        "\"Bo'lim rahbari/o'rinbosari\" roli endi xodim kartochkasi va kabinetida ko'rinadi",
+        'Xodimning ish jadvali (ish kunlari va soatlari)',
+        "Ishlab beriladigan dam olish kuni — endi bir nechta sana/davr qo'shish mumkin",
+        'Formalar va modal oynalardagi aylantirish tuzatildi',
+      ],
+    },
+    {
       version: '0.1.6',
       items: [
         "Xodim kabineti kengroq bo'ldi, maydonlar 3 ustunli jadvalga joylashtirildi",
@@ -157,6 +183,19 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.1.7',
+      items: [
+        '"15 дақиқага чиқди / Тушлик / Таътил / Дам олиш куни" ҳолатлари — рўйхатда, карточкада ва кабинетда ҳаммага кўринади',
+        'Йўқлик аризалари (5 тури, жумладан уйдан ишлаш) — барча ходимларга очиқ, раҳбар, унинг ўринбосари ёки администратор томонидан тасдиқланади',
+        'Администратор учун аризалар бўйича ойига Excelга экспорт қилинадиган ҳисобот',
+        'Бўлимлар: ўринбосар тайинлаш мумкин, у автоматик равишда шу бўлим ходимига айланади',
+        '"Бўлим раҳбари/ўринбосари" роли энди ходим карточкаси ва кабинетида кўринади',
+        'Ходимнинг иш жадвали (иш кунлари ва соатлари)',
+        'Ишлаб бериладиган дам олиш куни — энди бир нечта сана/давр қўшиш мумкин',
+        'Формалар ва модал ойналардаги айлантириш тузатилди',
+      ],
+    },
     {
       version: '0.1.6',
       items: [

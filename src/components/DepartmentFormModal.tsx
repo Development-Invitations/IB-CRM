@@ -24,6 +24,7 @@ export default function DepartmentFormModal({
   const { showToast } = useToast();
   const [name, setName] = useState('');
   const [headId, setHeadId] = useState('');
+  const [deputyId, setDeputyId] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -31,12 +32,19 @@ export default function DepartmentFormModal({
     if (!open) return;
     setName(department?.name ?? '');
     setHeadId(department?.headEmployeeId ?? '');
+    setDeputyId(department?.deputyEmployeeId ?? '');
     setError('');
   }, [open, department]);
 
   const headOptions = [
     { value: '', label: t('employees.notSelected') },
     ...employees.map((e) => ({ value: e.id, label: e.fullName || e.login })),
+  ];
+
+  // Заместителем логично не назначать того же человека, что и руководитель.
+  const deputyOptions = [
+    { value: '', label: t('employees.notSelected') },
+    ...employees.filter((e) => e.id !== headId).map((e) => ({ value: e.id, label: e.fullName || e.login })),
   ];
 
   const handleSubmit = async (e?: FormEvent) => {
@@ -49,10 +57,21 @@ export default function DepartmentFormModal({
     setBusy(true);
     try {
       if (department) {
-        await api.updateDepartment({ adminId: currentEmployeeId, id: department.id, name: name.trim(), headEmployeeId: headId || null });
+        await api.updateDepartment({
+          adminId: currentEmployeeId,
+          id: department.id,
+          name: name.trim(),
+          headEmployeeId: headId || null,
+          deputyEmployeeId: deputyId || null,
+        });
         showToast('success', t('departments.updated'));
       } else {
-        await api.createDepartment({ adminId: currentEmployeeId, name: name.trim(), headEmployeeId: headId || null });
+        await api.createDepartment({
+          adminId: currentEmployeeId,
+          name: name.trim(),
+          headEmployeeId: headId || null,
+          deputyEmployeeId: deputyId || null,
+        });
         showToast('success', t('departments.added'));
       }
       onSaved();
@@ -92,6 +111,12 @@ export default function DepartmentFormModal({
           <label>{t('departments.headLabel')}</label>
           <Select value={headId} options={headOptions} onChange={setHeadId} />
           <p className="settings-hint">{t('departments.headHint')}</p>
+        </div>
+
+        <div className="field">
+          <label>{t('employees.deputyLabel')}</label>
+          <Select value={deputyId} options={deputyOptions} onChange={setDeputyId} />
+          <p className="settings-hint">{t('departments.deputyHint')}</p>
         </div>
       </form>
     </Modal>

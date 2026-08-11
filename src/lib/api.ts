@@ -1,5 +1,26 @@
 import { invoke } from '@tauri-apps/api/core';
 
+export type EmployeeStatus = 'away15' | 'lunch' | 'vacation' | 'dayoff';
+
+export type AbsenceRequestType = 'dayoff_worked' | 'dayoff_unpaid' | 'vacation' | 'business_trip' | 'remote_work';
+
+export type AbsenceRequest = {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  type: AbsenceRequestType;
+  startDate: string;
+  endDate: string;
+  reason: string | null;
+  makeupSlots: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  resolvedBy: string | null;
+  resolvedByName: string | null;
+  resolvedByIsAdmin: boolean;
+  resolvedAt: string | null;
+};
+
 export type Employee = {
   id: string;
   employeeNumber: string;
@@ -21,6 +42,13 @@ export type Employee = {
   createdAt: string;
   isOnline: boolean;
   lastSeenAt: string | null;
+  manualStatus: EmployeeStatus | null;
+  manualStatusUntil: string | null;
+  workDays: string | null;
+  workStart: string | null;
+  workEnd: string | null;
+  headOfDepartmentName: string | null;
+  deputyOfDepartmentName: string | null;
 };
 
 export type Session = {
@@ -36,6 +64,8 @@ export type Department = {
   name: string;
   headEmployeeId: string | null;
   headName: string | null;
+  deputyEmployeeId: string | null;
+  deputyName: string | null;
   memberCount: number;
 };
 
@@ -104,11 +134,20 @@ export const api = {
 
   listDepartments: () => invoke<Department[]>('list_departments'),
 
-  createDepartment: (payload: { adminId: string; name: string; headEmployeeId?: string | null }) =>
-    invoke<Department>('create_department', { payload }),
+  createDepartment: (payload: {
+    adminId: string;
+    name: string;
+    headEmployeeId?: string | null;
+    deputyEmployeeId?: string | null;
+  }) => invoke<Department>('create_department', { payload }),
 
-  updateDepartment: (payload: { adminId: string; id: string; name: string; headEmployeeId?: string | null }) =>
-    invoke<Department>('update_department', { payload }),
+  updateDepartment: (payload: {
+    adminId: string;
+    id: string;
+    name: string;
+    headEmployeeId?: string | null;
+    deputyEmployeeId?: string | null;
+  }) => invoke<Department>('update_department', { payload }),
 
   deleteDepartment: (payload: { adminId: string; id: string }) => invoke<void>('delete_department', { payload }),
 
@@ -130,6 +169,39 @@ export const api = {
 
   selfUpdateEmployee: (payload: { employeeId: string; fullName: string; phone?: string | null }) =>
     invoke<Employee>('self_update_employee', { payload }),
+
+  setEmployeeStatus: (payload: { employeeId: string; status: EmployeeStatus | null }) =>
+    invoke<Employee>('set_employee_status', { payload }),
+
+  setEmployeeSchedule: (payload: {
+    adminId: string;
+    employeeId: string;
+    workDays: string | null;
+    workStart: string | null;
+    workEnd: string | null;
+  }) => invoke<Employee>('set_employee_schedule', { payload }),
+
+  createAbsenceRequest: (payload: {
+    employeeId: string;
+    type: AbsenceRequestType;
+    startDate: string;
+    endDate: string;
+    reason?: string | null;
+    makeupSlots?: string | null;
+  }) => invoke<AbsenceRequest>('create_absence_request', { payload }),
+
+  listAbsenceRequestsForEmployee: (employeeId: string) =>
+    invoke<AbsenceRequest[]>('list_absence_requests_for_employee', { employeeId }),
+
+  listPendingApprovals: (actorId: string) => invoke<AbsenceRequest[]>('list_pending_approvals', { actorId }),
+
+  listAllAbsenceRequests: (adminId: string) => invoke<AbsenceRequest[]>('list_all_absence_requests', { adminId }),
+
+  getAbsenceRequest: (payload: { actorId: string; requestId: string }) =>
+    invoke<AbsenceRequest>('get_absence_request', { payload }),
+
+  resolveAbsenceRequest: (payload: { actorId: string; requestId: string; approve: boolean }) =>
+    invoke<void>('resolve_absence_request', { payload }),
 
   recordLogin: (employeeId: string) => invoke<void>('record_login', { employeeId }),
 

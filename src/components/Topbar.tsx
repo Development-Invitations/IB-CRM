@@ -4,6 +4,7 @@ import { Bell, Settings as SettingsIcon, User } from 'lucide-react';
 import { api, type Employee, type Notification } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import EditRequestReviewModal from './EditRequestReviewModal';
+import AbsenceRequestReviewModal from './AbsenceRequestReviewModal';
 
 export default function Topbar({ employee }: { employee: Employee }) {
   const { t } = useLocale();
@@ -12,6 +13,7 @@ export default function Topbar({ employee }: { employee: Employee }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [reviewRequestId, setReviewRequestId] = useState<string | null>(null);
+  const [reviewAbsenceId, setReviewAbsenceId] = useState<string | null>(null);
 
   const loadNotifications = () => {
     api.listNotifications(employee.id).then(setNotifications);
@@ -43,6 +45,10 @@ export default function Topbar({ employee }: { employee: Employee }) {
       // Заявка на изменение данных — открываем модалку рассмотрения (только для админа,
       // но такие уведомления и приходят только админам, см. notify_all_admins в db.rs).
       setReviewRequestId(n.relatedEntityId);
+    } else if (n.type === 'absence_request' && n.relatedEntityId) {
+      // Заявка на отсутствие — приходит либо руководителю сотрудника, либо всем
+      // админам, если руководитель не назначен (см. create_absence_request в db.rs).
+      setReviewAbsenceId(n.relatedEntityId);
     } else {
       // Остальные типы (например, результат рассмотрения своей же заявки) — ведём в кабинет.
       navigate(`/dashboard/employees/${employee.id}`);
@@ -99,6 +105,16 @@ export default function Topbar({ employee }: { employee: Employee }) {
           requestId={reviewRequestId}
           adminId={employee.id}
           onClose={() => setReviewRequestId(null)}
+          onResolved={loadNotifications}
+        />
+      )}
+
+      {reviewAbsenceId && (
+        <AbsenceRequestReviewModal
+          open
+          requestId={reviewAbsenceId}
+          actorId={employee.id}
+          onClose={() => setReviewAbsenceId(null)}
           onResolved={loadNotifications}
         />
       )}

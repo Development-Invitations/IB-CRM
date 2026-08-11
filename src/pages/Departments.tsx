@@ -7,6 +7,7 @@ import Drawer from '../components/Drawer';
 import Modal from '../components/Modal';
 import DepartmentFormModal from '../components/DepartmentFormModal';
 import SearchableSelect from '../components/SearchableSelect';
+import LoadingScreen from '../components/LoadingScreen';
 
 export default function Departments({ currentEmployee }: { currentEmployee: Employee }) {
   const { t } = useLocale();
@@ -78,7 +79,11 @@ export default function Departments({ currentEmployee }: { currentEmployee: Empl
         fullName: emp.fullName,
         phone: emp.phone,
         positionId: emp.positionId,
-        managerId: emp.managerId,
+        // managerId: null — сотрудник переходит (или впервые попадает) в новое
+        // подразделение, руководителем должен стать глава ЭТОГО подразделения
+        // (авто-подстановка на Rust-стороне, см. resolve_manager в db.rs).
+        // Если передать старого руководителя, авто-подстановка не сработает.
+        managerId: null,
         deputyId: emp.deputyId,
         departmentId: selected.id,
         avatarData: emp.avatarData,
@@ -96,7 +101,12 @@ export default function Departments({ currentEmployee }: { currentEmployee: Empl
   const addableEmployees = selected ? employees.filter((e) => e.departmentId !== selected.id) : [];
   const addMemberOptions = [
     { value: '', label: t('employees.notSelected') },
-    ...addableEmployees.map((e) => ({ value: e.id, label: e.fullName || e.login })),
+    ...addableEmployees.map((e) => ({
+      value: e.id,
+      label: e.departmentName
+        ? `${e.fullName || e.login} (${e.departmentName} → ${selected?.name ?? ''})`
+        : e.fullName || e.login,
+    })),
   ];
 
   return (
@@ -111,7 +121,7 @@ export default function Departments({ currentEmployee }: { currentEmployee: Empl
       </div>
 
       {loading ? (
-        <p className="settings-hint">{t('common.loading')}</p>
+        <LoadingScreen compact />
       ) : departments.length === 0 ? (
         <p className="settings-hint">{t('departments.empty')}</p>
       ) : (
@@ -181,6 +191,11 @@ export default function Departments({ currentEmployee }: { currentEmployee: Empl
                   <li key={m.id}>
                     {m.fullName || m.login}
                     {m.positionTitle ? ` · ${m.positionTitle}` : ''}
+                    {m.id === selected.deputyEmployeeId && (
+                      <span className="role-badge role-badge-deputy" style={{ marginLeft: 8 }}>
+                        {t('employees.deputyLabel')}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>

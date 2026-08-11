@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import Modal from './Modal';
-import { checkForAppUpdate, type UpdateCheckResult } from '../lib/updater';
+import { checkForAppUpdate, type UpdateCheckResult, type UpdateProgress } from '../lib/updater';
 import { useLocale } from '../lib/i18n';
 
 export default function UpdateNotifier() {
   const { t } = useLocale();
   const [result, setResult] = useState<UpdateCheckResult | null>(null);
   const [installing, setInstalling] = useState(false);
+  const [progress, setProgress] = useState<UpdateProgress | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
@@ -22,31 +23,55 @@ export default function UpdateNotifier() {
 
   const handleInstall = async () => {
     setInstalling(true);
+    setProgress({ downloaded: 0, total: null });
     try {
-      await result.install();
-      // После успешного relaunch() приложение перезапустится само.
+      await result.install((p) => setProgress(p));
+      // После успешного relaunch() приложение перезапустится само —
+      // до этого момента редко успевает дойти код ниже.
     } catch {
       setInstalling(false);
+      setProgress(null);
     }
   };
+
+  const percent =
+    progress && progress.total ? Math.min(100, Math.round((progress.downloaded / progress.total) * 100)) : null;
 
   return (
     <Modal
       open
       title={t('updates.availableTitle', { version: result.version })}
-      onClose={() => setDismissed(true)}
+      onClose={() => !installing && setDismissed(true)}
       actions={
-        <>
-          <button className="modal-btn" onClick={() => setDismissed(true)} disabled={installing}>
-            {t('updates.later')}
-          </button>
-          <button className="modal-btn danger" onClick={handleInstall} disabled={installing}>
-            {installing ? t('updates.installing') : t('updates.installNow')}
-          </button>
-        </>
+        !installing ? (
+          <>
+            <button className="modal-btn" onClick={() => setDismissed(true)}>
+              {t('updates.later')}
+            </button>
+            <button className="modal-btn danger" onClick={handleInstall}>
+              {t('updates.installNow')}
+            </button>
+          </>
+        ) : undefined
       }
     >
-      {result.notes || t('updates.availableBody')}
+      {!installing ? (
+        result.notes || t('updates.availableBody')
+      ) : (
+        <div className="update-progress">
+          <div className="update-progress-label">
+            {percent !== null
+              ? t('updates.downloading', { percent: String(percent) })
+              : t('updates.downloadingIndeterminate')}
+          </div>
+          <div className="progress-track">
+            <div
+              className={`progress-fill ${percent === null ? 'indeterminate' : ''}`}
+              style={percent !== null ? { width: `${percent}%` } : undefined}
+            />
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }

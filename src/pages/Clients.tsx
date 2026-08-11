@@ -1,0 +1,252 @@
+import { useEffect, useState } from 'react';
+import { Plus, Pencil, Contact, Trash2, Send } from 'lucide-react';
+import { api, type Employee, type Client, type ClientHistoryEntry } from '../lib/api';
+import { useLocale } from '../lib/i18n';
+import { useToast } from '../lib/toast';
+import { parseSqliteUtc } from '../lib/date';
+import Drawer from '../components/Drawer';
+import Modal from '../components/Modal';
+import ClientFormModal from '../components/ClientFormModal';
+import LoadingScreen from '../components/LoadingScreen';
+
+export default function Clients({ currentEmployee }: { currentEmployee: Employee }) {
+  const { t } = useLocale();
+  const { showToast } = useToast();
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [selected, setSelected] = useState<Client | null>(null);
+  const [history, setHistory] = useState<ClientHistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [newNote, setNewNote] = useState('');
+  const [noteBusy, setNoteBusy] = useState(false);
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | undefined>(undefined);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+
+  const load = () => {
+    setLoading(true);
+    api.listClients().then((list) => {
+      setClients(list);
+      setLoading(false);
+      setSelected((prev) => (prev ? list.find((c) => c.id === prev.id) ?? null : null));
+    });
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  useEffect(() => {
+    if (!selected) {
+      setHistory([]);
+      return;
+    }
+    setHistoryLoading(true);
+    api.listClientHistory(selected.id).then((entries) => {
+      setHistory(entries);
+      setHistoryLoading(false);
+    });
+  }, [selected?.id]);
+
+  const openCreate = () => {
+    setEditingClient(undefined);
+    setFormOpen(true);
+  };
+
+  const openEdit = (client: Client) => {
+    setEditingClient(client);
+    setFormOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!selected) return;
+    setDeleteBusy(true);
+    try {
+      await api.deleteClient({ adminId: currentEmployee.id, id: selected.id });
+      showToast('success', t('clients.deleted'));
+      setDeleteConfirmOpen(false);
+      setSelected(null);
+      load();
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('clients.errorGeneric'));
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
+  const handleAddNote = async () => {
+    if (!selected || !newNote.trim()) return;
+    setNoteBusy(true);
+    try {
+      await api.addClientHistory({ clientId: selected.id, actorId: currentEmployee.id, description: newNote.trim() });
+      setNewNote('');
+      const entries = await api.listClientHistory(selected.id);
+      setHistory(entries);
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('clients.errorGeneric'));
+    } finally {
+      setNoteBusy(false);
+    }
+  };
+
+  return (
+    <div className="employees-page">
+      <div className="employees-header">
+        <h1>{t('sidebar.clients')}</h1>
+        <button className="primary employees-add-btn" onClick={openCreate}>
+          <Plus size={16} /> {t('clients.addBtn')}
+        </button>
+      </div>
+
+      {loading ? (
+        <LoadingScreen compact />
+      ) : clients.length === 0 ? (
+        <p className="settings-hint">{t('clients.empty')}</p>
+      ) : (
+        <table className="employees-table">
+          <thead>
+            <tr>
+              <th>{t('clients.colId')}</th>
+              <th>{t('clients.colName')}</th>
+              <th>{t('clients.colPhone')}</th>
+              <th>{t('clients.colEmail')}</th>
+              <th>{t('clients.colCreated')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {clients.map((c) => (
+              <tr key={c.id} className="employees-row" onClick={() => setSelected(c)}>
+                <td>{c.clientNumber}</td>
+                <td>{c.name}</td>
+                <td>{c.phone || '—'}</td>
+                <td>{c.email || '—'}</td>
+                <td>{parseSqliteUtc(c.createdAt).toLocaleDateString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <Drawer
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        title={t('clients.cardTitle')}
+        footer={
+          selected && (
+            <>
+              <button className="modal-btn" onClick={() => selected && openEdit(selected)}>
+                <Pencil size={14} /> {t('employees.editBtn')}
+              </button>
+              {currentEmployee.isAdmin && (
+                <button className="modal-btn danger" onClick={() => setDeleteConfirmOpen(true)}>
+                  <Trash2 size={14} /> {t('clients.deleteBtn')}
+                </button>
+              )}
+            </>
+          )
+        }
+      >
+        {selected && (
+          <div className="employee-card">
+            <div className="employee-card-head">
+              <div className="department-icon">
+                <Contact size={24} />
+              </div>
+              <div>
+                <div className="employee-card-name">{selected.name}</div>
+                <div className="settings-hint">{selected.clientNumber}</div>
+              </div>
+            </div>
+
+            <div className="employee-card-row">
+              <span className="settings-hint">{t('employees.phoneLabel')}</span>
+              <span>{selected.phone || '—'}</span>
+            </div>
+            <div className="employee-card-row">
+              <span className="settings-hint">{t('clients.emailLabel')}</span>
+              <span>{selected.email || '—'}</span>
+            </div>
+            <div className="employee-card-row">
+              <span className="settings-hint">{t('clients.addressLabel')}</span>
+              <span>{selected.address || '—'}</span>
+            </div>
+            {selected.notes && (
+              <div className="employee-card-row">
+                <span className="settings-hint">{t('clients.notesLabel')}</span>
+                <span>{selected.notes}</span>
+              </div>
+            )}
+            <div className="employee-card-row">
+              <span className="settings-hint">{t('clients.colCreated')}</span>
+              <span>
+                {parseSqliteUtc(selected.createdAt).toLocaleDateString()}
+                {selected.createdByName ? ` · ${selected.createdByName}` : ''}
+              </span>
+            </div>
+
+            <div className="department-members-title">{t('clients.historyTitle')}</div>
+
+            <div className="client-history-add">
+              <input
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                placeholder={t('clients.historyAddPlaceholder')}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddNote()}
+              />
+              <button type="button" className="modal-btn" onClick={handleAddNote} disabled={!newNote.trim() || noteBusy}>
+                <Send size={14} />
+              </button>
+            </div>
+
+            {historyLoading ? (
+              <LoadingScreen compact />
+            ) : history.length === 0 ? (
+              <p className="settings-hint">{t('clients.historyEmpty')}</p>
+            ) : (
+              <ul className="client-history-list">
+                {history.map((h) => (
+                  <li key={h.id}>
+                    <div>{h.description}</div>
+                    <div className="settings-hint client-history-meta">
+                      {parseSqliteUtc(h.createdAt).toLocaleString()}
+                      {h.createdByName ? ` · ${h.createdByName}` : ''}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </Drawer>
+
+      <ClientFormModal
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        client={editingClient}
+        currentEmployeeId={currentEmployee.id}
+        onSaved={load}
+      />
+
+      <Modal
+        open={deleteConfirmOpen}
+        title={t('clients.deleteConfirmTitle')}
+        onClose={() => setDeleteConfirmOpen(false)}
+        actions={
+          <>
+            <button className="modal-btn" onClick={() => setDeleteConfirmOpen(false)} disabled={deleteBusy}>
+              {t('common.cancel')}
+            </button>
+            <button className="modal-btn danger" onClick={handleDelete} disabled={deleteBusy}>
+              {deleteBusy ? t('common.loading') : t('clients.deleteBtn')}
+            </button>
+          </>
+        }
+      >
+        {t('clients.deleteConfirmBody', { name: selected?.name ?? '' })}
+      </Modal>
+    </div>
+  );
+}

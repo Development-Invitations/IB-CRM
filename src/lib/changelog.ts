@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.1.11';
+export const APP_VERSION = '0.1.12';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,13 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.1.12',
+      items: [
+        'Новый модуль "Клиенты" — карточка с контактами и лентой истории',
+        'Клиентов может добавлять и вести любой сотрудник, удаление — только у админа',
+      ],
+    },
     {
       version: '0.1.11',
       items: [
@@ -131,6 +138,13 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.1.12',
+      items: [
+        "Yangi \"Mijozlar\" moduli — kontaktlar va tarix lentasi bilan kartochka",
+        "Mijozlarni istalgan xodim qo'sha va yuritishi mumkin, o'chirish — faqat administratorda",
+      ],
+    },
+    {
       version: '0.1.11',
       items: [
         "\"Bo'lim o'rinbosari\" belgisi endi yaxshiroq ko'rinadi — avval qorong'i fon bilan qo'shilib ketardi",
@@ -245,6 +259,13 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.1.12',
+      items: [
+        'Янги "Мижозлар" модули — контактлар ва тарих ленталит билан карточка',
+        'Мижозларни исталган ходим қўша ва юритиши мумкин, ўчириш — фақат администраторда',
+      ],
+    },
     {
       version: '0.1.11',
       items: [

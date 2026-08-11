@@ -152,6 +152,38 @@ struct AbsenceRequest {
 }
 
 #[derive(Clone, serde::Serialize)]
+struct Client {
+    id: String,
+    #[serde(rename = "clientNumber")]
+    client_number: String,
+    name: String,
+    phone: Option<String>,
+    email: Option<String>,
+    address: Option<String>,
+    notes: Option<String>,
+    #[serde(rename = "createdBy")]
+    created_by: Option<String>,
+    #[serde(rename = "createdByName")]
+    created_by_name: Option<String>,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct ClientHistoryEntry {
+    id: String,
+    #[serde(rename = "clientId")]
+    client_id: String,
+    description: String,
+    #[serde(rename = "createdBy")]
+    created_by: Option<String>,
+    #[serde(rename = "createdByName")]
+    created_by_name: Option<String>,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+}
+
+#[derive(Clone, serde::Serialize)]
 struct Position {
     id: String,
     title: String,
@@ -306,6 +338,43 @@ struct ResolveAbsenceRequestPayload {
 }
 
 #[derive(serde::Deserialize)]
+struct CreateClientPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    name: String,
+    phone: Option<String>,
+    email: Option<String>,
+    address: Option<String>,
+    notes: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct UpdateClientPayload {
+    id: String,
+    name: String,
+    phone: Option<String>,
+    email: Option<String>,
+    address: Option<String>,
+    notes: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct DeleteClientPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct AddClientHistoryPayload {
+    #[serde(rename = "clientId")]
+    client_id: String,
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    description: String,
+}
+
+#[derive(serde::Deserialize)]
 struct SetEmployeeSchedulePayload {
     #[serde(rename = "adminId")]
     admin_id: String,
@@ -398,6 +467,32 @@ fn to_absence_request(r: db::AbsenceRequestRecord) -> AbsenceRequest {
 
 fn to_session(s: db::SessionRecord) -> Session {
     Session { id: s.id, login_at: s.login_at, logout_at: s.logout_at }
+}
+
+fn to_client(c: db::ClientRecord) -> Client {
+    Client {
+        id: c.id,
+        client_number: c.client_number,
+        name: c.name,
+        phone: c.phone,
+        email: c.email,
+        address: c.address,
+        notes: c.notes,
+        created_by: c.created_by,
+        created_by_name: c.created_by_name,
+        created_at: c.created_at,
+    }
+}
+
+fn to_client_history(h: db::ClientHistoryRecord) -> ClientHistoryEntry {
+    ClientHistoryEntry {
+        id: h.id,
+        client_id: h.client_id,
+        description: h.description,
+        created_by: h.created_by,
+        created_by_name: h.created_by_name,
+        created_at: h.created_at,
+    }
 }
 
 fn to_position(p: db::PositionRecord) -> Position {
@@ -675,6 +770,65 @@ fn resolve_absence_request(payload: ResolveAbsenceRequestPayload, state: tauri::
 }
 
 #[tauri::command]
+fn list_clients(state: tauri::State<AppState>) -> Vec<Client> {
+    let db = state.0.lock().unwrap();
+    db.list_clients().into_iter().map(to_client).collect()
+}
+
+#[tauri::command]
+fn get_client(id: String, state: tauri::State<AppState>) -> Option<Client> {
+    let db = state.0.lock().unwrap();
+    db.get_client(&id).map(to_client)
+}
+
+#[tauri::command]
+fn create_client(payload: CreateClientPayload, state: tauri::State<AppState>) -> Result<Client, String> {
+    let db = state.0.lock().unwrap();
+    db.create_client(
+        &payload.actor_id,
+        &payload.name,
+        payload.phone.as_deref(),
+        payload.email.as_deref(),
+        payload.address.as_deref(),
+        payload.notes.as_deref(),
+    )
+    .map(to_client)
+}
+
+#[tauri::command]
+fn update_client(payload: UpdateClientPayload, state: tauri::State<AppState>) -> Result<Client, String> {
+    let db = state.0.lock().unwrap();
+    db.update_client(
+        &payload.id,
+        &payload.name,
+        payload.phone.as_deref(),
+        payload.email.as_deref(),
+        payload.address.as_deref(),
+        payload.notes.as_deref(),
+    )
+    .map(to_client)
+}
+
+#[tauri::command]
+fn delete_client(payload: DeleteClientPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.delete_client(&payload.admin_id, &payload.id)
+}
+
+#[tauri::command]
+fn list_client_history(client_id: String, state: tauri::State<AppState>) -> Vec<ClientHistoryEntry> {
+    let db = state.0.lock().unwrap();
+    db.list_client_history(&client_id).into_iter().map(to_client_history).collect()
+}
+
+#[tauri::command]
+fn add_client_history(payload: AddClientHistoryPayload, state: tauri::State<AppState>) -> Result<ClientHistoryEntry, String> {
+    let db = state.0.lock().unwrap();
+    db.add_client_history(&payload.client_id, &payload.actor_id, &payload.description)
+        .map(to_client_history)
+}
+
+#[tauri::command]
 fn record_login(employee_id: String, state: tauri::State<AppState>) -> Result<(), String> {
     let db = state.0.lock().unwrap();
     db.record_login(&employee_id)
@@ -732,6 +886,13 @@ fn main() {
             list_all_absence_requests,
             get_absence_request,
             resolve_absence_request,
+            list_clients,
+            get_client,
+            create_client,
+            update_client,
+            delete_client,
+            list_client_history,
+            add_client_history,
             record_login,
             record_logout,
             list_recent_sessions

@@ -21,6 +21,28 @@ export type AbsenceRequest = {
   resolvedAt: string | null;
 };
 
+export type Client = {
+  id: string;
+  clientNumber: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  notes: string | null;
+  createdBy: string | null;
+  createdByName: string | null;
+  createdAt: string;
+};
+
+export type ClientHistoryEntry = {
+  id: string;
+  clientId: string;
+  description: string;
+  createdBy: string | null;
+  createdByName: string | null;
+  createdAt: string;
+};
+
 export type Employee = {
   id: string;
   employeeNumber: string;
@@ -202,6 +224,35 @@ export const api = {
 
   resolveAbsenceRequest: (payload: { actorId: string; requestId: string; approve: boolean }) =>
     invoke<void>('resolve_absence_request', { payload }),
+
+  listClients: () => invoke<Client[]>('list_clients'),
+
+  getClient: (id: string) => invoke<Client | null>('get_client', { id }),
+
+  createClient: (payload: {
+    actorId: string;
+    name: string;
+    phone?: string | null;
+    email?: string | null;
+    address?: string | null;
+    notes?: string | null;
+  }) => invoke<Client>('create_client', { payload }),
+
+  updateClient: (payload: {
+    id: string;
+    name: string;
+    phone?: string | null;
+    email?: string | null;
+    address?: string | null;
+    notes?: string | null;
+  }) => invoke<Client>('update_client', { payload }),
+
+  deleteClient: (payload: { adminId: string; id: string }) => invoke<void>('delete_client', { payload }),
+
+  listClientHistory: (clientId: string) => invoke<ClientHistoryEntry[]>('list_client_history', { clientId }),
+
+  addClientHistory: (payload: { clientId: string; actorId: string; description: string }) =>
+    invoke<ClientHistoryEntry>('add_client_history', { payload }),
 
   recordLogin: (employeeId: string) => invoke<void>('record_login', { employeeId }),
 

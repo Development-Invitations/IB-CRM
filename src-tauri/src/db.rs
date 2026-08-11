@@ -98,6 +98,28 @@ pub struct AbsenceRequestRecord {
     pub resolved_at: Option<String>,
 }
 
+pub struct ClientRecord {
+    pub id: String,
+    pub client_number: String,
+    pub name: String,
+    pub phone: Option<String>,
+    pub email: Option<String>,
+    pub address: Option<String>,
+    pub notes: Option<String>,
+    pub created_by: Option<String>,
+    pub created_by_name: Option<String>,
+    pub created_at: String,
+}
+
+pub struct ClientHistoryRecord {
+    pub id: String,
+    pub client_id: String,
+    pub description: String,
+    pub created_by: Option<String>,
+    pub created_by_name: Option<String>,
+    pub created_at: String,
+}
+
 pub struct PositionRecord {
     pub id: String,
     pub title: String,
@@ -181,6 +203,24 @@ impl Db {
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 resolved_at TEXT,
                 resolved_by TEXT
+            );
+            CREATE TABLE IF NOT EXISTS clients (
+                id TEXT PRIMARY KEY,
+                client_number TEXT UNIQUE NOT NULL,
+                name TEXT NOT NULL,
+                phone TEXT,
+                email TEXT,
+                address TEXT,
+                notes TEXT,
+                created_by TEXT REFERENCES employees(id),
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS client_history (
+                id TEXT PRIMARY KEY,
+                client_id TEXT NOT NULL REFERENCES clients(id),
+                description TEXT NOT NULL,
+                created_by TEXT REFERENCES employees(id),
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );",
         )
         .expect("не удалось инициализировать схему");
@@ -1263,5 +1303,159 @@ impl Db {
             Ok(r) => r.filter_map(|x| x.ok()).collect(),
             Err(_) => Vec::new(),
         }
+    }
+
+    // ---- Клиенты ----
+    // Клиентская база доступна всем сотрудникам (как обычно и бывает в CRM —
+    // менеджеры сами ведут своих клиентов), в отличие от подразделений/должностей,
+    // которые администрирует только админ. Удаление клиента — единственное
+    // действие, ограниченное админом (необратимо, стоит подстраховаться).
+
+    const CLIENT_SELECT: &'static str = "SELECT
+            c.id, c.client_number, c.name, c.phone, c.email, c.address, c.notes,
+            c.created_by, e.full_name, c.created_at
+        FROM clients c
+        LEFT JOIN employees e ON e.id = c.created_by";
+
+    fn map_client_row(row: &rusqlite::Row) -> rusqlite::Result<ClientRecord> {
+        Ok(ClientRecord {
+            id: row.get(0)?,
+            client_number: row.get(1)?,
+            name: row.get(2)?,
+            phone: row.get(3)?,
+            email: row.get(4)?,
+            address: row.get(5)?,
+            notes: row.get(6)?,
+            created_by: row.get(7)?,
+            created_by_name: row.get(8)?,
+            created_at: row.get(9)?,
+        })
+    }
+
+    fn next_client_number(&self) -> String {
+        let count: i64 = self.conn.query_row("SELECT COUNT(*) FROM clients", [], |row| row.get(0)).unwrap_or(0);
+        format!("CLI-{:05}", count + 1)
+    }
+
+    pub fn list_clients(&self) -> Vec<ClientRecord> {
+        let sql = format!("{} ORDER BY c.created_at DESC", Self::CLIENT_SELECT);
+        let mut stmt = match self.conn.prepare(&sql) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map([], Self::map_client_row)
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn get_client(&self, id: &str) -> Option<ClientRecord> {
+        let sql = format!("{} WHERE c.id = ?1", Self::CLIENT_SELECT);
+        self.conn.query_row(&sql, params![id], Self::map_client_row).ok()
+    }
+
+    pub fn create_client(
+        &self,
+        actor_id: &str,
+        name: &str,
+        phone: Option<&str>,
+        email: Option<&str>,
+        address: Option<&str>,
+        notes: Option<&str>,
+    ) -> Result<ClientRecord, String> {
+        if name.trim().is_empty() {
+            return Err("Укажите название/имя клиента".into());
+        }
+        let id = Uuid::new_v4().to_string();
+        let client_number = self.next_client_number();
+        self.conn
+            .execute(
+                "INSERT INTO clients (id, client_number, name, phone, email, address, notes, created_by)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![id, client_number, name.trim(), phone, email, address, notes, actor_id],
+            )
+            .map_err(|e| e.to_string())?;
+        self.get_client(&id).ok_or_else(|| "Клиент не найден".to_string())
+    }
+
+    pub fn update_client(
+        &self,
+        id: &str,
+        name: &str,
+        phone: Option<&str>,
+        email: Option<&str>,
+        address: Option<&str>,
+        notes: Option<&str>,
+    ) -> Result<ClientRecord, String> {
+        if name.trim().is_empty() {
+            return Err("Укажите название/имя клиента".into());
+        }
+        self.conn
+            .execute(
+                "UPDATE clients SET name = ?1, phone = ?2, email = ?3, address = ?4, notes = ?5 WHERE id = ?6",
+                params![name.trim(), phone, email, address, notes, id],
+            )
+            .map_err(|e| e.to_string())?;
+        self.get_client(id).ok_or_else(|| "Клиент не найден".to_string())
+    }
+
+    pub fn delete_client(&self, admin_id: &str, id: &str) -> Result<(), String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn.execute("DELETE FROM client_history WHERE client_id = ?1", params![id]).map_err(|e| e.to_string())?;
+        self.conn.execute("DELETE FROM clients WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn list_client_history(&self, client_id: &str) -> Vec<ClientHistoryRecord> {
+        let mut stmt = match self.conn.prepare(
+            "SELECT h.id, h.client_id, h.description, h.created_by, e.full_name, h.created_at
+             FROM client_history h
+             LEFT JOIN employees e ON e.id = h.created_by
+             WHERE h.client_id = ?1
+             ORDER BY h.created_at DESC",
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map(params![client_id], |row| {
+            Ok(ClientHistoryRecord {
+                id: row.get(0)?,
+                client_id: row.get(1)?,
+                description: row.get(2)?,
+                created_by: row.get(3)?,
+                created_by_name: row.get(4)?,
+                created_at: row.get(5)?,
+            })
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default()
+    }
+
+    pub fn add_client_history(&self, client_id: &str, actor_id: &str, description: &str) -> Result<ClientHistoryRecord, String> {
+        if description.trim().is_empty() {
+            return Err("Пустая запись".into());
+        }
+        let id = Uuid::new_v4().to_string();
+        self.conn
+            .execute(
+                "INSERT INTO client_history (id, client_id, description, created_by) VALUES (?1, ?2, ?3, ?4)",
+                params![id, client_id, description.trim(), actor_id],
+            )
+            .map_err(|e| e.to_string())?;
+
+        let (created_by_name,): (Option<String>,) = self
+            .conn
+            .query_row("SELECT full_name FROM employees WHERE id = ?1", params![actor_id], |row| Ok((row.get(0)?,)))
+            .unwrap_or((None,));
+
+        Ok(ClientHistoryRecord {
+            id,
+            client_id: client_id.to_string(),
+            description: description.trim().to_string(),
+            created_by: Some(actor_id.to_string()),
+            created_by_name,
+            created_at: String::new(),
+        })
     }
 }

@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { RefreshCw, ChevronDown } from 'lucide-react';
+import { RefreshCw, ChevronDown, CheckCircle2 } from 'lucide-react';
 import Modal from './Modal';
 import { changelog } from '../lib/changelog';
 import { useLocale } from '../lib/i18n';
-import { checkForAppUpdate, type UpdateCheckResult, type UpdateProgress } from '../lib/updater';
+import { checkForAppUpdate, restartApp, type UpdateCheckResult, type UpdateProgress } from '../lib/updater';
 
 export default function UpdatesButton() {
   const { t, locale } = useLocale();
@@ -13,6 +13,7 @@ export default function UpdatesButton() {
   const [onlineCheck, setOnlineCheck] = useState<'idle' | 'checking' | UpdateCheckResult>('idle');
   const [installing, setInstalling] = useState(false);
   const [progress, setProgress] = useState<UpdateProgress | null>(null);
+  const [done, setDone] = useState(false);
 
   const handleCheckOnline = async () => {
     setOnlineCheck('checking');
@@ -26,6 +27,13 @@ export default function UpdatesButton() {
     setProgress({ downloaded: 0, total: null });
     try {
       await onlineCheck.install((p) => setProgress(p));
+      setDone(true);
+      setTimeout(() => {
+        restartApp().catch(() => {
+          setInstalling(false);
+          setDone(false);
+        });
+      }, 1800);
     } catch {
       setInstalling(false);
       setProgress(null);
@@ -53,19 +61,26 @@ export default function UpdatesButton() {
         }
       >
         {installing ? (
-          <div className="update-progress">
-            <div className="update-progress-label">
-              {percent !== null
-                ? t('updates.downloading', { percent: String(percent) })
-                : t('updates.downloadingIndeterminate')}
+          done ? (
+            <div className="update-progress update-progress-done">
+              <CheckCircle2 size={32} className="update-done-icon" />
+              <div className="update-progress-label">{t('updates.installedRestarting')}</div>
             </div>
-            <div className="progress-track">
-              <div
-                className={`progress-fill ${percent === null ? 'indeterminate' : ''}`}
-                style={percent !== null ? { width: `${percent}%` } : undefined}
-              />
+          ) : (
+            <div className="update-progress">
+              <div className="update-progress-label">
+                {percent !== null
+                  ? t('updates.downloading', { percent: String(percent) })
+                  : t('updates.downloadingIndeterminate')}
+              </div>
+              <div className="progress-track">
+                <div
+                  className={`progress-fill ${percent === null ? 'indeterminate' : ''}`}
+                  style={percent !== null ? { width: `${percent}%` } : undefined}
+                />
+              </div>
             </div>
-          </div>
+          )
         ) : (
           <>
             <div className="updates-online-check">

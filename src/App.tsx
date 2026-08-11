@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { exit } from '@tauri-apps/plugin-process';
 import FirstRunSetup from './pages/FirstRunSetup';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -60,9 +61,20 @@ export default function App() {
       .onCloseRequested(async (event) => {
         event.preventDefault();
         try {
-          await api.recordLogout(employeeId);
+          // Не даём записи выхода заблокировать закрытие окна дольше чем на
+          // секунду — если Rust-команда зависла или сеть/БД тормозят, ждать
+          // ответа неограниченно нельзя: закрыть окно важнее.
+          await Promise.race([
+            api.recordLogout(employeeId),
+            new Promise((resolve) => setTimeout(resolve, 1000)),
+          ]);
+        } catch {
+          // Игнорируем ошибку записи выхода — она не должна мешать закрытию.
         } finally {
-          await getCurrentWindow().destroy();
+          // exit() из tauri-plugin-process гарантированно завершает весь
+          // процесс приложения — в отличие от window.destroy(), который
+          // иногда лишь скрывает окно, оставляя процесс висеть в фоне.
+          await exit(0);
         }
       })
       .then((fn) => {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Users, Trash2, UserPlus } from 'lucide-react';
+import { Plus, Pencil, Users, Trash2, UserPlus, X } from 'lucide-react';
 import { api, type Employee, type Department } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
@@ -24,6 +24,7 @@ export default function Departments({ currentEmployee }: { currentEmployee: Empl
 
   const [addMemberId, setAddMemberId] = useState('');
   const [addMemberBusy, setAddMemberBusy] = useState(false);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -95,6 +96,33 @@ export default function Departments({ currentEmployee }: { currentEmployee: Empl
       showToast('error', typeof err === 'string' ? err : t('departments.errorGeneric'));
     } finally {
       setAddMemberBusy(false);
+    }
+  };
+
+  const handleRemoveMember = async (emp: Employee) => {
+    setRemovingMemberId(emp.id);
+    try {
+      await api.updateEmployee({
+        adminId: currentEmployee.id,
+        employeeId: emp.id,
+        fullName: emp.fullName,
+        phone: emp.phone,
+        positionId: emp.positionId,
+        // Сотрудник покидает подразделение — руководителя, автоматически
+        // подставленного из главы ЭТОГО подразделения, тоже логично снять,
+        // иначе он останется "подчинённым" человека, к которому больше не
+        // относится (та же логика, что и при переводе — см. handleAddMember).
+        managerId: null,
+        deputyId: emp.deputyId,
+        departmentId: null,
+        avatarData: emp.avatarData,
+      });
+      showToast('success', t('departments.memberRemoved'));
+      load();
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('departments.errorGeneric'));
+    } finally {
+      setRemovingMemberId(null);
     }
   };
 
@@ -188,13 +216,26 @@ export default function Departments({ currentEmployee }: { currentEmployee: Empl
             ) : (
               <ul className="department-members-list">
                 {membersOf(selected.id).map((m) => (
-                  <li key={m.id}>
-                    {m.fullName || m.login}
-                    {m.positionTitle ? ` · ${m.positionTitle}` : ''}
-                    {m.id === selected.deputyEmployeeId && (
-                      <span className="role-badge role-badge-deputy" style={{ marginLeft: 8 }}>
-                        {t('employees.deputyLabel')}
-                      </span>
+                  <li key={m.id} className="department-member-row">
+                    <span>
+                      {m.fullName || m.login}
+                      {m.positionTitle ? ` · ${m.positionTitle}` : ''}
+                      {m.id === selected.deputyEmployeeId && (
+                        <span className="role-badge role-badge-deputy" style={{ marginLeft: 8 }}>
+                          {t('employees.deputyLabel')}
+                        </span>
+                      )}
+                    </span>
+                    {currentEmployee.isAdmin && (
+                      <button
+                        type="button"
+                        className="department-member-remove"
+                        onClick={() => handleRemoveMember(m)}
+                        disabled={removingMemberId === m.id}
+                        title={t('departments.removeMemberBtn')}
+                      >
+                        <X size={13} />
+                      </button>
                     )}
                   </li>
                 ))}

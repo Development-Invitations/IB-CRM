@@ -35,6 +35,15 @@ export type UpdateCheckResult =
   | { status: 'available'; version: string; notes?: string; install: (onProgress?: (p: UpdateProgress) => void) => Promise<void> }
   | { status: 'error'; message: string };
 
+// Перезапуск вынесен отдельной функцией и НЕ вызывается автоматически внутри
+// install() — раньше приложение перезапускалось мгновенно сразу после
+// загрузки, без единого сообщения об успехе, что выглядело как будто оно
+// просто вылетело. Теперь компонент сам показывает "Готово!" на пару секунд
+// и вызывает restartApp() уже после этого — красиво, а не резко.
+export async function restartApp() {
+  await relaunch();
+}
+
 export async function checkForAppUpdate(): Promise<UpdateCheckResult> {
   try {
     const update = await check();
@@ -62,8 +71,6 @@ export async function checkForAppUpdate(): Promise<UpdateCheckResult> {
                 break;
             }
           });
-
-          await relaunch();
         },
       };
     }

@@ -21,6 +21,11 @@ export default function Topbar({ employee }: { employee: Employee }) {
 
   useEffect(() => {
     loadNotifications();
+    // Опрашиваем сервер каждые 10 секунд — без этого новые уведомления
+    // (например, заявка от подчинённого) появлялись только после перезахода
+    // на страницу/перезапуска, что слишком медленно для рабочего процесса.
+    const interval = setInterval(loadNotifications, 10000);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employee.id]);
 
@@ -69,7 +74,16 @@ export default function Topbar({ employee }: { employee: Employee }) {
         </button>
 
         <div className="topbar-icon-wrap" ref={wrapRef}>
-          <button className="icon-btn" onClick={() => setOpen((o) => !o)} aria-label={t('topbar.notifications')}>
+          <button
+            className="icon-btn"
+            onClick={() => {
+              setOpen((o) => {
+                if (!o) loadNotifications();
+                return !o;
+              });
+            }}
+            aria-label={t('topbar.notifications')}
+          >
             <Bell size={20} />
             {unreadCount > 0 && <span className="icon-badge">{unreadCount}</span>}
           </button>

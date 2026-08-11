@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { CheckCircle2 } from 'lucide-react';
 import Modal from './Modal';
-import { checkForAppUpdate, type UpdateCheckResult, type UpdateProgress } from '../lib/updater';
+import { checkForAppUpdate, restartApp, type UpdateCheckResult, type UpdateProgress } from '../lib/updater';
 import { useLocale } from '../lib/i18n';
 
 export default function UpdateNotifier() {
@@ -8,6 +9,7 @@ export default function UpdateNotifier() {
   const [result, setResult] = useState<UpdateCheckResult | null>(null);
   const [installing, setInstalling] = useState(false);
   const [progress, setProgress] = useState<UpdateProgress | null>(null);
+  const [done, setDone] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
@@ -26,8 +28,16 @@ export default function UpdateNotifier() {
     setProgress({ downloaded: 0, total: null });
     try {
       await result.install((p) => setProgress(p));
-      // После успешного relaunch() приложение перезапустится само —
-      // до этого момента редко успевает дойти код ниже.
+      // Загрузка и установка завершены — показываем короткое "Готово!" перед
+      // перезапуском, чтобы это не выглядело как будто приложение просто
+      // вылетело, а ощущалось как осознанное, аккуратное завершение.
+      setDone(true);
+      setTimeout(() => {
+        restartApp().catch(() => {
+          setInstalling(false);
+          setDone(false);
+        });
+      }, 1800);
     } catch {
       setInstalling(false);
       setProgress(null);
@@ -57,6 +67,11 @@ export default function UpdateNotifier() {
     >
       {!installing ? (
         result.notes || t('updates.availableBody')
+      ) : done ? (
+        <div className="update-progress update-progress-done">
+          <CheckCircle2 size={32} className="update-done-icon" />
+          <div className="update-progress-label">{t('updates.installedRestarting')}</div>
+        </div>
       ) : (
         <div className="update-progress">
           <div className="update-progress-label">

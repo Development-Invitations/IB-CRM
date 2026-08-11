@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.1.7';
+export const APP_VERSION = '0.1.8';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,15 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.1.8',
+      items: [
+        'Приложение теперь надёжно закрывается по крестику, без зависаний',
+        'Уведомления о новых заявках приходят намного быстрее — обновляются сами каждые 10 секунд',
+        'Из подразделения теперь можно убрать сотрудника, а не только добавить',
+        'После загрузки обновления — красивое сообщение "Готово!" перед перезапуском',
+      ],
+    },
     {
       version: '0.1.7',
       items: [
@@ -100,6 +109,15 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.1.8',
+      items: [
+        "Ilova endi krestik orqali ishonchli yopiladi, osilib qolmaydi",
+        "Yangi arizalar haqida bildirishnomalar tezroq keladi — har 10 soniyada o'zi yangilanadi",
+        "Endi xodimni bo'limdan olib tashlash ham mumkin, nafaqat qo'shish",
+        "Yangilanish yuklab olingandan keyin — qayta ishga tushirishdan oldin chiroyli \"Tayyor!\" xabari",
+      ],
+    },
+    {
       version: '0.1.7',
       items: [
         "\"15 daqiqaga chiqdi / Tushlik / Ta'til / Dam olish kuni\" holatlari — ro'yxatda, kartochkada va kabinetda hammaga ko'rinadi",
@@ -183,6 +201,15 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.1.8',
+      items: [
+        'Илова энди крестик орқали ишончли ёпилади, осилиб қолмайди',
+        "Янги аризалар ҳақида билдиришномалар тезроқ келади — ҳар 10 сонияда ўзи янгиланади",
+        "Энди ходимни бўлимдан олиб ташлаш ҳам мумкин, нафақат қўшиш",
+        'Янгиланиш юклаб олингандан кейин — қайта ишга туширишдан олдин чиройли "Тайёр!" хабари',
+      ],
+    },
     {
       version: '0.1.7',
       items: [

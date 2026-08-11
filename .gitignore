@@ -1,0 +1,29 @@
+# Tauri / Rust build artifacts
+src-tauri/target/
+
+# Node
+node_modules/
+
+# Vite / frontend build
+dist/
+build/
+
+# Rust / Tauri
+target/
+src-tauri/target/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Pencil, ArrowRight } from 'lucide-react';
 import { api, type Employee, type Position, type Department } from '../lib/api';
 import { useLocale } from '../lib/i18n';
+import { parseSqliteUtc } from '../lib/date';
 import Drawer from '../components/Drawer';
 import EmployeeFormModal from '../components/EmployeeFormModal';
 import Avatar from '../components/Avatar';
@@ -78,7 +79,10 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
                 <td>{emp.employeeNumber}</td>
                 <td>
                   <div className="employees-name-cell">
-                    <Avatar name={emp.fullName || emp.login} size={28} src={emp.avatarData} />
+                    <span className="avatar-with-status">
+                      <Avatar name={emp.fullName || emp.login} size={28} src={emp.avatarData} />
+                      {emp.isOnline && <span className="avatar-online-dot" title={t('employees.onlineNow')} />}
+                    </span>
                     <span>{emp.fullName || '—'}</span>
                   </div>
                 </td>
@@ -145,6 +149,17 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
             <div className="employee-card-row">
               <span className="settings-hint">{t('employees.phoneLabel')}</span>
               <span>{selected.phone || '—'}</span>
+            </div>
+            <div className="employee-card-row">
+              <span className="settings-hint">{t('employees.statusLabel')}</span>
+              <span className={`status-value ${selected.isOnline ? 'online' : 'offline'}`}>
+                <span className="status-dot" />
+                {selected.isOnline
+                  ? t('employees.onlineNow')
+                  : selected.lastSeenAt
+                    ? t('employees.lastSeenLabel', { time: parseSqliteUtc(selected.lastSeenAt).toLocaleString() })
+                    : t('employees.neverLoggedIn')}
+              </span>
             </div>
           </div>
         )}

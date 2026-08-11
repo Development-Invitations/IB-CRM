@@ -1,18 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Phone, Briefcase, Building2, UserCog, Users, Clock, Send } from 'lucide-react';
-import { api, type Employee } from '../lib/api';
+import { ArrowLeft, Phone, Briefcase, Building2, UserCog, Users, Clock, Send, Calendar, History } from 'lucide-react';
+import { api, type Employee, type Session } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
 import { formatUzPhone } from '../lib/phone';
+import { parseSqliteUtc } from '../lib/date';
 import Avatar from '../components/Avatar';
 import Checkbox from '../components/Checkbox';
-
-// SQLite datetime('now') отдаёт UTC без таймзоны ("2026-08-01 12:34:56") —
-// добавляем 'Z', чтобы JS правильно понял, что это UTC, а не локальное время.
-function parseSqliteUtc(value: string): Date {
-  return new Date(value.replace(' ', 'T') + 'Z');
-}
 
 export default function EmployeeProfile({ currentEmployee }: { currentEmployee: Employee }) {
   const { id } = useParams<{ id: string }>();
@@ -21,13 +16,15 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
   const navigate = useNavigate();
 
   const [employee, setEmployee] = useState<Employee | null>(null);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = () => {
     if (!id) return;
     setLoading(true);
-    api.getEmployee(id).then((emp) => {
+    Promise.all([api.getEmployee(id), api.listRecentSessions(id)]).then(([emp, sess]) => {
       setEmployee(emp);
+      setSessions(sess);
       setLoading(false);
     });
   };
@@ -167,6 +164,47 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
               </span>
               <span>{employee.deputyName || '—'}</span>
             </div>
+            <div className="profile-field">
+              <span className="settings-hint">
+                <Calendar size={13} /> {t('employees.createdAtLabel')}
+              </span>
+              <span>{parseSqliteUtc(employee.createdAt).toLocaleDateString()}</span>
+            </div>
+            <div className="profile-field">
+              <span className="settings-hint">{t('employees.statusLabel')}</span>
+              <span className={`status-value ${employee.isOnline ? 'online' : 'offline'}`}>
+                <span className="status-dot" />
+                {employee.isOnline
+                  ? t('employees.onlineNow')
+                  : employee.lastSeenAt
+                    ? t('employees.lastSeenLabel', { time: parseSqliteUtc(employee.lastSeenAt).toLocaleString() })
+                    : t('employees.neverLoggedIn')}
+              </span>
+            </div>
+          </div>
+
+          <div className="profile-sessions-block">
+            <div className="profile-edit-request-title">
+              <History size={14} /> {t('employees.sessionsTitle')}
+            </div>
+            {sessions.length === 0 ? (
+              <p className="settings-hint">{t('employees.sessionsEmpty')}</p>
+            ) : (
+              <ul className="sessions-list">
+                {sessions.map((s) => (
+                  <li key={s.id}>
+                    <span>{parseSqliteUtc(s.loginAt).toLocaleDateString()}</span>
+                    <span>
+                      {parseSqliteUtc(s.loginAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {' – '}
+                      {s.logoutAt
+                        ? parseSqliteUtc(s.logoutAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : t('employees.sessionOnlineNow')}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {isOwnProfile && !currentEmployee.isAdmin && (

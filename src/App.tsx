@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import FirstRunSetup from './pages/FirstRunSetup';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -21,9 +22,21 @@ export default function App() {
     setCurrentEmployeeState(emp);
     if (emp) {
       session.set(emp);
+      // Фиксируем реальный новый вход (не срабатывает при восстановлении
+      // сессии из sessionStorage при обычном reload страницы — там employee
+      // читается напрямую из session.get() в инициализаторе useState выше,
+      // минуя setCurrentEmployee).
+      api.recordLogin(emp.id).catch(() => {});
     } else {
       session.clear();
     }
+  };
+
+  const handleLogout = () => {
+    if (currentEmployee) {
+      api.recordLogout(currentEmployee.id).catch(() => {});
+    }
+    setCurrentEmployee(null);
   };
 
   useEffect(() => {
@@ -32,6 +45,34 @@ export default function App() {
       setLoading(false);
     });
   }, []);
+
+  // Лучшая попытка зафиксировать выход и при закрытии окна приложения (крестик),
+  // а не только по кнопке "Выйти" — иначе статус "в сети" завис бы навсегда,
+  // если сотрудник просто закрыл окно. Не защищает от принудительного завершения
+  // процесса через диспетчер задач — это осознанное упрощение офлайн-версии.
+  useEffect(() => {
+    if (!currentEmployee) return;
+    const employeeId = currentEmployee.id;
+    let unlisten: (() => void) | undefined;
+
+    getCurrentWindow()
+      .onCloseRequested(async (event) => {
+        event.preventDefault();
+        try {
+          await api.recordLogout(employeeId);
+        } finally {
+          await getCurrentWindow().destroy();
+        }
+      })
+      .then((fn) => {
+        unlisten = fn;
+      })
+      .catch(() => {});
+
+    return () => {
+      unlisten?.();
+    };
+  }, [currentEmployee?.id]);
 
   if (loading) return <div className="loading-screen">{t('common.loading')}</div>;
 
@@ -68,7 +109,7 @@ export default function App() {
         path="/dashboard/*"
         element={
           currentEmployee ? (
-            <Dashboard employee={currentEmployee} onLogout={() => setCurrentEmployee(null)} />
+            <Dashboard employee={currentEmployee} onLogout={handleLogout} />
           ) : (
             <Navigate to="/login" />
           )

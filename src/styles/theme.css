@@ -871,6 +871,23 @@ button.employees-add-btn {
   gap: 10px;
 }
 
+.avatar-with-status {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.avatar-online-dot {
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--color-success);
+  border: 2px solid var(--color-surface);
+}
+
 .avatar-upload-row {
   display: flex;
   align-items: center;
@@ -897,7 +914,7 @@ button.employees-add-btn {
 }
 
 .drawer-panel {
-  width: 420px;
+  width: 560px;
   max-width: calc(100vw - 40px);
   height: 100%;
   background: var(--color-surface);
@@ -960,7 +977,7 @@ button.employees-add-btn {
 .employee-profile-back { width: auto; display: inline-flex; margin-bottom: 20px; }
 
 .profile-card {
-  max-width: 640px;
+  max-width: 920px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -978,8 +995,12 @@ button.employees-add-btn {
 
 .profile-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
+}
+
+@media (max-width: 820px) {
+  .profile-grid { grid-template-columns: 1fr 1fr; }
 }
 
 .profile-field {
@@ -997,6 +1018,52 @@ button.employees-add-btn {
   align-items: center;
   gap: 6px;
 }
+
+.status-value {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--color-text-muted);
+}
+
+.status-value.online .status-dot { background: var(--color-success); }
+.status-value.offline .status-dot { background: var(--color-text-muted); }
+
+.profile-sessions-block {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.sessions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.sessions-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--color-surface-2);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+
+.sessions-list li span:first-child { color: var(--color-text-muted); }
 
 /* ---- Декоративный баннер сверху карточки кабинета ---- */
 

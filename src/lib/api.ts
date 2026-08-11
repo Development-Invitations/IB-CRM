@@ -18,6 +18,15 @@ export type Employee = {
   selfEditUntil: string | null;
   hasPendingEditRequest: boolean;
   avatarData: string | null;
+  createdAt: string;
+  isOnline: boolean;
+  lastSeenAt: string | null;
+};
+
+export type Session = {
+  id: string;
+  loginAt: string;
+  logoutAt: string | null;
 };
 
 export type Position = { id: string; title: string };
@@ -121,4 +130,10 @@ export const api = {
 
   selfUpdateEmployee: (payload: { employeeId: string; fullName: string; phone?: string | null }) =>
     invoke<Employee>('self_update_employee', { payload }),
+
+  recordLogin: (employeeId: string) => invoke<void>('record_login', { employeeId }),
+
+  recordLogout: (employeeId: string) => invoke<void>('record_logout', { employeeId }),
+
+  listRecentSessions: (employeeId: string) => invoke<Session[]>('list_recent_sessions', { employeeId }),
 };

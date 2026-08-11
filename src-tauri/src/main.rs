@@ -39,6 +39,21 @@ struct Employee {
     has_pending_edit_request: bool,
     #[serde(rename = "avatarData")]
     avatar_data: Option<String>,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+    #[serde(rename = "isOnline")]
+    is_online: bool,
+    #[serde(rename = "lastSeenAt")]
+    last_seen_at: Option<String>,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct Session {
+    id: String,
+    #[serde(rename = "loginAt")]
+    login_at: String,
+    #[serde(rename = "logoutAt")]
+    logout_at: Option<String>,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -244,7 +259,14 @@ fn to_employee(e: db::EmployeeRecord) -> Employee {
         self_edit_until: e.self_edit_until,
         has_pending_edit_request: e.has_pending_edit_request,
         avatar_data: e.avatar_data,
+        created_at: e.created_at,
+        is_online: e.is_online,
+        last_seen_at: e.last_seen_at,
     }
+}
+
+fn to_session(s: db::SessionRecord) -> Session {
+    Session { id: s.id, login_at: s.login_at, logout_at: s.logout_at }
 }
 
 fn to_position(p: db::PositionRecord) -> Position {
@@ -444,6 +466,24 @@ fn self_update_employee(payload: SelfUpdateEmployeePayload, state: tauri::State<
         .map(to_employee)
 }
 
+#[tauri::command]
+fn record_login(employee_id: String, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.record_login(&employee_id)
+}
+
+#[tauri::command]
+fn record_logout(employee_id: String, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.record_logout(&employee_id)
+}
+
+#[tauri::command]
+fn list_recent_sessions(employee_id: String, state: tauri::State<AppState>) -> Vec<Session> {
+    let db = state.0.lock().unwrap();
+    db.list_recent_sessions(&employee_id, 20).into_iter().map(to_session).collect()
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -475,7 +515,10 @@ fn main() {
             create_edit_request,
             list_edit_requests,
             resolve_edit_request,
-            self_update_employee
+            self_update_employee,
+            record_login,
+            record_logout,
+            list_recent_sessions
         ])
         .run(tauri::generate_context!())
         .expect("ошибка запуска tauri приложения");

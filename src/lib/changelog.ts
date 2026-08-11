@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.1.5';
+export const APP_VERSION = '0.1.6';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,15 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.1.6',
+      items: [
+        'Кабинет сотрудника стал просторнее, поля разложены по сетке в 3 колонки',
+        'Дата регистрации теперь видна в кабинете сотрудника',
+        'Учёт входов и выходов: кто сейчас в сети, когда был в последний раз, история за последние дни',
+        'Статус "в сети" теперь виден и в карточке сотрудника, и прямо в списке сотрудников',
+      ],
+    },
     {
       version: '0.1.5',
       items: [
@@ -78,6 +87,15 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.1.6',
+      items: [
+        "Xodim kabineti kengroq bo'ldi, maydonlar 3 ustunli jadvalga joylashtirildi",
+        "Ro'yxatdan o'tgan sana endi xodim kabinetida ko'rinadi",
+        "Kirish va chiqishlar hisobi: hozir kim tizimda, oxirgi marta qachon bo'lgan, so'nggi kunlar tarixi",
+        '"Tizimda" holati endi xodim kartochkasida va xodimlar ro\'yxatida ham ko\'rinadi',
+      ],
+    },
+    {
       version: '0.1.5',
       items: [
         "Bo'limni o'chirish mumkin (xodimlar qoladi, faqat undan bog'lanishi yo'qoladi)",
@@ -139,6 +157,15 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.1.6',
+      items: [
+        'Ходим кабинети кенгроқ бўлди, майдонлар 3 устунли жадвалга жойлаштирилди',
+        'Рўйхатдан ўтган сана энди ходим кабинетида кўринади',
+        'Кириш ва чиқишлар ҳисоби: ҳозир ким тизимда, охирги марта қачон бўлган, сўнгги кунлар тарихи',
+        '"Тизимда" ҳолати энди ходим карточкасида ва ходимлар рўйхатида ҳам кўринади',
+      ],
+    },
     {
       version: '0.1.5',
       items: [

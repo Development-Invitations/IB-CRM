@@ -13,29 +13,47 @@ function initials(name: string): string {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
-export default function Avatar({ name, size = 40, src }: { name: string; size?: number; src?: string | null }) {
+export default function Avatar({
+  name,
+  size = 40,
+  src,
+  online,
+}: {
+  name: string;
+  size?: number;
+  src?: string | null;
+  online?: boolean;
+}) {
+  const dot = online !== undefined && (
+    <span
+      className={`avatar-status-dot ${online ? 'online' : ''}`}
+      style={{ width: Math.max(8, size * 0.24), height: Math.max(8, size * 0.24) }}
+    />
+  );
+
   if (src) {
     return (
-      <img
-        className="avatar avatar-photo"
-        src={src}
-        alt={name}
-        style={{ width: size, height: size }}
-      />
+      <span className="avatar-wrap" style={{ width: size, height: size }}>
+        <img className="avatar avatar-photo" src={src} alt={name} style={{ width: size, height: size }} />
+        {dot}
+      </span>
     );
   }
 
   return (
-    <div
-      className="avatar"
-      style={{
-        width: size,
-        height: size,
-        fontSize: size * 0.4,
-        background: colorForName(name || '?'),
-      }}
-    >
-      {initials(name)}
-    </div>
+    <span className="avatar-wrap" style={{ width: size, height: size }}>
+      <div
+        className="avatar"
+        style={{
+          width: size,
+          height: size,
+          fontSize: size * 0.4,
+          background: colorForName(name || '?'),
+        }}
+      >
+        {initials(name)}
+      </div>
+      {dot}
+    </span>
   );
 }

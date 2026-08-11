@@ -28,6 +28,15 @@ pub struct EmployeeRecord {
     pub self_edit_until: Option<String>,
     pub has_pending_edit_request: bool,
     pub avatar_data: Option<String>,
+    pub created_at: String,
+    pub is_online: bool,
+    pub last_seen_at: Option<String>,
+}
+
+pub struct SessionRecord {
+    pub id: String,
+    pub login_at: String,
+    pub logout_at: Option<String>,
 }
 
 pub struct DepartmentRecord {
@@ -124,6 +133,12 @@ impl Db {
             CREATE TABLE IF NOT EXISTS app_meta (
                 key TEXT PRIMARY KEY,
                 value TEXT
+            );
+            CREATE TABLE IF NOT EXISTS employee_sessions (
+                id TEXT PRIMARY KEY,
+                employee_id TEXT NOT NULL REFERENCES employees(id),
+                login_at TEXT NOT NULL DEFAULT (datetime('now')),
+                logout_at TEXT
             );",
         )
         .expect("не удалось инициализировать схему");
@@ -178,7 +193,10 @@ impl Db {
             e.department_id, dep.name,
             e.self_edit_until,
             EXISTS(SELECT 1 FROM edit_requests er WHERE er.employee_id = e.id AND er.status = 'pending'),
-            e.avatar_data
+            e.avatar_data,
+            e.created_at,
+            EXISTS(SELECT 1 FROM employee_sessions s WHERE s.employee_id = e.id AND s.logout_at IS NULL),
+            (SELECT MAX(COALESCE(s.logout_at, s.login_at)) FROM employee_sessions s WHERE s.employee_id = e.id)
         FROM employees e
         LEFT JOIN positions p ON p.id = e.position_id
         LEFT JOIN employees m ON m.id = e.manager_id
@@ -204,6 +222,9 @@ impl Db {
             self_edit_until: row.get(14)?,
             has_pending_edit_request: row.get::<_, i64>(15)? != 0,
             avatar_data: row.get(16)?,
+            created_at: row.get(17)?,
+            is_online: row.get::<_, i64>(18)? != 0,
+            last_seen_at: row.get(19)?,
         })
     }
 
@@ -755,5 +776,57 @@ impl Db {
             .map_err(|e| e.to_string())?;
 
         self.get_employee(employee_id).ok_or_else(|| "Сотрудник не найден".to_string())
+    }
+
+    // ---- Учёт входов/выходов и статус "в сети" ----
+    // Логика простая и намеренно без heartbeat: при успешном логине создаём
+    // строку сессии (login_at = сейчас, logout_at = NULL — значит "в сети").
+    // При явном выходе (кнопка "Выйти") или закрытии окна приложения
+    // (см. Dashboard.tsx на фронтенде, слушает close-requested) закрываем
+    // все открытые сессии этого сотрудника, проставляя logout_at.
+    // Если приложение крашнется или будет завершено принудительно (диспетчер
+    // задач) без штатного закрытия окна — сессия так и останется "открытой"
+    // до следующего входа. Это осознанное упрощение для офлайн-версии.
+
+    pub fn record_login(&self, employee_id: &str) -> Result<(), String> {
+        let id = Uuid::new_v4().to_string();
+        self.conn
+            .execute(
+                "INSERT INTO employee_sessions (id, employee_id, login_at) VALUES (?1, ?2, datetime('now'))",
+                params![id, employee_id],
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn record_logout(&self, employee_id: &str) -> Result<(), String> {
+        self.conn
+            .execute(
+                "UPDATE employee_sessions SET logout_at = datetime('now') WHERE employee_id = ?1 AND logout_at IS NULL",
+                params![employee_id],
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn list_recent_sessions(&self, employee_id: &str, limit: i64) -> Vec<SessionRecord> {
+        let mut stmt = match self.conn.prepare(
+            "SELECT id, login_at, logout_at FROM employee_sessions
+             WHERE employee_id = ?1 ORDER BY login_at DESC LIMIT ?2",
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        let rows = stmt.query_map(params![employee_id, limit], |row| {
+            Ok(SessionRecord {
+                id: row.get(0)?,
+                login_at: row.get(1)?,
+                logout_at: row.get(2)?,
+            })
+        });
+        match rows {
+            Ok(r) => r.filter_map(|x| x.ok()).collect(),
+            Err(_) => Vec::new(),
+        }
     }
 }

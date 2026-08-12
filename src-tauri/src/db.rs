@@ -120,6 +120,41 @@ pub struct ClientHistoryRecord {
     pub created_at: String,
 }
 
+pub struct ProjectRecord {
+    pub id: String,
+    pub project_number: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub client_id: Option<String>,
+    pub client_name: Option<String>,
+    pub owner_id: String,
+    pub owner_name: String,
+    pub status: String,
+    pub created_by: Option<String>,
+    pub created_by_name: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub member_count: i64,
+}
+
+pub struct ProjectMemberRecord {
+    pub employee_id: String,
+    pub employee_name: String,
+    pub role_in_project: String,
+    pub is_owner: bool,
+    pub added_at: String,
+}
+
+pub struct ProjectChatMessageRecord {
+    pub id: String,
+    pub project_id: String,
+    pub sender_id: String,
+    pub sender_name: String,
+    pub content: String,
+    pub is_task: bool,
+    pub created_at: String,
+}
+
 pub struct PositionRecord {
     pub id: String,
     pub title: String,
@@ -220,6 +255,41 @@ impl Db {
                 client_id TEXT NOT NULL REFERENCES clients(id),
                 description TEXT NOT NULL,
                 created_by TEXT REFERENCES employees(id),
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS projects (
+                id TEXT PRIMARY KEY,
+                project_number TEXT UNIQUE NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                client_id TEXT REFERENCES clients(id),
+                owner_id TEXT NOT NULL REFERENCES employees(id),
+                status TEXT NOT NULL DEFAULT 'planning',
+                created_by TEXT REFERENCES employees(id),
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS project_members (
+                project_id TEXT NOT NULL REFERENCES projects(id),
+                employee_id TEXT NOT NULL REFERENCES employees(id),
+                role_in_project TEXT NOT NULL DEFAULT 'member',
+                added_by TEXT REFERENCES employees(id),
+                added_at TEXT NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY (project_id, employee_id)
+            );
+            CREATE TABLE IF NOT EXISTS project_ownership_transfers (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL REFERENCES projects(id),
+                from_employee_id TEXT REFERENCES employees(id),
+                to_employee_id TEXT NOT NULL REFERENCES employees(id),
+                transferred_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS project_chat_messages (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL REFERENCES projects(id),
+                sender_id TEXT NOT NULL REFERENCES employees(id),
+                content TEXT NOT NULL,
+                is_task INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );",
         )
@@ -1455,6 +1525,318 @@ impl Db {
             description: description.trim().to_string(),
             created_by: Some(actor_id.to_string()),
             created_by_name,
+            created_at: String::new(),
+        })
+    }
+
+    // ---- Проекты ----
+    // Владелец ("главный над проектом") хранится отдельным полем projects.owner_id
+    // (можно передать другому — project_ownership_transfers ведёт историю передач),
+    // но владелец также всегда состоит в project_members — чтобы не городить спецкейсы
+    // на каждом шагу (отображение в составе, право писать в чат и т.д.).
+    // Управлять проектом (редактировать, добавлять/убирать участников, передавать
+    // главенство) может владелец или админ. Удаление — только админ.
+
+    const PROJECT_SELECT: &'static str = "SELECT
+            p.id, p.project_number, p.name, p.description, p.client_id, c.name,
+            p.owner_id, o.full_name, p.status, p.created_by, cb.full_name,
+            p.created_at, p.updated_at,
+            (SELECT COUNT(*) FROM project_members pm WHERE pm.project_id = p.id)
+        FROM projects p
+        LEFT JOIN clients c ON c.id = p.client_id
+        LEFT JOIN employees o ON o.id = p.owner_id
+        LEFT JOIN employees cb ON cb.id = p.created_by";
+
+    fn map_project_row(row: &rusqlite::Row) -> rusqlite::Result<ProjectRecord> {
+        Ok(ProjectRecord {
+            id: row.get(0)?,
+            project_number: row.get(1)?,
+            name: row.get(2)?,
+            description: row.get(3)?,
+            client_id: row.get(4)?,
+            client_name: row.get(5)?,
+            owner_id: row.get(6)?,
+            owner_name: row.get::<_, Option<String>>(7)?.unwrap_or_default(),
+            status: row.get(8)?,
+            created_by: row.get(9)?,
+            created_by_name: row.get(10)?,
+            created_at: row.get(11)?,
+            updated_at: row.get(12)?,
+            member_count: row.get(13)?,
+        })
+    }
+
+    fn next_project_number(&self) -> String {
+        let count: i64 = self.conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0)).unwrap_or(0);
+        format!("PRJ-{:05}", count + 1)
+    }
+
+    fn can_manage_project(&self, actor_id: &str, owner_id: &str) -> bool {
+        self.is_admin(actor_id) || owner_id == actor_id
+    }
+
+    fn is_project_participant(&self, actor_id: &str, project: &ProjectRecord) -> bool {
+        if self.is_admin(actor_id) || project.owner_id == actor_id {
+            return true;
+        }
+        self.conn
+            .query_row(
+                "SELECT 1 FROM project_members WHERE project_id = ?1 AND employee_id = ?2",
+                params![project.id, actor_id],
+                |_| Ok(()),
+            )
+            .is_ok()
+    }
+
+    pub fn list_projects(&self) -> Vec<ProjectRecord> {
+        let sql = format!("{} ORDER BY p.created_at DESC", Self::PROJECT_SELECT);
+        let mut stmt = match self.conn.prepare(&sql) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map([], Self::map_project_row)
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn get_project(&self, id: &str) -> Option<ProjectRecord> {
+        let sql = format!("{} WHERE p.id = ?1", Self::PROJECT_SELECT);
+        self.conn.query_row(&sql, params![id], Self::map_project_row).ok()
+    }
+
+    pub fn create_project(
+        &self,
+        actor_id: &str,
+        name: &str,
+        description: Option<&str>,
+        client_id: Option<&str>,
+        status: &str,
+    ) -> Result<ProjectRecord, String> {
+        if name.trim().is_empty() {
+            return Err("Укажите название проекта".into());
+        }
+        if !["planning", "active", "on_hold", "completed", "cancelled"].contains(&status) {
+            return Err("Некорректный статус проекта".into());
+        }
+
+        let id = Uuid::new_v4().to_string();
+        let project_number = self.next_project_number();
+        self.conn
+            .execute(
+                "INSERT INTO projects (id, project_number, name, description, client_id, owner_id, status, created_by)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![id, project_number, name.trim(), description, client_id, actor_id, status, actor_id],
+            )
+            .map_err(|e| e.to_string())?;
+
+        self.conn
+            .execute(
+                "INSERT OR IGNORE INTO project_members (project_id, employee_id, role_in_project, added_by)
+                 VALUES (?1, ?2, 'member', ?2)",
+                params![id, actor_id],
+            )
+            .ok();
+
+        if let Some(cid) = client_id {
+            let title = format!("Создан проект «{}»", name.trim());
+            let _ = self.add_client_history(cid, actor_id, &title);
+        }
+
+        self.get_project(&id).ok_or_else(|| "Проект не найден".to_string())
+    }
+
+    pub fn update_project(
+        &self,
+        actor_id: &str,
+        id: &str,
+        name: &str,
+        description: Option<&str>,
+        client_id: Option<&str>,
+        status: &str,
+    ) -> Result<ProjectRecord, String> {
+        let project = self.get_project(id).ok_or_else(|| "Проект не найден".to_string())?;
+        if !self.can_manage_project(actor_id, &project.owner_id) {
+            return Err("Недостаточно прав для редактирования проекта".into());
+        }
+        if name.trim().is_empty() {
+            return Err("Укажите название проекта".into());
+        }
+        if !["planning", "active", "on_hold", "completed", "cancelled"].contains(&status) {
+            return Err("Некорректный статус проекта".into());
+        }
+
+        self.conn
+            .execute(
+                "UPDATE projects SET name = ?1, description = ?2, client_id = ?3, status = ?4, updated_at = datetime('now') WHERE id = ?5",
+                params![name.trim(), description, client_id, status, id],
+            )
+            .map_err(|e| e.to_string())?;
+
+        self.get_project(id).ok_or_else(|| "Проект не найден".to_string())
+    }
+
+    pub fn delete_project(&self, admin_id: &str, id: &str) -> Result<(), String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn.execute("DELETE FROM project_chat_messages WHERE project_id = ?1", params![id]).ok();
+        self.conn.execute("DELETE FROM project_ownership_transfers WHERE project_id = ?1", params![id]).ok();
+        self.conn.execute("DELETE FROM project_members WHERE project_id = ?1", params![id]).ok();
+        self.conn.execute("DELETE FROM projects WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn list_project_members(&self, project_id: &str) -> Vec<ProjectMemberRecord> {
+        let owner_id: Option<String> = self
+            .conn
+            .query_row("SELECT owner_id FROM projects WHERE id = ?1", params![project_id], |row| row.get(0))
+            .ok();
+        let mut stmt = match self.conn.prepare(
+            "SELECT pm.employee_id, e.full_name, pm.role_in_project, pm.added_at
+             FROM project_members pm JOIN employees e ON e.id = pm.employee_id
+             WHERE pm.project_id = ?1 ORDER BY pm.added_at ASC",
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map(params![project_id], |row| {
+            let employee_id: String = row.get(0)?;
+            let is_owner = owner_id.as_deref() == Some(employee_id.as_str());
+            Ok(ProjectMemberRecord {
+                employee_id,
+                employee_name: row.get(1)?,
+                role_in_project: row.get(2)?,
+                is_owner,
+                added_at: row.get(3)?,
+            })
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default()
+    }
+
+    pub fn add_project_member(&self, actor_id: &str, project_id: &str, employee_id: &str, role: &str) -> Result<(), String> {
+        let project = self.get_project(project_id).ok_or_else(|| "Проект не найден".to_string())?;
+        if !self.can_manage_project(actor_id, &project.owner_id) {
+            return Err("Недостаточно прав".into());
+        }
+        if !["member", "assistant"].contains(&role) {
+            return Err("Некорректная роль".into());
+        }
+        self.conn
+            .execute(
+                "INSERT INTO project_members (project_id, employee_id, role_in_project, added_by)
+                 VALUES (?1, ?2, ?3, ?4)
+                 ON CONFLICT(project_id, employee_id) DO UPDATE SET role_in_project = excluded.role_in_project",
+                params![project_id, employee_id, role, actor_id],
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn remove_project_member(&self, actor_id: &str, project_id: &str, employee_id: &str) -> Result<(), String> {
+        let project = self.get_project(project_id).ok_or_else(|| "Проект не найден".to_string())?;
+        if !self.can_manage_project(actor_id, &project.owner_id) {
+            return Err("Недостаточно прав".into());
+        }
+        if project.owner_id == employee_id {
+            return Err("Сначала передайте главенство над проектом другому участнику".into());
+        }
+        self.conn
+            .execute("DELETE FROM project_members WHERE project_id = ?1 AND employee_id = ?2", params![project_id, employee_id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn transfer_project_ownership(&self, actor_id: &str, project_id: &str, new_owner_id: &str) -> Result<ProjectRecord, String> {
+        let project = self.get_project(project_id).ok_or_else(|| "Проект не найден".to_string())?;
+        if !self.can_manage_project(actor_id, &project.owner_id) {
+            return Err("Недостаточно прав".into());
+        }
+        if project.owner_id == new_owner_id {
+            return Err("Этот сотрудник уже является владельцем проекта".into());
+        }
+
+        let id = Uuid::new_v4().to_string();
+        self.conn
+            .execute(
+                "INSERT INTO project_ownership_transfers (id, project_id, from_employee_id, to_employee_id) VALUES (?1, ?2, ?3, ?4)",
+                params![id, project_id, project.owner_id, new_owner_id],
+            )
+            .map_err(|e| e.to_string())?;
+
+        self.conn
+            .execute(
+                "UPDATE projects SET owner_id = ?1, updated_at = datetime('now') WHERE id = ?2",
+                params![new_owner_id, project_id],
+            )
+            .map_err(|e| e.to_string())?;
+
+        self.conn
+            .execute(
+                "INSERT OR IGNORE INTO project_members (project_id, employee_id, role_in_project, added_by) VALUES (?1, ?2, 'member', ?3)",
+                params![project_id, new_owner_id, actor_id],
+            )
+            .ok();
+
+        let title = format!("Вам передан проект «{}»", project.name);
+        self.notify(new_owner_id, "project_ownership_transfer", &title, None, Some("project"), Some(project_id));
+
+        self.get_project(project_id).ok_or_else(|| "Проект не найден".to_string())
+    }
+
+    pub fn list_project_chat(&self, project_id: &str) -> Vec<ProjectChatMessageRecord> {
+        let mut stmt = match self.conn.prepare(
+            "SELECT m.id, m.project_id, m.sender_id, e.full_name, m.content, m.is_task, m.created_at
+             FROM project_chat_messages m JOIN employees e ON e.id = m.sender_id
+             WHERE m.project_id = ?1 ORDER BY m.created_at ASC",
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map(params![project_id], |row| {
+            Ok(ProjectChatMessageRecord {
+                id: row.get(0)?,
+                project_id: row.get(1)?,
+                sender_id: row.get(2)?,
+                sender_name: row.get(3)?,
+                content: row.get(4)?,
+                is_task: row.get::<_, i64>(5)? != 0,
+                created_at: row.get(6)?,
+            })
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default()
+    }
+
+    pub fn send_project_chat_message(&self, actor_id: &str, project_id: &str, content: &str, is_task: bool) -> Result<ProjectChatMessageRecord, String> {
+        let project = self.get_project(project_id).ok_or_else(|| "Проект не найден".to_string())?;
+        if !self.is_project_participant(actor_id, &project) {
+            return Err("Вы не участник этого проекта".into());
+        }
+        if content.trim().is_empty() {
+            return Err("Пустое сообщение".into());
+        }
+
+        let id = Uuid::new_v4().to_string();
+        self.conn
+            .execute(
+                "INSERT INTO project_chat_messages (id, project_id, sender_id, content, is_task) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![id, project_id, actor_id, content.trim(), is_task as i64],
+            )
+            .map_err(|e| e.to_string())?;
+
+        let (sender_name,): (Option<String>,) = self
+            .conn
+            .query_row("SELECT full_name FROM employees WHERE id = ?1", params![actor_id], |row| Ok((row.get(0)?,)))
+            .unwrap_or((None,));
+
+        Ok(ProjectChatMessageRecord {
+            id,
+            project_id: project_id.to_string(),
+            sender_id: actor_id.to_string(),
+            sender_name: sender_name.unwrap_or_default(),
+            content: content.trim().to_string(),
+            is_task,
             created_at: String::new(),
         })
     }

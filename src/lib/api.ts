@@ -43,6 +43,45 @@ export type ClientHistoryEntry = {
   createdAt: string;
 };
 
+export type ProjectStatus = 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled';
+
+export type Project = {
+  id: string;
+  projectNumber: string;
+  name: string;
+  description: string | null;
+  clientId: string | null;
+  clientName: string | null;
+  ownerId: string;
+  ownerName: string;
+  status: ProjectStatus;
+  createdBy: string | null;
+  createdByName: string | null;
+  createdAt: string;
+  updatedAt: string;
+  memberCount: number;
+};
+
+export type ProjectMemberRole = 'member' | 'assistant';
+
+export type ProjectMember = {
+  employeeId: string;
+  employeeName: string;
+  roleInProject: ProjectMemberRole;
+  isOwner: boolean;
+  addedAt: string;
+};
+
+export type ProjectChatMessage = {
+  id: string;
+  projectId: string;
+  senderId: string;
+  senderName: string;
+  content: string;
+  isTask: boolean;
+  createdAt: string;
+};
+
 export type Employee = {
   id: string;
   employeeNumber: string;
@@ -253,6 +292,45 @@ export const api = {
 
   addClientHistory: (payload: { clientId: string; actorId: string; description: string }) =>
     invoke<ClientHistoryEntry>('add_client_history', { payload }),
+
+  listProjects: () => invoke<Project[]>('list_projects'),
+
+  getProject: (id: string) => invoke<Project | null>('get_project', { id }),
+
+  createProject: (payload: {
+    actorId: string;
+    name: string;
+    description?: string | null;
+    clientId?: string | null;
+    status: ProjectStatus;
+  }) => invoke<Project>('create_project', { payload }),
+
+  updateProject: (payload: {
+    actorId: string;
+    id: string;
+    name: string;
+    description?: string | null;
+    clientId?: string | null;
+    status: ProjectStatus;
+  }) => invoke<Project>('update_project', { payload }),
+
+  deleteProject: (payload: { adminId: string; id: string }) => invoke<void>('delete_project', { payload }),
+
+  listProjectMembers: (projectId: string) => invoke<ProjectMember[]>('list_project_members', { projectId }),
+
+  addProjectMember: (payload: { actorId: string; projectId: string; employeeId: string; role: ProjectMemberRole }) =>
+    invoke<void>('add_project_member', { payload }),
+
+  removeProjectMember: (payload: { actorId: string; projectId: string; employeeId: string }) =>
+    invoke<void>('remove_project_member', { payload }),
+
+  transferProjectOwnership: (payload: { actorId: string; projectId: string; newOwnerId: string }) =>
+    invoke<Project>('transfer_project_ownership', { payload }),
+
+  listProjectChat: (projectId: string) => invoke<ProjectChatMessage[]>('list_project_chat', { projectId }),
+
+  sendProjectChatMessage: (payload: { actorId: string; projectId: string; content: string; isTask: boolean }) =>
+    invoke<ProjectChatMessage>('send_project_chat_message', { payload }),
 
   recordLogin: (employeeId: string) => invoke<void>('record_login', { employeeId }),
 

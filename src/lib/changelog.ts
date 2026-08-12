@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.1.12';
+export const APP_VERSION = '0.1.13';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,15 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.1.13',
+      items: [
+        'Новый модуль "Проекты" — карточка, статус, привязка к клиенту',
+        'Владелец проекта может передать главенство другому участнику',
+        'Роли участников — "Участник" и "Помощник"',
+        'Общий чат проекта, сообщения можно помечать как задачу',
+      ],
+    },
     {
       version: '0.1.12',
       items: [
@@ -138,6 +147,15 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.1.13',
+      items: [
+        "Yangi \"Loyihalar\" moduli — kartochka, holat, mijozga bog'lash",
+        "Loyiha egasi egalikni boshqa ishtirokchiga topshirishi mumkin",
+        "Ishtirokchi rollari — \"Ishtirokchi\" va \"Yordamchi\"",
+        "Loyiha umumiy chati, xabarlarni vazifa sifatida belgilash mumkin",
+      ],
+    },
+    {
       version: '0.1.12',
       items: [
         "Yangi \"Mijozlar\" moduli — kontaktlar va tarix lentasi bilan kartochka",
@@ -259,6 +277,15 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.1.13',
+      items: [
+        'Янги "Лойиҳалар" модули — карточка, ҳолат, мижозга боғлаш',
+        'Лойиҳа эгаси эгаликни бошқа иштирокчига топшириши мумкин',
+        'Иштирокчи роллари — "Иштирокчи" ва "Ёрдамчи"',
+        'Лойиҳа умумий чати, хабарларни вазифа сифатида белгилаш мумкин',
+      ],
+    },
     {
       version: '0.1.12',
       items: [

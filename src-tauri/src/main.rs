@@ -184,6 +184,64 @@ struct ClientHistoryEntry {
 }
 
 #[derive(Clone, serde::Serialize)]
+struct Project {
+    id: String,
+    #[serde(rename = "projectNumber")]
+    project_number: String,
+    name: String,
+    description: Option<String>,
+    #[serde(rename = "clientId")]
+    client_id: Option<String>,
+    #[serde(rename = "clientName")]
+    client_name: Option<String>,
+    #[serde(rename = "ownerId")]
+    owner_id: String,
+    #[serde(rename = "ownerName")]
+    owner_name: String,
+    status: String,
+    #[serde(rename = "createdBy")]
+    created_by: Option<String>,
+    #[serde(rename = "createdByName")]
+    created_by_name: Option<String>,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+    #[serde(rename = "updatedAt")]
+    updated_at: String,
+    #[serde(rename = "memberCount")]
+    member_count: i64,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct ProjectMember {
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+    #[serde(rename = "employeeName")]
+    employee_name: String,
+    #[serde(rename = "roleInProject")]
+    role_in_project: String,
+    #[serde(rename = "isOwner")]
+    is_owner: bool,
+    #[serde(rename = "addedAt")]
+    added_at: String,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct ProjectChatMessage {
+    id: String,
+    #[serde(rename = "projectId")]
+    project_id: String,
+    #[serde(rename = "senderId")]
+    sender_id: String,
+    #[serde(rename = "senderName")]
+    sender_name: String,
+    content: String,
+    #[serde(rename = "isTask")]
+    is_task: bool,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+}
+
+#[derive(Clone, serde::Serialize)]
 struct Position {
     id: String,
     title: String,
@@ -375,6 +433,78 @@ struct AddClientHistoryPayload {
 }
 
 #[derive(serde::Deserialize)]
+struct CreateProjectPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    name: String,
+    description: Option<String>,
+    #[serde(rename = "clientId")]
+    client_id: Option<String>,
+    status: String,
+}
+
+#[derive(serde::Deserialize)]
+struct UpdateProjectPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    id: String,
+    name: String,
+    description: Option<String>,
+    #[serde(rename = "clientId")]
+    client_id: Option<String>,
+    status: String,
+}
+
+#[derive(serde::Deserialize)]
+struct DeleteProjectPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct AddProjectMemberPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "projectId")]
+    project_id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+    role: String,
+}
+
+#[derive(serde::Deserialize)]
+struct RemoveProjectMemberPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "projectId")]
+    project_id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct TransferProjectOwnershipPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "projectId")]
+    project_id: String,
+    #[serde(rename = "newOwnerId")]
+    new_owner_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct SendProjectChatMessagePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "projectId")]
+    project_id: String,
+    content: String,
+    #[serde(rename = "isTask")]
+    is_task: bool,
+}
+
+#[derive(serde::Deserialize)]
 struct SetEmployeeSchedulePayload {
     #[serde(rename = "adminId")]
     admin_id: String,
@@ -492,6 +622,47 @@ fn to_client_history(h: db::ClientHistoryRecord) -> ClientHistoryEntry {
         created_by: h.created_by,
         created_by_name: h.created_by_name,
         created_at: h.created_at,
+    }
+}
+
+fn to_project(p: db::ProjectRecord) -> Project {
+    Project {
+        id: p.id,
+        project_number: p.project_number,
+        name: p.name,
+        description: p.description,
+        client_id: p.client_id,
+        client_name: p.client_name,
+        owner_id: p.owner_id,
+        owner_name: p.owner_name,
+        status: p.status,
+        created_by: p.created_by,
+        created_by_name: p.created_by_name,
+        created_at: p.created_at,
+        updated_at: p.updated_at,
+        member_count: p.member_count,
+    }
+}
+
+fn to_project_member(m: db::ProjectMemberRecord) -> ProjectMember {
+    ProjectMember {
+        employee_id: m.employee_id,
+        employee_name: m.employee_name,
+        role_in_project: m.role_in_project,
+        is_owner: m.is_owner,
+        added_at: m.added_at,
+    }
+}
+
+fn to_project_chat_message(m: db::ProjectChatMessageRecord) -> ProjectChatMessage {
+    ProjectChatMessage {
+        id: m.id,
+        project_id: m.project_id,
+        sender_id: m.sender_id,
+        sender_name: m.sender_name,
+        content: m.content,
+        is_task: m.is_task,
+        created_at: m.created_at,
     }
 }
 
@@ -829,6 +1000,89 @@ fn add_client_history(payload: AddClientHistoryPayload, state: tauri::State<AppS
 }
 
 #[tauri::command]
+fn list_projects(state: tauri::State<AppState>) -> Vec<Project> {
+    let db = state.0.lock().unwrap();
+    db.list_projects().into_iter().map(to_project).collect()
+}
+
+#[tauri::command]
+fn get_project(id: String, state: tauri::State<AppState>) -> Option<Project> {
+    let db = state.0.lock().unwrap();
+    db.get_project(&id).map(to_project)
+}
+
+#[tauri::command]
+fn create_project(payload: CreateProjectPayload, state: tauri::State<AppState>) -> Result<Project, String> {
+    let db = state.0.lock().unwrap();
+    db.create_project(
+        &payload.actor_id,
+        &payload.name,
+        payload.description.as_deref(),
+        payload.client_id.as_deref(),
+        &payload.status,
+    )
+    .map(to_project)
+}
+
+#[tauri::command]
+fn update_project(payload: UpdateProjectPayload, state: tauri::State<AppState>) -> Result<Project, String> {
+    let db = state.0.lock().unwrap();
+    db.update_project(
+        &payload.actor_id,
+        &payload.id,
+        &payload.name,
+        payload.description.as_deref(),
+        payload.client_id.as_deref(),
+        &payload.status,
+    )
+    .map(to_project)
+}
+
+#[tauri::command]
+fn delete_project(payload: DeleteProjectPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.delete_project(&payload.admin_id, &payload.id)
+}
+
+#[tauri::command]
+fn list_project_members(project_id: String, state: tauri::State<AppState>) -> Vec<ProjectMember> {
+    let db = state.0.lock().unwrap();
+    db.list_project_members(&project_id).into_iter().map(to_project_member).collect()
+}
+
+#[tauri::command]
+fn add_project_member(payload: AddProjectMemberPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.add_project_member(&payload.actor_id, &payload.project_id, &payload.employee_id, &payload.role)
+}
+
+#[tauri::command]
+fn remove_project_member(payload: RemoveProjectMemberPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.remove_project_member(&payload.actor_id, &payload.project_id, &payload.employee_id)
+}
+
+#[tauri::command]
+fn transfer_project_ownership(payload: TransferProjectOwnershipPayload, state: tauri::State<AppState>) -> Result<Project, String> {
+    let db = state.0.lock().unwrap();
+    db.transfer_project_ownership(&payload.actor_id, &payload.project_id, &payload.new_owner_id)
+        .map(to_project)
+}
+
+#[tauri::command]
+fn list_project_chat(project_id: String, state: tauri::State<AppState>) -> Vec<ProjectChatMessage> {
+    let db = state.0.lock().unwrap();
+    db.list_project_chat(&project_id).into_iter().map(to_project_chat_message).collect()
+}
+
+#[tauri::command]
+fn send_project_chat_message(payload: SendProjectChatMessagePayload, state: tauri::State<AppState>) -> Result<ProjectChatMessage, String> {
+    let db = state.0.lock().unwrap();
+    db.send_project_chat_message(&payload.actor_id, &payload.project_id, &payload.content, payload.is_task)
+        .map(to_project_chat_message)
+}
+
+#[tauri::command]
 fn record_login(employee_id: String, state: tauri::State<AppState>) -> Result<(), String> {
     let db = state.0.lock().unwrap();
     db.record_login(&employee_id)
@@ -893,6 +1147,17 @@ fn main() {
             delete_client,
             list_client_history,
             add_client_history,
+            list_projects,
+            get_project,
+            create_project,
+            update_project,
+            delete_project,
+            list_project_members,
+            add_project_member,
+            remove_project_member,
+            transfer_project_ownership,
+            list_project_chat,
+            send_project_chat_message,
             record_login,
             record_logout,
             list_recent_sessions

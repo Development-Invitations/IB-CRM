@@ -24,6 +24,7 @@ import DepartmentsPage from './Departments';
 import AbsenceRequestsPage from './AbsenceRequests';
 import ClientsPage from './Clients';
 import ProjectsPage from './Projects';
+import RegulationsPage from './Regulations';
 import type { Employee } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { APP_VERSION } from '../lib/changelog';
@@ -37,7 +38,7 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
     { label: t('sidebar.departments'), icon: Building2, path: 'departments' },
     { label: t('sidebar.clients'), icon: Contact, path: 'clients' },
     { label: t('sidebar.projects'), icon: FolderKanban, path: 'projects' },
-    { label: t('sidebar.regulations'), icon: FileText },
+    { label: t('sidebar.regulations'), icon: FileText, path: 'regulations' },
     { label: t('sidebar.blog'), icon: MessageSquare },
     { label: t('sidebar.birthdays'), icon: Cake },
   ];
@@ -97,6 +98,7 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
             <Route path="departments" element={<DepartmentsPage currentEmployee={employee} />} />
             <Route path="clients" element={<ClientsPage currentEmployee={employee} />} />
             <Route path="projects" element={<ProjectsPage currentEmployee={employee} />} />
+            <Route path="regulations" element={<RegulationsPage currentEmployee={employee} />} />
             <Route path="absence-requests" element={<AbsenceRequestsPage currentEmployee={employee} />} />
             <Route path="settings" element={<SettingsPage employee={employee} />} />
           </Routes>

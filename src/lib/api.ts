@@ -84,6 +84,62 @@ export type ProjectChatMessage = {
   createdAt: string;
 };
 
+export type RegulationStatus = 'active' | 'closed';
+export type RegulationEntryStatus = 'open' | 'done' | 'cancelled';
+export type RegulationMemberRole = 'owner' | 'member';
+
+export type Regulation = {
+  id: string;
+  regNumber: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  clientId: string | null;
+  clientName: string | null;
+  ownerId: string;
+  ownerName: string;
+  status: RegulationStatus;
+  deadline: string | null;
+  closedAt: string | null;
+  createdBy: string | null;
+  createdByName: string | null;
+  createdAt: string;
+  updatedAt: string;
+  memberCount: number;
+  entryCount: number;
+};
+
+export type RegulationMember = {
+  employeeId: string;
+  employeeName: string;
+  roleInReg: RegulationMemberRole;
+  addedAt: string;
+};
+
+export type RegulationEntry = {
+  id: string;
+  regulationId: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  attachmentData: string | null;
+  attachmentName: string | null;
+  deadline: string | null;
+  status: RegulationEntryStatus;
+  createdAt: string;
+  updatedAt: string;
+  replyCount: number;
+};
+
+export type RegulationReply = {
+  id: string;
+  entryId: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  createdAt: string;
+};
+
 export type Employee = {
   id: string;
   employeeNumber: string;
@@ -337,6 +393,30 @@ export const api = {
 
   sendProjectChatMessage: (payload: { actorId: string; projectId: string; content: string; isTask: boolean }) =>
     invoke<ProjectChatMessage>('send_project_chat_message', { payload }),
+
+  listRegulations: () => invoke<Regulation[]>('list_regulations'),
+  getRegulation: (id: string) => invoke<Regulation | null>('get_regulation', { id }),
+  createRegulation: (payload: { actorId: string; title: string; description?: string | null; clientId?: string | null; deadline?: string | null }) =>
+    invoke<Regulation>('create_regulation', { payload }),
+  updateRegulation: (payload: { actorId: string; id: string; title: string; description?: string | null; clientId?: string | null; deadline?: string | null; status: RegulationStatus }) =>
+    invoke<Regulation>('update_regulation', { payload }),
+  deleteRegulation: (payload: { adminId: string; id: string }) => invoke<void>('delete_regulation', { payload }),
+
+  listRegulationMembers: (regulationId: string) => invoke<RegulationMember[]>('list_regulation_members', { regulationId }),
+  addRegulationMember: (payload: { actorId: string; regulationId: string; employeeId: string; role: string }) =>
+    invoke<void>('add_regulation_member', { payload }),
+  removeRegulationMember: (payload: { actorId: string; regulationId: string; employeeId: string }) =>
+    invoke<void>('remove_regulation_member', { payload }),
+
+  listRegulationEntries: (regulationId: string) => invoke<RegulationEntry[]>('list_regulation_entries', { regulationId }),
+  addRegulationEntry: (payload: { actorId: string; regulationId: string; content: string; attachmentData?: string | null; attachmentName?: string | null; deadline?: string | null }) =>
+    invoke<RegulationEntry>('add_regulation_entry', { payload }),
+  updateEntryStatus: (payload: { actorId: string; entryId: string; status: RegulationEntryStatus }) =>
+    invoke<void>('update_entry_status', { payload }),
+
+  listRegulationReplies: (entryId: string) => invoke<RegulationReply[]>('list_regulation_replies', { entryId }),
+  addRegulationReply: (payload: { actorId: string; entryId: string; content: string }) =>
+    invoke<RegulationReply>('add_regulation_reply', { payload }),
 
   recordLogin: (employeeId: string) => invoke<void>('record_login', { employeeId }),
 

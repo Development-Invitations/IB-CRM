@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.1.14';
+export const APP_VERSION = '0.1.15';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,17 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.1.15',
+      items: [
+        'Новый модуль "Регламенты" — внутренние рабочие документы с лентой записей',
+        'Поиск в регламентах по ID или ссылке (slug)',
+        'Записи в регламенте с дедлайнами, статусами задач и вложениями',
+        'Ответы на записи от участников регламента',
+        'Закрытие и возобновление регламента, управление составом участников',
+        'Уникальная ссылка (slug) для каждого регламента — можно поделиться с коллегой',
+      ],
+    },
     {
       version: '0.1.14',
       items: [
@@ -156,6 +167,17 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.1.15',
+      items: [
+        "Yangi \"Reglamentlar\" moduli — yozuvlar lentasi bilan ichki ish hujjatlari",
+        "Reglamentlarni ID yoki havola (slug) bo'yicha qidirish",
+        "Reglamentdagi yozuvlar — muddatlar, vazifa holatlari va ilovalar bilan",
+        "Reglament ishtirokchilaridan yozuvlarga javoblar",
+        "Reglamentni yopish va qayta tiklash, ishtirokchilar tarkibini boshqarish",
+        "Har bir reglament uchun noyob havola (slug) — hamkasbingiz bilan ulashish mumkin",
+      ],
+    },
+    {
       version: '0.1.14',
       items: [
         "Bo'lim rahbari endi xodim kartochkasida to'g'ri ko'rinadi",
@@ -295,6 +317,17 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.1.15',
+      items: [
+        'Янги "Регламентлар" модули — ёзувлар ленталит билан ички иш ҳужжатлари',
+        'Регламентларни ID ёки ҳавола (slug) бўйича қидириш',
+        'Регламентдаги ёзувлар — муддатлар, вазифа ҳолатлари ва иловалар билан',
+        'Регламент иштирокчиларидан ёзувларга жавоблар',
+        'Регламентни ёпиш ва қайта тиклаш, иштирокчилар таркибини бошқариш',
+        'Ҳар бир регламент учун ноёб ҳавола (slug) — ҳамкасбингиз билан улашиш мумкин',
+      ],
+    },
     {
       version: '0.1.14',
       items: [

@@ -1746,3 +1746,192 @@ button.employees-add-btn {
 }
 
 .employees-search-input:focus { outline: none; border-color: var(--color-accent); }
+
+/* ---- Статусы регламента ---- */
+.reg-status-active { background: color-mix(in srgb, var(--color-success) 18%, transparent); color: var(--color-success); }
+.reg-status-closed { background: color-mix(in srgb, var(--color-text-muted) 20%, transparent); color: var(--color-text-muted); }
+
+/* ---- Детальный вид регламента (оверлей поверх списка) ---- */
+.regulation-detail-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+}
+
+.regulation-detail {
+  width: min(900px, 100vw);
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.regulation-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.regulation-detail-header h2 { margin: 0; font-size: 20px; }
+.regulation-detail-header-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+.reg-closed-banner {
+  background: color-mix(in srgb, var(--color-text-muted) 12%, transparent);
+  color: var(--color-text-muted);
+  padding: 8px 24px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.regulation-detail-meta {
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.reg-slug-row { display: flex; align-items: center; gap: 8px; }
+.reg-slug-row code {
+  background: var(--color-surface-2);
+  padding: 2px 8px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-family: monospace;
+}
+.reg-copy-btn { background: none; border: none; cursor: pointer; color: var(--color-text-muted); display: flex; }
+.reg-copy-btn:hover { color: var(--color-accent); }
+
+.regulation-detail-cols {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.regulation-members-panel {
+  border-right: 1px solid var(--color-border);
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.regulation-entries-panel {
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.regulation-add-member { display: flex; gap: 8px; margin-bottom: 12px; }
+
+/* ---- Форма добавления записи ---- */
+.reg-add-entry textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  margin-bottom: 8px;
+}
+
+.reg-add-entry-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.reg-add-entry-row input[type="date"] {
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: 12px;
+}
+
+.regulation-remove-attach {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-danger);
+  display: flex;
+}
+
+/* ---- Запись регламента ---- */
+.reg-entries-list { display: flex; flex-direction: column; gap: 10px; }
+
+.reg-entry {
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+}
+
+.reg-entry-done { border-color: var(--color-success); opacity: 0.8; }
+.reg-entry-cancelled { opacity: 0.5; }
+
+.reg-entry-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.reg-entry-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
+.reg-entry-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+.reg-action-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  border: none; cursor: pointer; background: var(--color-surface);
+}
+.reg-action-btn.done { color: var(--color-success); }
+.reg-action-btn.cancel { color: var(--color-danger); }
+.reg-action-btn.reopen { color: var(--color-text-muted); }
+.reg-action-btn:hover { background: var(--color-border); }
+
+.reg-entry-content { font-size: 13px; line-height: 1.5; margin-bottom: 8px; }
+.reg-entry-badge-open { background: color-mix(in srgb, var(--color-primary) 20%, transparent); color: var(--color-primary); }
+.reg-entry-badge-done { background: color-mix(in srgb, var(--color-success) 18%, transparent); color: var(--color-success); }
+.reg-entry-badge-cancelled { background: color-mix(in srgb, var(--color-text-muted) 20%, transparent); color: var(--color-text-muted); }
+
+.reg-entry-attachment { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-muted); margin-bottom: 8px; }
+
+.reg-replies-toggle {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+/* ---- Ответы ---- */
+.reg-replies { margin-top: 8px; padding-left: 12px; border-left: 2px solid var(--color-border); }
+.reg-reply { padding: 6px 0; font-size: 12px; }
+.reg-reply-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+
+.reg-reply-form { display: flex; gap: 8px; margin-top: 8px; }
+.reg-reply-form input {
+  flex: 1;
+  padding: 7px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 12px;
+}
+
+/* ---- Правка карточки проекта (тесный низ) ---- */
+.project-chat-form { margin-top: 8px; }
+.project-chat-form textarea { min-height: 60px; }
+
+/* ---- Исправление drawer — фиксированная ширина ---- */
+.drawer-panel { min-width: 360px; }

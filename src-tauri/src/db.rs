@@ -157,6 +157,58 @@ pub struct ProjectChatMessageRecord {
     pub created_at: String,
 }
 
+pub struct RegulationRecord {
+    pub id: String,
+    pub reg_number: String,
+    pub slug: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub client_id: Option<String>,
+    pub client_name: Option<String>,
+    pub owner_id: String,
+    pub owner_name: String,
+    pub status: String,
+    pub deadline: Option<String>,
+    pub closed_at: Option<String>,
+    pub created_by: Option<String>,
+    pub created_by_name: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub member_count: i64,
+    pub entry_count: i64,
+}
+
+pub struct RegulationMemberRecord {
+    pub employee_id: String,
+    pub employee_name: String,
+    pub role_in_reg: String,
+    pub added_at: String,
+}
+
+pub struct RegulationEntryRecord {
+    pub id: String,
+    pub regulation_id: String,
+    pub author_id: String,
+    pub author_name: String,
+    pub content: String,
+    pub attachment_data: Option<String>,
+    pub attachment_name: Option<String>,
+    pub deadline: Option<String>,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub reply_count: i64,
+}
+
+pub struct RegulationReplyRecord {
+    pub id: String,
+    pub entry_id: String,
+    pub author_id: String,
+    pub author_name: String,
+    pub content: String,
+    pub created_at: String,
+}
+
 pub struct PositionRecord {
     pub id: String,
     pub title: String,
@@ -294,6 +346,48 @@ impl Db {
                 sender_id TEXT NOT NULL REFERENCES employees(id),
                 content TEXT NOT NULL,
                 is_task INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS regulations (
+                id TEXT PRIMARY KEY,
+                reg_number TEXT UNIQUE NOT NULL,
+                slug TEXT UNIQUE NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT,
+                client_id TEXT REFERENCES clients(id),
+                owner_id TEXT NOT NULL REFERENCES employees(id),
+                status TEXT NOT NULL DEFAULT 'active',
+                deadline TEXT,
+                closed_at TEXT,
+                created_by TEXT REFERENCES employees(id),
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS regulation_members (
+                regulation_id TEXT NOT NULL REFERENCES regulations(id),
+                employee_id TEXT NOT NULL REFERENCES employees(id),
+                role_in_reg TEXT NOT NULL DEFAULT 'member',
+                added_by TEXT REFERENCES employees(id),
+                added_at TEXT NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY (regulation_id, employee_id)
+            );
+            CREATE TABLE IF NOT EXISTS regulation_entries (
+                id TEXT PRIMARY KEY,
+                regulation_id TEXT NOT NULL REFERENCES regulations(id),
+                author_id TEXT NOT NULL REFERENCES employees(id),
+                content TEXT NOT NULL,
+                attachment_data TEXT,
+                attachment_name TEXT,
+                deadline TEXT,
+                status TEXT NOT NULL DEFAULT 'open',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS regulation_replies (
+                id TEXT PRIMARY KEY,
+                entry_id TEXT NOT NULL REFERENCES regulation_entries(id),
+                author_id TEXT NOT NULL REFERENCES employees(id),
+                content TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );",
         )
@@ -1899,6 +1993,390 @@ impl Db {
             sender_name: sender_name.unwrap_or_default(),
             content: content.trim().to_string(),
             is_task,
+            created_at: String::new(),
+        })
+    }
+
+    // ---- Регламенты ----
+    // Регламент — внутренний рабочий документ с лентой записей/задач, ответами
+    // сотрудников, вложениями и сроками. Каждый регламент имеет:
+    // — уникальный числовой номер REG-00001 для идентификации;
+    // — slug (короткая текстовая метка) для ссылок между регламентами;
+    // — ответственного (owner), участников с ролями, и опционально — привязку к клиенту.
+
+    const REGULATION_SELECT: &'static str = "SELECT
+            r.id, r.reg_number, r.slug, r.title, r.description,
+            r.client_id, c.name,
+            r.owner_id, o.full_name,
+            r.status, r.deadline, r.closed_at,
+            r.created_by, cb.full_name,
+            r.created_at, r.updated_at,
+            (SELECT COUNT(*) FROM regulation_members rm WHERE rm.regulation_id = r.id),
+            (SELECT COUNT(*) FROM regulation_entries re WHERE re.regulation_id = r.id)
+        FROM regulations r
+        LEFT JOIN clients c ON c.id = r.client_id
+        LEFT JOIN employees o ON o.id = r.owner_id
+        LEFT JOIN employees cb ON cb.id = r.created_by";
+
+    fn map_regulation_row(row: &rusqlite::Row) -> rusqlite::Result<RegulationRecord> {
+        Ok(RegulationRecord {
+            id: row.get(0)?,
+            reg_number: row.get(1)?,
+            slug: row.get(2)?,
+            title: row.get(3)?,
+            description: row.get(4)?,
+            client_id: row.get(5)?,
+            client_name: row.get(6)?,
+            owner_id: row.get(7)?,
+            owner_name: row.get::<_, Option<String>>(8)?.unwrap_or_default(),
+            status: row.get(9)?,
+            deadline: row.get(10)?,
+            closed_at: row.get(11)?,
+            created_by: row.get(12)?,
+            created_by_name: row.get(13)?,
+            created_at: row.get(14)?,
+            updated_at: row.get(15)?,
+            member_count: row.get(16)?,
+            entry_count: row.get(17)?,
+        })
+    }
+
+    fn next_reg_number(&self) -> String {
+        let count: i64 = self.conn.query_row("SELECT COUNT(*) FROM regulations", [], |row| row.get(0)).unwrap_or(0);
+        format!("REG-{:05}", count + 1)
+    }
+
+    fn make_slug(&self, title: &str, id: &str) -> String {
+        // Slug из первых 6 символов id (уникально) + первые слова заголовка
+        let short_id = &id[..6];
+        let words: String = title
+            .chars()
+            .filter(|c| c.is_alphanumeric() || c.is_whitespace())
+            .collect::<String>()
+            .split_whitespace()
+            .take(3)
+            .collect::<Vec<_>>()
+            .join("-")
+            .to_lowercase();
+        if words.is_empty() {
+            short_id.to_string()
+        } else {
+            format!("{}-{}", short_id, words)
+        }
+    }
+
+    pub fn list_regulations(&self) -> Vec<RegulationRecord> {
+        let sql = format!("{} ORDER BY r.updated_at DESC", Self::REGULATION_SELECT);
+        let mut stmt = match self.conn.prepare(&sql) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map([], Self::map_regulation_row)
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn get_regulation(&self, id: &str) -> Option<RegulationRecord> {
+        let sql = format!("{} WHERE r.id = ?1 OR r.slug = ?1 OR r.reg_number = ?1", Self::REGULATION_SELECT);
+        self.conn.query_row(&sql, params![id], Self::map_regulation_row).ok()
+    }
+
+    pub fn create_regulation(
+        &self,
+        actor_id: &str,
+        title: &str,
+        description: Option<&str>,
+        client_id: Option<&str>,
+        deadline: Option<&str>,
+    ) -> Result<RegulationRecord, String> {
+        if title.trim().is_empty() {
+            return Err("Укажите название регламента".into());
+        }
+        let id = Uuid::new_v4().to_string();
+        let reg_number = self.next_reg_number();
+        let slug = self.make_slug(title.trim(), &id);
+
+        self.conn
+            .execute(
+                "INSERT INTO regulations (id, reg_number, slug, title, description, client_id, owner_id, deadline, created_by)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                params![id, reg_number, slug, title.trim(), description, client_id, actor_id, deadline, actor_id],
+            )
+            .map_err(|e| e.to_string())?;
+
+        self.conn
+            .execute(
+                "INSERT OR IGNORE INTO regulation_members (regulation_id, employee_id, role_in_reg, added_by) VALUES (?1, ?2, 'owner', ?2)",
+                params![id, actor_id],
+            )
+            .ok();
+
+        self.get_regulation(&id).ok_or_else(|| "Регламент не найден".to_string())
+    }
+
+    pub fn update_regulation(
+        &self,
+        actor_id: &str,
+        id: &str,
+        title: &str,
+        description: Option<&str>,
+        client_id: Option<&str>,
+        deadline: Option<&str>,
+        status: &str,
+    ) -> Result<RegulationRecord, String> {
+        let reg = self.get_regulation(id).ok_or_else(|| "Регламент не найден".to_string())?;
+        if !self.is_admin(actor_id) && reg.owner_id != actor_id {
+            return Err("Недостаточно прав для редактирования регламента".into());
+        }
+        if title.trim().is_empty() {
+            return Err("Укажите название регламента".into());
+        }
+        if !["active", "closed"].contains(&status) {
+            return Err("Некорректный статус".into());
+        }
+
+        let closed_at = if status == "closed" && reg.status != "closed" {
+            "datetime('now')"
+        } else if status == "active" {
+            "NULL"
+        } else {
+            "closed_at"
+        };
+
+        let sql = format!(
+            "UPDATE regulations SET title = ?1, description = ?2, client_id = ?3, deadline = ?4, status = ?5, closed_at = {}, updated_at = datetime('now') WHERE id = ?6",
+            closed_at
+        );
+        self.conn.execute(&sql, params![title.trim(), description, client_id, deadline, status, id])
+            .map_err(|e| e.to_string())?;
+
+        self.get_regulation(id).ok_or_else(|| "Регламент не найден".to_string())
+    }
+
+    pub fn delete_regulation(&self, admin_id: &str, id: &str) -> Result<(), String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn.execute("DELETE FROM regulation_replies WHERE entry_id IN (SELECT id FROM regulation_entries WHERE regulation_id = ?1)", params![id]).ok();
+        self.conn.execute("DELETE FROM regulation_entries WHERE regulation_id = ?1", params![id]).ok();
+        self.conn.execute("DELETE FROM regulation_members WHERE regulation_id = ?1", params![id]).ok();
+        self.conn.execute("DELETE FROM regulations WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn list_regulation_members(&self, regulation_id: &str) -> Vec<RegulationMemberRecord> {
+        let mut stmt = match self.conn.prepare(
+            "SELECT rm.employee_id, e.full_name, rm.role_in_reg, rm.added_at
+             FROM regulation_members rm JOIN employees e ON e.id = rm.employee_id
+             WHERE rm.regulation_id = ?1 ORDER BY rm.added_at ASC",
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map(params![regulation_id], |row| {
+            Ok(RegulationMemberRecord {
+                employee_id: row.get(0)?,
+                employee_name: row.get(1)?,
+                role_in_reg: row.get(2)?,
+                added_at: row.get(3)?,
+            })
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default()
+    }
+
+    pub fn add_regulation_member(&self, actor_id: &str, regulation_id: &str, employee_id: &str, role: &str) -> Result<(), String> {
+        let reg = self.get_regulation(regulation_id).ok_or_else(|| "Регламент не найден".to_string())?;
+        if !self.is_admin(actor_id) && reg.owner_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn
+            .execute(
+                "INSERT INTO regulation_members (regulation_id, employee_id, role_in_reg, added_by)
+                 VALUES (?1, ?2, ?3, ?4)
+                 ON CONFLICT(regulation_id, employee_id) DO UPDATE SET role_in_reg = excluded.role_in_reg",
+                params![regulation_id, employee_id, role, actor_id],
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn remove_regulation_member(&self, actor_id: &str, regulation_id: &str, employee_id: &str) -> Result<(), String> {
+        let reg = self.get_regulation(regulation_id).ok_or_else(|| "Регламент не найден".to_string())?;
+        if !self.is_admin(actor_id) && reg.owner_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        if reg.owner_id == employee_id {
+            return Err("Нельзя убрать ответственного из регламента".into());
+        }
+        self.conn
+            .execute("DELETE FROM regulation_members WHERE regulation_id = ?1 AND employee_id = ?2", params![regulation_id, employee_id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn list_regulation_entries(&self, regulation_id: &str) -> Vec<RegulationEntryRecord> {
+        let mut stmt = match self.conn.prepare(
+            "SELECT e.id, e.regulation_id, e.author_id, a.full_name, e.content,
+                    e.attachment_data, e.attachment_name, e.deadline, e.status,
+                    e.created_at, e.updated_at,
+                    (SELECT COUNT(*) FROM regulation_replies rr WHERE rr.entry_id = e.id)
+             FROM regulation_entries e JOIN employees a ON a.id = e.author_id
+             WHERE e.regulation_id = ?1 ORDER BY e.created_at ASC",
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map(params![regulation_id], |row| {
+            Ok(RegulationEntryRecord {
+                id: row.get(0)?,
+                regulation_id: row.get(1)?,
+                author_id: row.get(2)?,
+                author_name: row.get(3)?,
+                content: row.get(4)?,
+                attachment_data: row.get(5)?,
+                attachment_name: row.get(6)?,
+                deadline: row.get(7)?,
+                status: row.get(8)?,
+                created_at: row.get(9)?,
+                updated_at: row.get(10)?,
+                reply_count: row.get(11)?,
+            })
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default()
+    }
+
+    pub fn add_regulation_entry(
+        &self,
+        actor_id: &str,
+        regulation_id: &str,
+        content: &str,
+        attachment_data: Option<&str>,
+        attachment_name: Option<&str>,
+        deadline: Option<&str>,
+    ) -> Result<RegulationEntryRecord, String> {
+        let reg = self.get_regulation(regulation_id).ok_or_else(|| "Регламент не найден".to_string())?;
+        if reg.status == "closed" {
+            return Err("Регламент закрыт — новые записи нельзя добавлять".into());
+        }
+        let is_participant = self.is_admin(actor_id) || reg.owner_id == actor_id || self.conn
+            .query_row("SELECT 1 FROM regulation_members WHERE regulation_id = ?1 AND employee_id = ?2", params![regulation_id, actor_id], |_| Ok(()))
+            .is_ok();
+        if !is_participant {
+            return Err("Вы не участник этого регламента".into());
+        }
+        if content.trim().is_empty() {
+            return Err("Запись не может быть пустой".into());
+        }
+
+        let id = Uuid::new_v4().to_string();
+        self.conn
+            .execute(
+                "INSERT INTO regulation_entries (id, regulation_id, author_id, content, attachment_data, attachment_name, deadline) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![id, regulation_id, actor_id, content.trim(), attachment_data, attachment_name, deadline],
+            )
+            .map_err(|e| e.to_string())?;
+
+        self.conn.execute("UPDATE regulations SET updated_at = datetime('now') WHERE id = ?1", params![regulation_id]).ok();
+
+        let author_name: Option<String> = self.conn
+            .query_row("SELECT full_name FROM employees WHERE id = ?1", params![actor_id], |row| row.get(0))
+            .ok();
+
+        Ok(RegulationEntryRecord {
+            id,
+            regulation_id: regulation_id.to_string(),
+            author_id: actor_id.to_string(),
+            author_name: author_name.unwrap_or_default(),
+            content: content.trim().to_string(),
+            attachment_data: attachment_data.map(str::to_string),
+            attachment_name: attachment_name.map(str::to_string),
+            deadline: deadline.map(str::to_string),
+            status: "open".to_string(),
+            created_at: String::new(),
+            updated_at: String::new(),
+            reply_count: 0,
+        })
+    }
+
+    pub fn update_entry_status(&self, actor_id: &str, entry_id: &str, new_status: &str) -> Result<(), String> {
+        if !["open", "done", "cancelled"].contains(&new_status) {
+            return Err("Некорректный статус задачи".into());
+        }
+        let (regulation_id, author_id): (String, String) = self.conn
+            .query_row("SELECT regulation_id, author_id FROM regulation_entries WHERE id = ?1", params![entry_id], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|_| "Запись не найдена".to_string())?;
+        let reg = self.get_regulation(&regulation_id).ok_or_else(|| "Регламент не найден".to_string())?;
+        if !self.is_admin(actor_id) && reg.owner_id != actor_id && author_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn.execute("UPDATE regulation_entries SET status = ?1, updated_at = datetime('now') WHERE id = ?2", params![new_status, entry_id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn list_regulation_replies(&self, entry_id: &str) -> Vec<RegulationReplyRecord> {
+        let mut stmt = match self.conn.prepare(
+            "SELECT rr.id, rr.entry_id, rr.author_id, e.full_name, rr.content, rr.created_at
+             FROM regulation_replies rr JOIN employees e ON e.id = rr.author_id
+             WHERE rr.entry_id = ?1 ORDER BY rr.created_at ASC",
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map(params![entry_id], |row| {
+            Ok(RegulationReplyRecord {
+                id: row.get(0)?,
+                entry_id: row.get(1)?,
+                author_id: row.get(2)?,
+                author_name: row.get(3)?,
+                content: row.get(4)?,
+                created_at: row.get(5)?,
+            })
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default()
+    }
+
+    pub fn add_regulation_reply(&self, actor_id: &str, entry_id: &str, content: &str) -> Result<RegulationReplyRecord, String> {
+        if content.trim().is_empty() {
+            return Err("Ответ не может быть пустым".into());
+        }
+        let regulation_id: String = self.conn
+            .query_row("SELECT regulation_id FROM regulation_entries WHERE id = ?1", params![entry_id], |row| row.get(0))
+            .map_err(|_| "Запись не найдена".to_string())?;
+        let reg = self.get_regulation(&regulation_id).ok_or_else(|| "Регламент не найден".to_string())?;
+        if reg.status == "closed" {
+            return Err("Регламент закрыт — новые ответы нельзя добавлять".into());
+        }
+        let is_participant = self.is_admin(actor_id) || reg.owner_id == actor_id || self.conn
+            .query_row("SELECT 1 FROM regulation_members WHERE regulation_id = ?1 AND employee_id = ?2", params![regulation_id, actor_id], |_| Ok(()))
+            .is_ok();
+        if !is_participant {
+            return Err("Вы не участник этого регламента".into());
+        }
+
+        let id = Uuid::new_v4().to_string();
+        self.conn
+            .execute(
+                "INSERT INTO regulation_replies (id, entry_id, author_id, content) VALUES (?1, ?2, ?3, ?4)",
+                params![id, entry_id, actor_id, content.trim()],
+            )
+            .map_err(|e| e.to_string())?;
+
+        self.conn.execute("UPDATE regulations SET updated_at = datetime('now') WHERE id = ?1", params![regulation_id]).ok();
+
+        let author_name: Option<String> = self.conn
+            .query_row("SELECT full_name FROM employees WHERE id = ?1", params![actor_id], |row| row.get(0))
+            .ok();
+
+        Ok(RegulationReplyRecord {
+            id,
+            entry_id: entry_id.to_string(),
+            author_id: actor_id.to_string(),
+            author_name: author_name.unwrap_or_default(),
+            content: content.trim().to_string(),
             created_at: String::new(),
         })
     }

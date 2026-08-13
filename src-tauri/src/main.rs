@@ -246,6 +246,90 @@ struct ProjectChatMessage {
 }
 
 #[derive(Clone, serde::Serialize)]
+struct Regulation {
+    id: String,
+    #[serde(rename = "regNumber")]
+    reg_number: String,
+    slug: String,
+    title: String,
+    description: Option<String>,
+    #[serde(rename = "clientId")]
+    client_id: Option<String>,
+    #[serde(rename = "clientName")]
+    client_name: Option<String>,
+    #[serde(rename = "ownerId")]
+    owner_id: String,
+    #[serde(rename = "ownerName")]
+    owner_name: String,
+    status: String,
+    deadline: Option<String>,
+    #[serde(rename = "closedAt")]
+    closed_at: Option<String>,
+    #[serde(rename = "createdBy")]
+    created_by: Option<String>,
+    #[serde(rename = "createdByName")]
+    created_by_name: Option<String>,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+    #[serde(rename = "updatedAt")]
+    updated_at: String,
+    #[serde(rename = "memberCount")]
+    member_count: i64,
+    #[serde(rename = "entryCount")]
+    entry_count: i64,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct RegulationMember {
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+    #[serde(rename = "employeeName")]
+    employee_name: String,
+    #[serde(rename = "roleInReg")]
+    role_in_reg: String,
+    #[serde(rename = "addedAt")]
+    added_at: String,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct RegulationEntry {
+    id: String,
+    #[serde(rename = "regulationId")]
+    regulation_id: String,
+    #[serde(rename = "authorId")]
+    author_id: String,
+    #[serde(rename = "authorName")]
+    author_name: String,
+    content: String,
+    #[serde(rename = "attachmentData")]
+    attachment_data: Option<String>,
+    #[serde(rename = "attachmentName")]
+    attachment_name: Option<String>,
+    deadline: Option<String>,
+    status: String,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+    #[serde(rename = "updatedAt")]
+    updated_at: String,
+    #[serde(rename = "replyCount")]
+    reply_count: i64,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct RegulationReply {
+    id: String,
+    #[serde(rename = "entryId")]
+    entry_id: String,
+    #[serde(rename = "authorId")]
+    author_id: String,
+    #[serde(rename = "authorName")]
+    author_name: String,
+    content: String,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+}
+
+#[derive(Clone, serde::Serialize)]
 struct Position {
     id: String,
     title: String,
@@ -517,6 +601,90 @@ struct SendProjectChatMessagePayload {
 }
 
 #[derive(serde::Deserialize)]
+struct CreateRegulationPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    title: String,
+    description: Option<String>,
+    #[serde(rename = "clientId")]
+    client_id: Option<String>,
+    deadline: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct UpdateRegulationPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    id: String,
+    title: String,
+    description: Option<String>,
+    #[serde(rename = "clientId")]
+    client_id: Option<String>,
+    deadline: Option<String>,
+    status: String,
+}
+
+#[derive(serde::Deserialize)]
+struct DeleteRegulationPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct AddRegulationMemberPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "regulationId")]
+    regulation_id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+    role: String,
+}
+
+#[derive(serde::Deserialize)]
+struct RemoveRegulationMemberPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "regulationId")]
+    regulation_id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct AddRegulationEntryPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "regulationId")]
+    regulation_id: String,
+    content: String,
+    #[serde(rename = "attachmentData")]
+    attachment_data: Option<String>,
+    #[serde(rename = "attachmentName")]
+    attachment_name: Option<String>,
+    deadline: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct UpdateEntryStatusPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "entryId")]
+    entry_id: String,
+    status: String,
+}
+
+#[derive(serde::Deserialize)]
+struct AddRegulationReplyPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "entryId")]
+    entry_id: String,
+    content: String,
+}
+
+#[derive(serde::Deserialize)]
 struct SetEmployeeSchedulePayload {
     #[serde(rename = "adminId")]
     admin_id: String,
@@ -678,6 +846,34 @@ fn to_project_chat_message(m: db::ProjectChatMessageRecord) -> ProjectChatMessag
         is_task: m.is_task,
         created_at: m.created_at,
     }
+}
+
+fn to_regulation(r: db::RegulationRecord) -> Regulation {
+    Regulation {
+        id: r.id, reg_number: r.reg_number, slug: r.slug, title: r.title,
+        description: r.description, client_id: r.client_id, client_name: r.client_name,
+        owner_id: r.owner_id, owner_name: r.owner_name, status: r.status,
+        deadline: r.deadline, closed_at: r.closed_at,
+        created_by: r.created_by, created_by_name: r.created_by_name,
+        created_at: r.created_at, updated_at: r.updated_at,
+        member_count: r.member_count, entry_count: r.entry_count,
+    }
+}
+
+fn to_reg_member(m: db::RegulationMemberRecord) -> RegulationMember {
+    RegulationMember { employee_id: m.employee_id, employee_name: m.employee_name, role_in_reg: m.role_in_reg, added_at: m.added_at }
+}
+
+fn to_reg_entry(e: db::RegulationEntryRecord) -> RegulationEntry {
+    RegulationEntry {
+        id: e.id, regulation_id: e.regulation_id, author_id: e.author_id, author_name: e.author_name,
+        content: e.content, attachment_data: e.attachment_data, attachment_name: e.attachment_name,
+        deadline: e.deadline, status: e.status, created_at: e.created_at, updated_at: e.updated_at, reply_count: e.reply_count,
+    }
+}
+
+fn to_reg_reply(r: db::RegulationReplyRecord) -> RegulationReply {
+    RegulationReply { id: r.id, entry_id: r.entry_id, author_id: r.author_id, author_name: r.author_name, content: r.content, created_at: r.created_at }
 }
 
 fn to_position(p: db::PositionRecord) -> Position {
@@ -1101,6 +1297,88 @@ fn send_project_chat_message(payload: SendProjectChatMessagePayload, state: taur
 }
 
 #[tauri::command]
+fn list_regulations(state: tauri::State<AppState>) -> Vec<Regulation> {
+    let db = state.0.lock().unwrap();
+    db.list_regulations().into_iter().map(to_regulation).collect()
+}
+
+#[tauri::command]
+fn get_regulation(id: String, state: tauri::State<AppState>) -> Option<Regulation> {
+    let db = state.0.lock().unwrap();
+    db.get_regulation(&id).map(to_regulation)
+}
+
+#[tauri::command]
+fn create_regulation(payload: CreateRegulationPayload, state: tauri::State<AppState>) -> Result<Regulation, String> {
+    let db = state.0.lock().unwrap();
+    db.create_regulation(&payload.actor_id, &payload.title, payload.description.as_deref(), payload.client_id.as_deref(), payload.deadline.as_deref())
+        .map(to_regulation)
+}
+
+#[tauri::command]
+fn update_regulation(payload: UpdateRegulationPayload, state: tauri::State<AppState>) -> Result<Regulation, String> {
+    let db = state.0.lock().unwrap();
+    db.update_regulation(&payload.actor_id, &payload.id, &payload.title, payload.description.as_deref(), payload.client_id.as_deref(), payload.deadline.as_deref(), &payload.status)
+        .map(to_regulation)
+}
+
+#[tauri::command]
+fn delete_regulation(payload: DeleteRegulationPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.delete_regulation(&payload.admin_id, &payload.id)
+}
+
+#[tauri::command]
+fn list_regulation_members(regulation_id: String, state: tauri::State<AppState>) -> Vec<RegulationMember> {
+    let db = state.0.lock().unwrap();
+    db.list_regulation_members(&regulation_id).into_iter().map(to_reg_member).collect()
+}
+
+#[tauri::command]
+fn add_regulation_member(payload: AddRegulationMemberPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.add_regulation_member(&payload.actor_id, &payload.regulation_id, &payload.employee_id, &payload.role)
+}
+
+#[tauri::command]
+fn remove_regulation_member(payload: RemoveRegulationMemberPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.remove_regulation_member(&payload.actor_id, &payload.regulation_id, &payload.employee_id)
+}
+
+#[tauri::command]
+fn list_regulation_entries(regulation_id: String, state: tauri::State<AppState>) -> Vec<RegulationEntry> {
+    let db = state.0.lock().unwrap();
+    db.list_regulation_entries(&regulation_id).into_iter().map(to_reg_entry).collect()
+}
+
+#[tauri::command]
+fn add_regulation_entry(payload: AddRegulationEntryPayload, state: tauri::State<AppState>) -> Result<RegulationEntry, String> {
+    let db = state.0.lock().unwrap();
+    db.add_regulation_entry(&payload.actor_id, &payload.regulation_id, &payload.content, payload.attachment_data.as_deref(), payload.attachment_name.as_deref(), payload.deadline.as_deref())
+        .map(to_reg_entry)
+}
+
+#[tauri::command]
+fn update_entry_status(payload: UpdateEntryStatusPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.update_entry_status(&payload.actor_id, &payload.entry_id, &payload.status)
+}
+
+#[tauri::command]
+fn list_regulation_replies(entry_id: String, state: tauri::State<AppState>) -> Vec<RegulationReply> {
+    let db = state.0.lock().unwrap();
+    db.list_regulation_replies(&entry_id).into_iter().map(to_reg_reply).collect()
+}
+
+#[tauri::command]
+fn add_regulation_reply(payload: AddRegulationReplyPayload, state: tauri::State<AppState>) -> Result<RegulationReply, String> {
+    let db = state.0.lock().unwrap();
+    db.add_regulation_reply(&payload.actor_id, &payload.entry_id, &payload.content)
+        .map(to_reg_reply)
+}
+
+#[tauri::command]
 fn record_login(employee_id: String, state: tauri::State<AppState>) -> Result<(), String> {
     let db = state.0.lock().unwrap();
     db.record_login(&employee_id)
@@ -1176,6 +1454,19 @@ fn main() {
             transfer_project_ownership,
             list_project_chat,
             send_project_chat_message,
+            list_regulations,
+            get_regulation,
+            create_regulation,
+            update_regulation,
+            delete_regulation,
+            list_regulation_members,
+            add_regulation_member,
+            remove_regulation_member,
+            list_regulation_entries,
+            add_regulation_entry,
+            update_entry_status,
+            list_regulation_replies,
+            add_regulation_reply,
             record_login,
             record_logout,
             list_recent_sessions

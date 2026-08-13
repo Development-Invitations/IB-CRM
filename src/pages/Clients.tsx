@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Contact, Trash2, Send } from 'lucide-react';
-import { api, type Employee, type Client, type ClientHistoryEntry } from '../lib/api';
+import { Plus, Pencil, Contact, Trash2, Send, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { api, type Employee, type Client, type ClientHistoryEntry, type Regulation } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
 import { parseSqliteUtc } from '../lib/date';
@@ -12,11 +13,13 @@ import LoadingScreen from '../components/LoadingScreen';
 export default function Clients({ currentEmployee }: { currentEmployee: Employee }) {
   const { t } = useLocale();
   const { showToast } = useToast();
+  const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [selected, setSelected] = useState<Client | null>(null);
   const [history, setHistory] = useState<ClientHistoryEntry[]>([]);
+  const [clientRegs, setClientRegs] = useState<Regulation[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [noteBusy, setNoteBusy] = useState(false);
@@ -42,11 +45,16 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
   useEffect(() => {
     if (!selected) {
       setHistory([]);
+      setClientRegs([]);
       return;
     }
     setHistoryLoading(true);
-    api.listClientHistory(selected.id).then((entries) => {
+    Promise.all([
+      api.listClientHistory(selected.id),
+      api.listRegulations(),
+    ]).then(([entries, allRegs]) => {
       setHistory(entries);
+      setClientRegs(allRegs.filter((r) => r.clientId === selected.id));
       setHistoryLoading(false);
     });
   }, [selected?.id]);
@@ -195,6 +203,35 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
                 {selected.createdByName ? ` · ${selected.createdByName}` : ''}
               </span>
             </div>
+
+            <div className="department-members-title">{t('clients.historyTitle')}</div>
+
+            {clientRegs.length > 0 && (
+              <>
+                <div className="department-members-title">{t('clients.regulationsTitle')}</div>
+                <ul className="client-history-list">
+                  {clientRegs.map((r) => (
+                    <li
+                      key={r.id}
+                      className="client-reg-item"
+                      onClick={() => navigate('../regulations', { state: { openRegId: r.id } })}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div>
+                        <div className="client-reg-name">
+                          <ExternalLink size={12} style={{ marginRight: 5, opacity: 0.5 }} />
+                          {r.title}
+                        </div>
+                        <div className="settings-hint client-history-meta">{r.regNumber} · {r.ownerName}</div>
+                      </div>
+                      <span className={`absence-status reg-status-${r.status}`} style={{ flexShrink: 0 }}>
+                        {t(r.status === 'active' ? 'regulations.statusActive' : 'regulations.statusClosed')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
 
             <div className="department-members-title">{t('clients.historyTitle')}</div>
 

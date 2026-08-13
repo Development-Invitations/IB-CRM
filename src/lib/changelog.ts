@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.1.15';
+export const APP_VERSION = '0.1.16';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,15 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.1.16',
+      items: [
+        'Регламенты открываются на полный экран с двумя колонками (участники / записи)',
+        'Ссылка на каждую запись регламента — можно поделиться с коллегой',
+        'Регламенты по клиенту теперь видны прямо в карточке клиента',
+        'Поиск по ID, номеру и названию регламента',
+      ],
+    },
     {
       version: '0.1.15',
       items: [
@@ -167,6 +176,15 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.1.16',
+      items: [
+        "Reglamentlar to'liq ekranda ikki ustunli ko'rinishda ochiladi (ishtirokchilar / yozuvlar)",
+        "Har bir reglament yozuviga havola — hamkasbingiz bilan ulashish mumkin",
+        "Mijoz bo'yicha reglamentlar endi bevosita mijoz kartochkasida ko'rinadi",
+        "ID, raqam va reglament nomi bo'yicha qidiruv",
+      ],
+    },
+    {
       version: '0.1.15',
       items: [
         "Yangi \"Reglamentlar\" moduli — yozuvlar lentasi bilan ichki ish hujjatlari",
@@ -317,6 +335,15 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.1.16',
+      items: [
+        'Регламентлар тўлиқ экранда икки устунли кўринишда очилади (иштирокчилар / ёзувлар)',
+        'Ҳар бир регламент ёзувига ҳавола — ҳамкасбингиз билан улашиш мумкин',
+        'Мижоз бўйича регламентлар энди бевосита мижоз карточкасида кўринади',
+        'ID, рақам ва регламент номи бўйича қидирув',
+      ],
+    },
     {
       version: '0.1.15',
       items: [

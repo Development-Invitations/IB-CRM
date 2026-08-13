@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search } from 'lucide-react';
-import { api, type Employee, type Position, type Department, type AbsenceRequest } from '../lib/api';
+import { api, type Employee, type Position, type Department, type AbsenceRequest, type Regulation } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { parseSqliteUtc } from '../lib/date';
 import { formatWorkDays } from '../lib/schedule';
@@ -24,14 +24,23 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
 
   const [selected, setSelected] = useState<Employee | null>(null);
   const [selectedAbsences, setSelectedAbsences] = useState<AbsenceRequest[]>([]);
+  const [empRegs, setEmpRegs] = useState<Regulation[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
 
   useEffect(() => {
     if (selected) {
-      api.listAbsenceRequestsForEmployee(selected.id).then(setSelectedAbsences);
+      Promise.all([
+        api.listAbsenceRequestsForEmployee(selected.id),
+        api.listRegulations(),
+      ]).then(([absences, allRegs]) => {
+        setSelectedAbsences(absences);
+        // Показываем регламенты где сотрудник — ответственный
+        setEmpRegs(allRegs.filter((r) => r.ownerId === selected.id));
+      });
     } else {
       setSelectedAbsences([]);
+      setEmpRegs([]);
     }
   }, [selected?.id]);
 
@@ -234,6 +243,35 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
                   </li>
                 ))}
               </ul>
+            )}
+
+            {empRegs.length > 0 && (
+              <>
+                <div className="department-members-title" style={{ marginTop: 16 }}>
+                  {t('clients.regulationsTitle')}
+                </div>
+                <ul className="client-history-list">
+                  {empRegs.map((r) => (
+                    <li
+                      key={r.id}
+                      className="client-reg-item"
+                      onClick={() => navigate('../regulations', { state: { openRegId: r.id } })}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div>
+                        <div className="client-reg-name">
+                          <span style={{ marginRight: 5, opacity: 0.5, fontSize: 11 }}>↗</span>
+                          {r.title}
+                        </div>
+                        <div className="settings-hint client-history-meta">{r.regNumber}</div>
+                      </div>
+                      <span className={`absence-status reg-status-${r.status}`} style={{ flexShrink: 0 }}>
+                        {r.status === 'active' ? t('regulations.statusActive') : t('regulations.statusClosed')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </div>
         )}

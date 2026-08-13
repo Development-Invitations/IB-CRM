@@ -45,7 +45,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgwQzkxNEYyRTNGQ0I4NTMKUldSVHVQemo4aFRKZ01kSWZXRGprMVc4WVo2S0k2MWMxZzBKcHZ1V1lPYWV5anc0bk1HQzY3ZkQK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IHJzaWduIGVuY3J5cHRlZCBzZWNyZXQga2V5ClJXUlRZMEl5L0FUdXh1NEcxdVF4ZkpncHlBYmNnSnRscnFxd0VSak9EQVpMSlNiMEwyOEFBQkFBQUFBQUFBQUFBQUlBQUFBQVp0WHBralRsNERZL00vN0ljMXdhWHpKdE1uanZCRGdPV3R5Ty9KWFBUT0paakxsUUVlelRibktieXp2YlBSWUVrYlNuTXRzckZEYnhiV2grZFpXanVXOHFreSswWUlyWUtvMmN3azlyb2xoT1pPcHZlbW5ncHgyMzR0aHEvbk40eXJnQW9FSkVMVDA9Cg==",
       "endpoints": [
         "https://github.com/Development-Invitations/IB-CRM/releases/latest/download/latest.json"
       ]

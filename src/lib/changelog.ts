@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.1.13';
+export const APP_VERSION = '0.1.14';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,15 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.1.14',
+      items: [
+        'Руководитель подразделения теперь правильно отображается в карточке сотрудника',
+        'Поиск сотрудников по имени, логину или ID',
+        'В карточке клиента — контактное лицо и его должность',
+        'Исправление автообновления: обновлённый workflow для корректной генерации latest.json',
+      ],
+    },
     {
       version: '0.1.13',
       items: [
@@ -147,6 +156,15 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.1.14',
+      items: [
+        "Bo'lim rahbari endi xodim kartochkasida to'g'ri ko'rinadi",
+        "Xodimlarni ism, login yoki ID bo'yicha qidirish",
+        "Mijoz kartochkasida — bog'lanish shaxsi va uning lavozimi",
+        "Avtomatik yangilash tuzatildi: latest.json to'g'ri yaratilishi uchun workflow yangilandi",
+      ],
+    },
+    {
       version: '0.1.13',
       items: [
         "Yangi \"Loyihalar\" moduli — kartochka, holat, mijozga bog'lash",
@@ -277,6 +295,15 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.1.14',
+      items: [
+        'Бўлим раҳбари энди ходим карточкасида тўғри кўринади',
+        'Ходимларни исм, логин ёки ID бўйича қидириш',
+        'Мижоз карточкасида — боғланиш шахси ва унинг лавозими',
+        'Автоматик янгиланиш тузатилди: latest.json тўғри яратилиши учун workflow янгиланди',
+      ],
+    },
     {
       version: '0.1.13',
       items: [

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Pencil, ArrowRight } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { api, type Employee, type Position, type Department, type AbsenceRequest } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { parseSqliteUtc } from '../lib/date';
@@ -20,6 +20,7 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
   const [positions, setPositions] = useState<Position[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   const [selected, setSelected] = useState<Employee | null>(null);
   const [selectedAbsences, setSelectedAbsences] = useState<AbsenceRequest[]>([]);
@@ -41,7 +42,6 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
       setPositions(pos);
       setDepartments(deps);
       setLoading(false);
-      // Держим открытую панель в актуальном состоянии, если сотрудника только что отредактировали
       setSelected((prev) => (prev ? emps.find((e) => e.id === prev.id) ?? null : null));
     });
   };
@@ -49,6 +49,17 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
   useEffect(() => {
     load();
   }, []);
+
+  const filteredEmployees = search.trim()
+    ? employees.filter((e) => {
+        const q = search.trim().toLowerCase();
+        return (
+          e.employeeNumber.toLowerCase().includes(q) ||
+          (e.fullName || '').toLowerCase().includes(q) ||
+          e.login.toLowerCase().includes(q)
+        );
+      })
+    : employees;
 
   const openCreate = () => {
     setFormMode('create');
@@ -72,6 +83,16 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
         )}
       </div>
 
+      <div className="employees-search-row">
+        <Search size={15} className="employees-search-icon" />
+        <input
+          className="employees-search-input"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t('employees.searchByNameOrId')}
+        />
+      </div>
+
       {loading ? (
         <LoadingScreen compact />
       ) : (
@@ -87,7 +108,7 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
             </tr>
           </thead>
           <tbody>
-            {employees.map((emp) => (
+            {filteredEmployees.map((emp) => (
               <tr key={emp.id} className="employees-row" onClick={() => setSelected(emp)}>
                 <td>{emp.employeeNumber}</td>
                 <td>

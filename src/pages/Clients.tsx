@@ -169,6 +169,15 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
               <span className="settings-hint">{t('clients.emailLabel')}</span>
               <span>{selected.email || '—'}</span>
             </div>
+            {(selected.contactPerson || selected.contactPosition) && (
+              <div className="employee-card-row">
+                <span className="settings-hint">{t('clients.contactPersonLabel')}</span>
+                <span>
+                  {selected.contactPerson || ''}
+                  {selected.contactPosition ? ` · ${selected.contactPosition}` : ''}
+                </span>
+              </div>
+            )}
             <div className="employee-card-row">
               <span className="settings-hint">{t('clients.addressLabel')}</span>
               <span>{selected.address || '—'}</span>

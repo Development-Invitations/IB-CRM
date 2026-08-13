@@ -102,6 +102,8 @@ pub struct ClientRecord {
     pub id: String,
     pub client_number: String,
     pub name: String,
+    pub contact_person: Option<String>,
+    pub contact_position: Option<String>,
     pub phone: Option<String>,
     pub email: Option<String>,
     pub address: Option<String>,
@@ -243,6 +245,8 @@ impl Db {
                 id TEXT PRIMARY KEY,
                 client_number TEXT UNIQUE NOT NULL,
                 name TEXT NOT NULL,
+                contact_person TEXT,
+                contact_position TEXT,
                 phone TEXT,
                 email TEXT,
                 address TEXT,
@@ -317,7 +321,22 @@ impl Db {
         // [{date, start, end}, ...], произвольное количество (было 3 отдельные
         // колонки под ровно один слот — заменено одной JSON-колонкой).
         add_column_if_missing(&conn, "absence_requests", "makeup_slots TEXT");
+        add_column_if_missing(&conn, "clients", "contact_person TEXT");
+        add_column_if_missing(&conn, "clients", "contact_position TEXT");
         add_column_if_missing(&conn, "departments", "deputy_employee_id TEXT REFERENCES employees(id)");
+
+        // Ретроактивно проставляем department_id всем руководителям подразделений,
+        // у которых оно не заполнено (было сознательно не заполнено в ранних версиях,
+        // теперь политика изменилась — руководитель тоже должен иметь department_id
+        // для корректного отображения во всех карточках/кабинетах).
+        let _ = conn.execute(
+            "UPDATE employees SET department_id = (
+                SELECT d.id FROM departments d WHERE d.head_employee_id = employees.id LIMIT 1
+             ) WHERE department_id IS NULL AND EXISTS (
+                SELECT 1 FROM departments d WHERE d.head_employee_id = employees.id
+             )",
+            [],
+        );
 
         // Разовая (но безвредная при повторных запусках) ретроактивная чистка:
         // раньше уведомления по заявкам не помечались прочитанными при решении
@@ -727,6 +746,17 @@ impl Db {
 
         self.link_deputy_as_member(&id, deputy_employee_id, head_employee_id);
 
+        // Руководитель тоже получает department_id этого подразделения — чтобы
+        // в карточке и кабинете не было прочерков. Руководитель при этом не числится
+        // в project_members подразделения (только заместитель), но поле department_id
+        // должно быть заполнено для корректного отображения во всех местах.
+        if let Some(head_id) = head_employee_id {
+            let _ = self.conn.execute(
+                "UPDATE employees SET department_id = ?1 WHERE id = ?2",
+                params![id, head_id],
+            );
+        }
+
         let sql = format!("{} WHERE dep.id = ?1", Self::DEPARTMENT_SELECT);
         self.conn
             .query_row(&sql, params![id], Self::map_department_row)
@@ -748,6 +778,13 @@ impl Db {
         if name.is_empty() {
             return Err("Название подразделения не может быть пустым".into());
         }
+
+        // Получаем старого руководителя, чтобы снять у него department_id
+        // если он больше не является главой этого подразделения.
+        let old_head_id: Option<String> = self.conn
+            .query_row("SELECT head_employee_id FROM departments WHERE id = ?1", params![id], |row| row.get(0))
+            .unwrap_or(None);
+
         self.conn
             .execute(
                 "UPDATE departments SET name = ?1, head_employee_id = ?2, deputy_employee_id = ?3 WHERE id = ?4",
@@ -755,7 +792,25 @@ impl Db {
             )
             .map_err(|e| e.to_string())?;
 
+        // Если руководитель сменился — снимаем department_id у старого
+        if old_head_id.as_deref() != head_employee_id {
+            if let Some(old_id) = &old_head_id {
+                let _ = self.conn.execute(
+                    "UPDATE employees SET department_id = NULL WHERE id = ?1 AND department_id = ?2",
+                    params![old_id, id],
+                );
+            }
+        }
+
         self.link_deputy_as_member(id, deputy_employee_id, head_employee_id);
+
+        // Новому руководителю проставляем department_id
+        if let Some(head_id) = head_employee_id {
+            let _ = self.conn.execute(
+                "UPDATE employees SET department_id = ?1 WHERE id = ?2",
+                params![id, head_id],
+            );
+        }
 
         let sql = format!("{} WHERE dep.id = ?1", Self::DEPARTMENT_SELECT);
         self.conn
@@ -1382,7 +1437,8 @@ impl Db {
     // действие, ограниченное админом (необратимо, стоит подстраховаться).
 
     const CLIENT_SELECT: &'static str = "SELECT
-            c.id, c.client_number, c.name, c.phone, c.email, c.address, c.notes,
+            c.id, c.client_number, c.name, c.contact_person, c.contact_position,
+            c.phone, c.email, c.address, c.notes,
             c.created_by, e.full_name, c.created_at
         FROM clients c
         LEFT JOIN employees e ON e.id = c.created_by";
@@ -1392,13 +1448,15 @@ impl Db {
             id: row.get(0)?,
             client_number: row.get(1)?,
             name: row.get(2)?,
-            phone: row.get(3)?,
-            email: row.get(4)?,
-            address: row.get(5)?,
-            notes: row.get(6)?,
-            created_by: row.get(7)?,
-            created_by_name: row.get(8)?,
-            created_at: row.get(9)?,
+            contact_person: row.get(3)?,
+            contact_position: row.get(4)?,
+            phone: row.get(5)?,
+            email: row.get(6)?,
+            address: row.get(7)?,
+            notes: row.get(8)?,
+            created_by: row.get(9)?,
+            created_by_name: row.get(10)?,
+            created_at: row.get(11)?,
         })
     }
 
@@ -1427,6 +1485,8 @@ impl Db {
         &self,
         actor_id: &str,
         name: &str,
+        contact_person: Option<&str>,
+        contact_position: Option<&str>,
         phone: Option<&str>,
         email: Option<&str>,
         address: Option<&str>,
@@ -1439,9 +1499,9 @@ impl Db {
         let client_number = self.next_client_number();
         self.conn
             .execute(
-                "INSERT INTO clients (id, client_number, name, phone, email, address, notes, created_by)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                params![id, client_number, name.trim(), phone, email, address, notes, actor_id],
+                "INSERT INTO clients (id, client_number, name, contact_person, contact_position, phone, email, address, notes, created_by)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                params![id, client_number, name.trim(), contact_person, contact_position, phone, email, address, notes, actor_id],
             )
             .map_err(|e| e.to_string())?;
         self.get_client(&id).ok_or_else(|| "Клиент не найден".to_string())
@@ -1451,6 +1511,8 @@ impl Db {
         &self,
         id: &str,
         name: &str,
+        contact_person: Option<&str>,
+        contact_position: Option<&str>,
         phone: Option<&str>,
         email: Option<&str>,
         address: Option<&str>,
@@ -1461,8 +1523,8 @@ impl Db {
         }
         self.conn
             .execute(
-                "UPDATE clients SET name = ?1, phone = ?2, email = ?3, address = ?4, notes = ?5 WHERE id = ?6",
-                params![name.trim(), phone, email, address, notes, id],
+                "UPDATE clients SET name = ?1, contact_person = ?2, contact_position = ?3, phone = ?4, email = ?5, address = ?6, notes = ?7 WHERE id = ?8",
+                params![name.trim(), contact_person, contact_position, phone, email, address, notes, id],
             )
             .map_err(|e| e.to_string())?;
         self.get_client(id).ok_or_else(|| "Клиент не найден".to_string())

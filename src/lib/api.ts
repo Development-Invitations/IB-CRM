@@ -25,6 +25,8 @@ export type Client = {
   id: string;
   clientNumber: string;
   name: string;
+  contactPerson: string | null;
+  contactPosition: string | null;
   phone: string | null;
   email: string | null;
   address: string | null;
@@ -271,6 +273,8 @@ export const api = {
   createClient: (payload: {
     actorId: string;
     name: string;
+    contactPerson?: string | null;
+    contactPosition?: string | null;
     phone?: string | null;
     email?: string | null;
     address?: string | null;
@@ -280,6 +284,8 @@ export const api = {
   updateClient: (payload: {
     id: string;
     name: string;
+    contactPerson?: string | null;
+    contactPosition?: string | null;
     phone?: string | null;
     email?: string | null;
     address?: string | null;

@@ -157,6 +157,10 @@ struct Client {
     #[serde(rename = "clientNumber")]
     client_number: String,
     name: String,
+    #[serde(rename = "contactPerson")]
+    contact_person: Option<String>,
+    #[serde(rename = "contactPosition")]
+    contact_position: Option<String>,
     phone: Option<String>,
     email: Option<String>,
     address: Option<String>,
@@ -400,6 +404,10 @@ struct CreateClientPayload {
     #[serde(rename = "actorId")]
     actor_id: String,
     name: String,
+    #[serde(rename = "contactPerson")]
+    contact_person: Option<String>,
+    #[serde(rename = "contactPosition")]
+    contact_position: Option<String>,
     phone: Option<String>,
     email: Option<String>,
     address: Option<String>,
@@ -410,6 +418,10 @@ struct CreateClientPayload {
 struct UpdateClientPayload {
     id: String,
     name: String,
+    #[serde(rename = "contactPerson")]
+    contact_person: Option<String>,
+    #[serde(rename = "contactPosition")]
+    contact_position: Option<String>,
     phone: Option<String>,
     email: Option<String>,
     address: Option<String>,
@@ -604,6 +616,8 @@ fn to_client(c: db::ClientRecord) -> Client {
         id: c.id,
         client_number: c.client_number,
         name: c.name,
+        contact_person: c.contact_person,
+        contact_position: c.contact_position,
         phone: c.phone,
         email: c.email,
         address: c.address,
@@ -958,6 +972,8 @@ fn create_client(payload: CreateClientPayload, state: tauri::State<AppState>) ->
     db.create_client(
         &payload.actor_id,
         &payload.name,
+        payload.contact_person.as_deref(),
+        payload.contact_position.as_deref(),
         payload.phone.as_deref(),
         payload.email.as_deref(),
         payload.address.as_deref(),
@@ -972,6 +988,8 @@ fn update_client(payload: UpdateClientPayload, state: tauri::State<AppState>) ->
     db.update_client(
         &payload.id,
         &payload.name,
+        payload.contact_person.as_deref(),
+        payload.contact_position.as_deref(),
         payload.phone.as_deref(),
         payload.email.as_deref(),
         payload.address.as_deref(),

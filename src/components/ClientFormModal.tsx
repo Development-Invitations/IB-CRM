@@ -21,6 +21,8 @@ export default function ClientFormModal({
   const { t } = useLocale();
   const { showToast } = useToast();
   const [name, setName] = useState('');
+  const [contactPerson, setContactPerson] = useState('');
+  const [contactPosition, setContactPosition] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
@@ -31,6 +33,8 @@ export default function ClientFormModal({
   useEffect(() => {
     if (!open) return;
     setName(client?.name ?? '');
+    setContactPerson(client?.contactPerson ?? '');
+    setContactPosition(client?.contactPosition ?? '');
     setPhone(client?.phone ?? '');
     setEmail(client?.email ?? '');
     setAddress(client?.address ?? '');
@@ -47,25 +51,20 @@ export default function ClientFormModal({
     }
     setBusy(true);
     try {
+      const shared = {
+        name: name.trim(),
+        contactPerson: contactPerson.trim() || null,
+        contactPosition: contactPosition.trim() || null,
+        phone: phone.trim() || null,
+        email: email.trim() || null,
+        address: address.trim() || null,
+        notes: notes.trim() || null,
+      };
       if (client) {
-        await api.updateClient({
-          id: client.id,
-          name: name.trim(),
-          phone: phone.trim() || null,
-          email: email.trim() || null,
-          address: address.trim() || null,
-          notes: notes.trim() || null,
-        });
+        await api.updateClient({ id: client.id, ...shared });
         showToast('success', t('clients.updated'));
       } else {
-        await api.createClient({
-          actorId: currentEmployeeId,
-          name: name.trim(),
-          phone: phone.trim() || null,
-          email: email.trim() || null,
-          address: address.trim() || null,
-          notes: notes.trim() || null,
-        });
+        await api.createClient({ actorId: currentEmployeeId, ...shared });
         showToast('success', t('clients.added'));
       }
       onSaved();
@@ -99,6 +98,17 @@ export default function ClientFormModal({
         <div className="field">
           <label>{t('clients.nameLabel')}</label>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('clients.namePlaceholder')} />
+        </div>
+
+        <div className="absence-form-dates">
+          <div className="field">
+            <label>{t('clients.contactPersonLabel')}</label>
+            <input value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} placeholder={t('clients.contactPersonPlaceholder')} />
+          </div>
+          <div className="field">
+            <label>{t('clients.contactPositionLabel')}</label>
+            <input value={contactPosition} onChange={(e) => setContactPosition(e.target.value)} placeholder={t('clients.contactPositionPlaceholder')} />
+          </div>
         </div>
 
         <div className="field">

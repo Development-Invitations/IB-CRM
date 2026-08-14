@@ -1,5 +1,12 @@
-import { useState } from 'react';
+import { useState, createContext, useContext, useCallback } from 'react';
 import { Routes, Route, NavLink } from 'react-router-dom';
+
+// Контекст для полноэкранного режима — регламенты и проекты скрывают sidebar/topbar
+export const FullscreenContext = createContext<{
+  isFullscreen: boolean;
+  enter: () => void;
+  exit: () => void;
+}>({ isFullscreen: false, enter: () => {}, exit: () => {} });
 import {
   Users,
   Building2,
@@ -32,6 +39,9 @@ import { APP_VERSION } from '../lib/changelog';
 export default function Dashboard({ employee, onLogout }: { employee: Employee; onLogout: () => void }) {
   const { t } = useLocale();
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const enter = useCallback(() => setIsFullscreen(true), []);
+  const exit = useCallback(() => setIsFullscreen(false), []);
 
   const modules = [
     { label: t('sidebar.employees'), icon: Users, path: 'employees' },
@@ -44,7 +54,8 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
   ];
 
   return (
-    <div className="app-shell">
+    <FullscreenContext.Provider value={{ isFullscreen, enter, exit }}>
+    <div className={`app-shell${isFullscreen ? ' app-shell-fullscreen' : ''}`}>
       <aside className="sidebar">
         <div className="brand">IB CRM</div>
         <nav>
@@ -125,5 +136,6 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
 
       <UpdateNotifier />
     </div>
+    </FullscreenContext.Provider>
   );
 }

@@ -67,7 +67,7 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
       await api.selfUpdateEmployee({ employeeId: employee.id, fullName: editFullName.trim(), phone: editPhone.trim() || null });
       showToast('success', t('editRequest.selfSaved'));
       load();
-    } catch (err: any) {
+    } catch (err: unknown) {
       showToast('error', typeof err === 'string' ? err : t('employees.errorGeneric'));
     } finally {
       setSavingSelf(false);
@@ -110,7 +110,7 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
       showToast('success', t('editRequest.sent'));
       setRequestOpen(false);
       load();
-    } catch (err: any) {
+    } catch (err: unknown) {
       showToast('error', typeof err === 'string' ? err : t('employees.errorGeneric'));
     } finally {
       setSendingRequest(false);
@@ -340,3 +340,4 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
     </div>
   );
 }
+

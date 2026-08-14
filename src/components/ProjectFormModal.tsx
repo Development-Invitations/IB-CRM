@@ -84,7 +84,7 @@ export default function ProjectFormModal({
       }
       onSaved();
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(typeof err === 'string' ? err : t('projects.errorGeneric'));
     } finally {
       setBusy(false);
@@ -138,3 +138,4 @@ export default function ProjectFormModal({
     </Modal>
   );
 }
+

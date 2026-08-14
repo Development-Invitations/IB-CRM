@@ -69,7 +69,7 @@ export default function ClientFormModal({
       }
       onSaved();
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(typeof err === 'string' ? err : t('clients.errorGeneric'));
     } finally {
       setBusy(false);
@@ -134,3 +134,4 @@ export default function ClientFormModal({
     </Modal>
   );
 }
+

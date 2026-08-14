@@ -1,5 +1,6 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useContext } from 'react';
 import { useLocation } from 'react-router-dom';
+import { FullscreenContext } from './Dashboard';
 import { Plus, Pencil, FileText, Trash2, UserPlus, X, Paperclip, CheckSquare, XSquare, RotateCcw, ChevronDown, ChevronRight, Search, Copy, Check, ArrowLeft, Link2 } from 'lucide-react';
 import { api, type Employee, type Regulation, type RegulationMember, type RegulationEntry, type RegulationReply, type RegulationStatus, type RegulationEntryStatus, type Client } from '../lib/api';
 import { useLocale } from '../lib/i18n';
@@ -153,6 +154,7 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
   const { t } = useLocale();
   const { showToast } = useToast();
   const location = useLocation();
+  const { enter: enterFullscreen, exit: exitFullscreen } = useContext(FullscreenContext);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const entriesRef = useRef<HTMLDivElement>(null);
 
@@ -189,6 +191,12 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
   const [entryBusy, setEntryBusy] = useState(false);
   const [copiedSlug, setCopiedSlug] = useState(false);
 
+  // Меню участника: клик открывает панель с действиями
+  const [memberMenuId, setMemberMenuId] = useState<string | null>(null);
+  const [memberMenuAction, setMemberMenuAction] = useState<'reminder' | 'extend' | null>(null);
+  const [memberMenuDeadline, setMemberMenuDeadline] = useState('');
+  const [memberMenuNote, setMemberMenuNote] = useState('');
+
   const load = useCallback(() => {
     setLoading(true);
     Promise.all([api.listRegulations(), api.listClients(), api.listEmployees()]).then(([regs, cls, emps]) => {
@@ -197,12 +205,21 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
       setEmployees(emps);
       setLoading(false);
       setSelected((prev) => (prev ? regs.find((r) => r.id === prev.id) ?? null : null));
+      // Если был открыт регламент — остаёмся в fullscreen
     });
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  // Авто-открываем регламент если перешли с карточки клиента/сотрудника
+  // При открытии/закрытии регламента — полноэкранный режим
+  useEffect(() => {
+    if (selected) {
+      enterFullscreen();
+    } else {
+      exitFullscreen();
+    }
+    return () => { exitFullscreen(); };
+  }, [!!selected]); // eslint-disable-line
   useEffect(() => {
     const openRegId = (location.state as any)?.openRegId;
     if (!openRegId || regulations.length === 0) return;
@@ -271,7 +288,7 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
       }
       setFormOpen(false);
       load();
-    } catch (err: any) {
+    } catch (err: unknown) {
       setFormError(typeof err === 'string' ? err : t('regulations.errorGeneric'));
     } finally {
       setFormBusy(false);
@@ -285,7 +302,7 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
       await api.updateRegulation({ actorId: currentEmployee.id, id: selected.id, title: selected.title, description: selected.description, clientId: selected.clientId, deadline: selected.deadline, status: newStatus });
       showToast('success', newStatus === 'closed' ? t('regulations.closedSuccess') : t('regulations.reopenedSuccess'));
       load();
-    } catch (err: any) {
+    } catch (err: unknown) {
       showToast('error', typeof err === 'string' ? err : t('regulations.errorGeneric'));
     }
   };
@@ -299,7 +316,7 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
       setDeleteConfirmOpen(false);
       setSelected(null);
       load();
-    } catch (err: any) {
+    } catch (err: unknown) {
       showToast('error', typeof err === 'string' ? err : t('regulations.errorGeneric'));
     } finally {
       setDeleteBusy(false);
@@ -318,7 +335,7 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
       showToast('success', t('regulations.memberAdded'));
       setAddMemberId('');
       loadDetail(); load();
-    } catch (err: any) {
+    } catch (err: unknown) {
       showToast('error', typeof err === 'string' ? err : t('regulations.errorGeneric'));
     } finally {
       setAddMemberBusy(false);
@@ -331,7 +348,7 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
       await api.removeRegulationMember({ actorId: currentEmployee.id, regulationId: selected.id, employeeId: m.employeeId });
       showToast('success', t('regulations.memberRemoved'));
       loadDetail(); load();
-    } catch (err: any) {
+    } catch (err: unknown) {
       showToast('error', typeof err === 'string' ? err : t('regulations.errorGeneric'));
     }
   };
@@ -353,7 +370,7 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
       loadDetail();
       // Прокрутка к новой записи
       setTimeout(() => entriesRef.current?.scrollTo({ top: entriesRef.current.scrollHeight, behavior: 'smooth' }), 200);
-    } catch (err: any) {
+    } catch (err: unknown) {
       showToast('error', typeof err === 'string' ? err : t('regulations.errorGeneric'));
     } finally {
       setEntryBusy(false);
@@ -365,7 +382,7 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
     try {
       await api.updateEntryStatus({ actorId: currentEmployee.id, entryId, status });
       loadDetail();
-    } catch (err: any) {
+    } catch (err: unknown) {
       showToast('error', typeof err === 'string' ? err : t('regulations.errorGeneric'));
     }
   };
@@ -459,17 +476,118 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
               )}
               {detailLoading ? <LoadingScreen compact /> : (
                 <ul className="department-members-list">
-                  {members.map((m) => (
-                    <li key={m.employeeId} className="department-member-row">
-                      <span>
-                        {m.employeeName}
-                        {m.roleInReg === 'owner' && <span className="role-badge role-badge-head" style={{ marginLeft: 8 }}>{t('regulations.roleOwner')}</span>}
-                      </span>
-                      {isManager && m.roleInReg !== 'owner' && (
-                        <button type="button" className="department-member-remove" onClick={() => handleRemoveMember(m)}><X size={13} /></button>
-                      )}
-                    </li>
-                  ))}
+                  {members.map((m) => {
+                    // Ищем задачи этого участника — записи где он автор
+                    const memberEntries = entries.filter((e) => e.authorId === m.employeeId);
+                    const hasOverdue = memberEntries.some((e) => {
+                      if (!e.deadline || e.status !== 'open') return false;
+                      return new Date(e.deadline) < new Date();
+                    });
+                    const hasDueSoon = !hasOverdue && memberEntries.some((e) => {
+                      if (!e.deadline || e.status !== 'open') return false;
+                      const diff = (new Date(e.deadline).getTime() - Date.now()) / 86400000;
+                      return diff >= 0 && diff <= 3;
+                    });
+
+                    return (
+                      <li key={m.employeeId} className="department-member-row">
+                        <button
+                          className={`reg-member-btn${memberMenuId === m.employeeId ? ' active' : ''}`}
+                          onClick={() => setMemberMenuId(memberMenuId === m.employeeId ? null : m.employeeId)}
+                        >
+                          <span className="reg-member-name">
+                            {m.employeeName}
+                            {m.roleInReg === 'owner' && <span className="role-badge role-badge-head" style={{ marginLeft: 6 }}>{t('regulations.roleOwner')}</span>}
+                          </span>
+                          {hasOverdue && <span className="reg-deadline-dot overdue" title={t('regulations.overdueHint')}>!</span>}
+                          {hasDueSoon && !hasOverdue && <span className="reg-deadline-dot due-soon" title={t('regulations.dueSoonHint')}>~</span>}
+                        </button>
+
+                        {memberMenuId === m.employeeId && (
+                          <div className="reg-member-menu">
+                            <div className="reg-member-menu-name">{m.employeeName}</div>
+                            <div className="reg-member-menu-tasks">
+                              {memberEntries.length === 0
+                                ? <span className="settings-hint">{t('regulations.noMemberTasks')}</span>
+                                : memberEntries.map((e) => {
+                                    const isOver = e.deadline && e.status === 'open' && new Date(e.deadline) < new Date();
+                                    return (
+                                      <div key={e.id} className={`reg-member-task-row ${isOver ? 'overdue' : ''}`}>
+                                        <span className="reg-member-task-text">{e.content.slice(0, 40)}{e.content.length > 40 ? '…' : ''}</span>
+                                        {e.deadline && <span className="settings-hint" style={{ color: isOver ? 'var(--color-danger)' : undefined }}>{e.deadline}</span>}
+                                        <span className={`absence-status reg-entry-badge-${e.status}`}>{t(`regulations.entryStatus${e.status.charAt(0).toUpperCase() + e.status.slice(1)}`)}</span>
+                                      </div>
+                                    );
+                                  })}
+                            </div>
+                            <div className="reg-member-menu-actions">
+                              <button className="modal-btn" onClick={() => { setMemberMenuAction('reminder'); setMemberMenuNote(''); setMemberMenuDeadline(''); }}>
+                                🔔 {t('regulations.addReminderBtn')}
+                              </button>
+                              <button className="modal-btn" onClick={() => { setMemberMenuAction('extend'); setMemberMenuDeadline(''); }}>
+                                📅 {t('regulations.extendDeadlineBtn')}
+                              </button>
+                              {isManager && m.roleInReg !== 'owner' && (
+                                <button className="modal-btn danger" onClick={() => { handleRemoveMember(m); setMemberMenuId(null); }}>
+                                  <X size={12} /> {t('projects.removeMemberBtn')}
+                                </button>
+                              )}
+                            </div>
+
+                            {memberMenuAction === 'reminder' && (
+                              <div className="reg-member-menu-form">
+                                <input
+                                  placeholder={t('regulations.reminderNotePlaceholder')}
+                                  value={memberMenuNote}
+                                  onChange={(e) => setMemberMenuNote(e.target.value)}
+                                />
+                                <button className="modal-btn" onClick={async () => {
+                                  if (!selected || !memberMenuNote.trim()) return;
+                                  // Отправляем запись-напоминание в регламент с упоминанием участника
+                                  await api.addRegulationEntry({
+                                    actorId: currentEmployee.id,
+                                    regulationId: selected.id,
+                                    content: `@${m.employeeName}: ${memberMenuNote.trim()}`,
+                                    deadline: memberMenuDeadline || null,
+                                  });
+                                  setMemberMenuAction(null);
+                                  setMemberMenuId(null);
+                                  setMemberMenuNote('');
+                                  loadDetail();
+                                }}>
+                                  {t('common.save')}
+                                </button>
+                              </div>
+                            )}
+
+                            {memberMenuAction === 'extend' && (
+                              <div className="reg-member-menu-form">
+                                <input type="date" value={memberMenuDeadline} onChange={(e) => setMemberMenuDeadline(e.target.value)} />
+                                <button className="modal-btn" onClick={async () => {
+                                  if (!memberMenuDeadline) return;
+                                  // Обновляем все открытые задачи этого участника с новым дедлайном
+                                  const openTasks = memberEntries.filter((e) => e.status === 'open' && e.deadline);
+                                  await Promise.all(openTasks.map((e) =>
+                                    api.addRegulationEntry({
+                                      actorId: currentEmployee.id,
+                                      regulationId: selected!.id,
+                                      content: `↻ Срок задачи продлён до ${memberMenuDeadline}: ${e.content.slice(0, 60)}`,
+                                      deadline: memberMenuDeadline,
+                                    })
+                                  ));
+                                  setMemberMenuAction(null);
+                                  setMemberMenuId(null);
+                                  loadDetail();
+                                }}>
+                                  {t('common.save')}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>
@@ -604,3 +722,4 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
     </div>
   );
 }
+

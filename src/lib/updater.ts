@@ -75,7 +75,8 @@ export async function checkForAppUpdate(): Promise<UpdateCheckResult> {
       };
     }
     return { status: 'up-to-date' };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return { status: 'error', message: err?.message ?? String(err) };
   }
 }
+

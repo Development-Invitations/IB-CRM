@@ -123,7 +123,7 @@ export default function EmployeeFormModal({
       setPositionId(created.id);
       setAddingPosition(false);
       setNewPositionTitle('');
-    } catch (err: any) {
+    } catch (err: unknown) {
       showToast('error', typeof err === 'string' ? err : t('employees.errorGeneric'));
     } finally {
       setPositionBusy(false);
@@ -177,7 +177,7 @@ export default function EmployeeFormModal({
 
       onSaved();
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(typeof err === 'string' ? err : t('employees.errorGeneric'));
     } finally {
       setBusy(false);
@@ -363,3 +363,4 @@ export default function EmployeeFormModal({
     </Modal>
   );
 }
+

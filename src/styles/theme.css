@@ -1936,21 +1936,14 @@ button.employees-add-btn {
 /* ---- Исправление drawer — фиксированная ширина ---- */
 .drawer-panel { min-width: 360px; }
 
-/* ---- Полноэкранный вид открытого регламента ---- */
-
-.reg-fullscreen {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-  background: var(--color-bg);
-}
+/* ---- Полноэкранный вид: хедер ---- */
 
 .reg-fullscreen-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px 24px;
+  gap: 12px;
+  padding: 0 24px;
+  height: 52px;
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
   background: var(--color-surface);
@@ -1959,68 +1952,75 @@ button.employees-add-btn {
 .reg-back-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   background: none;
   border: none;
   color: var(--color-text-muted);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   flex-shrink: 0;
+  padding: 0;
+  white-space: nowrap;
 }
-.reg-back-btn:hover { color: var(--color-text); }
+.reg-back-btn:hover { color: var(--color-accent); }
 
 .reg-fullscreen-title {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex: 1;
   min-width: 0;
 }
 .reg-fullscreen-title h2 {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 380px;
 }
 
 .reg-fullscreen-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
+/* ---- Тело: две колонки ---- */
 .reg-fullscreen-body {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 320px 1fr;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
-  gap: 0;
 }
 
+/* ---- Левая колонка: участники и инфо ---- */
 .reg-sidebar {
   border-right: 1px solid var(--color-border);
   overflow-y: auto;
-  padding: 20px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
+  background: var(--color-surface);
 }
 
 .reg-sidebar-section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
+/* ---- Правая колонка: записи/чат ---- */
 .reg-entries-col {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 20px;
-  gap: 12px;
+  padding: 16px 20px;
+  gap: 10px;
 }
 
 .reg-entries-list {
@@ -2029,7 +2029,7 @@ button.employees-add-btn {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding-right: 4px;
+  padding-right: 6px;
 }
 
 .reg-deadline-badge {
@@ -2059,3 +2059,181 @@ button.employees-add-btn {
   gap: 10px;
 }
 .client-reg-name { font-size: 13px; font-weight: 500; }
+
+/* ---- Полноэкранный режим (регламенты, проекты) ---- */
+
+.app-shell-fullscreen .sidebar,
+.app-shell-fullscreen .topbar {
+  display: none;
+}
+
+.app-shell-fullscreen .main-area {
+  width: 100%;
+}
+
+/* ---- App-shell fullscreen: скрываем sidebar + topbar ---- */
+.app-shell-fullscreen .content {
+  padding: 0;
+  overflow: hidden;
+}
+
+.app-shell-fullscreen .sidebar {
+  display: none;
+}
+
+.app-shell-fullscreen .topbar {
+  display: none;
+}
+
+.app-shell-fullscreen .main-area {
+  width: 100vw;
+}
+
+/* ---- Контейнер — занимает всё свободное место в .content ---- */
+.reg-fullscreen {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh);      /* 100vh когда topbar скрыт */
+  width: 100%;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+/* ---- Меню участника регламента ---- */
+
+.reg-member-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  color: var(--color-text);
+  font-size: 13px;
+  text-align: left;
+  padding: 8px 10px;
+  transition: background 0.15s;
+}
+.reg-member-btn:hover { background: var(--color-border); }
+.reg-member-btn.active { border-color: var(--color-accent); }
+
+.reg-member-name { flex: 1; }
+
+.reg-deadline-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.reg-deadline-dot.overdue { background: var(--color-danger); color: #fff; }
+.reg-deadline-dot.due-soon { background: var(--color-accent); color: #14213D; }
+
+.reg-member-menu {
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-accent);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.reg-member-menu-name {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--color-accent);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.reg-member-menu-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 130px;
+  overflow-y: auto;
+}
+
+.reg-member-task-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: var(--color-surface-2);
+}
+.reg-member-task-row.overdue { background: color-mix(in srgb, var(--color-danger) 15%, transparent); }
+.reg-member-task-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.reg-member-menu-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.reg-member-menu-actions .modal-btn {
+  font-size: 12px;
+  padding: 6px 10px;
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.reg-member-menu-form {
+  display: flex;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-border);
+}
+.reg-member-menu-form input {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: 12px;
+}
+.reg-member-menu-form .modal-btn { padding: 6px 12px; font-size: 12px; }
+
+/* ---- Сообщение чата проекта (полноэкранный вид) ---- */
+.project-chat-msg {
+  padding: 10px 14px;
+  background: var(--color-surface-2);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  font-size: 13px;
+}
+.project-chat-msg.project-chat-task {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface-2));
+}
+.project-chat-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+/* ---- Форма добавления записи в регламент (улучшенная) ---- */
+.reg-add-entry {
+  flex-shrink: 0;
+  border-top: 1px solid var(--color-border);
+  padding-top: 10px;
+}

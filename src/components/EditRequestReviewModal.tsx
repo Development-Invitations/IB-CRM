@@ -39,7 +39,7 @@ export default function EditRequestReviewModal({
       showToast('success', t('editRequest.resolved'));
       onResolved();
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       showToast('error', typeof err === 'string' ? err : t('employees.errorGeneric'));
     } finally {
       setBusy(false);
@@ -95,3 +95,4 @@ export default function EditRequestReviewModal({
     </Modal>
   );
 }
+

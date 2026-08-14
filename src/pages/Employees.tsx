@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Pencil, ArrowRight } from 'lucide-react';
 import { api, type Employee, type Position, type Department, type AbsenceRequest, type Regulation } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { parseSqliteUtc } from '../lib/date';

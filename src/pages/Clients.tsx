@@ -78,7 +78,7 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
       setDeleteConfirmOpen(false);
       setSelected(null);
       load();
-    } catch (err: any) {
+    } catch (err: unknown) {
       showToast('error', typeof err === 'string' ? err : t('clients.errorGeneric'));
     } finally {
       setDeleteBusy(false);
@@ -93,7 +93,7 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
       setNewNote('');
       const entries = await api.listClientHistory(selected.id);
       setHistory(entries);
-    } catch (err: any) {
+    } catch (err: unknown) {
       showToast('error', typeof err === 'string' ? err : t('clients.errorGeneric'));
     } finally {
       setNoteBusy(false);
@@ -296,3 +296,4 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
     </div>
   );
 }
+

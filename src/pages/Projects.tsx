@@ -1,6 +1,31 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useContext } from 'react';
 import { Plus, Pencil, FolderKanban, Trash2, Send, UserPlus, X, Repeat, CheckSquare, ArrowLeft, Link2, Check } from 'lucide-react';
 import { api, type Employee, type Project, type ProjectMember, type ProjectChatMessage, type Client, type ProjectMemberRole } from '../lib/api';
+import { FullscreenContext } from './Dashboard';
+
+// Компонент одного сообщения чата — отдельно, чтобы useState работал корректно
+function ChatMessage({ m, t }: { m: ProjectChatMessage; t: (k: string) => string }) {
+  const [copied, setCopied] = useState(false);
+  const copyLink = () => {
+    navigator.clipboard.writeText(`${window.location.href.split('#')[0]}#msg-${m.id}`).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <div id={`msg-${m.id}`} className={m.isTask ? 'project-chat-task project-chat-msg' : 'project-chat-msg'}>
+      <div className="project-chat-meta">
+        <strong>{m.senderName}</strong>
+        <span className="settings-hint">{new Date(m.createdAt).toLocaleString()}</span>
+        {m.isTask && <span className="role-badge role-badge-head"><CheckSquare size={11} /> {t('projects.chatTaskBadge')}</span>}
+        <button className="reg-action-btn" style={{ marginLeft: 'auto' }} onClick={copyLink} title={t('projects.copyMsgLink')}>
+          {copied ? <Check size={12} /> : <Link2 size={12} />}
+        </button>
+      </div>
+      <div>{m.content}</div>
+    </div>
+  );
+}
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
 import { parseSqliteUtc } from '../lib/date';
@@ -22,6 +47,7 @@ const STATUS_LABEL_KEYS: Record<Project['status'], string> = {
 export default function Projects({ currentEmployee }: { currentEmployee: Employee }) {
   const { t } = useLocale();
   const { showToast } = useToast();
+  const { enter: enterFullscreen, exit: exitFullscreen } = useContext(FullscreenContext);
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -64,6 +90,15 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
     load();
   }, []);
 
+  useEffect(() => {
+    if (selected) {
+      enterFullscreen();
+    } else {
+      exitFullscreen();
+    }
+    return () => { exitFullscreen(); };
+  }, [!!selected]); // eslint-disable-line
+
   const loadDetail = () => {
     if (!selected) return;
     setDetailLoading(true);
@@ -102,7 +137,7 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
       setDeleteConfirmOpen(false);
       setSelected(null);
       load();
-    } catch (err: any) {
+    } catch (err: unknown) {
       showToast('error', typeof err === 'string' ? err : t('projects.errorGeneric'));
     } finally {
       setDeleteBusy(false);
@@ -128,7 +163,7 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
       setAddMemberRole('member');
       loadDetail();
       load();
-    } catch (err: any) {
+    } catch (err: unknown) {
       showToast('error', typeof err === 'string' ? err : t('projects.errorGeneric'));
     } finally {
       setAddMemberBusy(false);
@@ -142,7 +177,7 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
       showToast('success', t('projects.memberRemoved'));
       loadDetail();
       load();
-    } catch (err: any) {
+    } catch (err: unknown) {
       showToast('error', typeof err === 'string' ? err : t('projects.errorGeneric'));
     }
   };
@@ -156,7 +191,7 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
       setTransferTarget(null);
       loadDetail();
       load();
-    } catch (err: any) {
+    } catch (err: unknown) {
       showToast('error', typeof err === 'string' ? err : t('projects.errorGeneric'));
     } finally {
       setTransferBusy(false);
@@ -172,7 +207,7 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
       setChatIsTask(false);
       const messages = await api.listProjectChat(selected.id);
       setChat(messages);
-    } catch (err: any) {
+    } catch (err: unknown) {
       showToast('error', typeof err === 'string' ? err : t('projects.errorGeneric'));
     } finally {
       setChatBusy(false);
@@ -281,28 +316,7 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
               {detailLoading ? <LoadingScreen compact /> : chat.length === 0 ? (
                 <p className="settings-hint">{t('projects.chatEmpty')}</p>
               ) : (
-                chat.map((m) => {
-                  const [copied, setCopied] = useState(false);
-                  const copyLink = () => {
-                    navigator.clipboard.writeText(`${window.location.href.split('#')[0]}#msg-${m.id}`).then(() => {
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 2000);
-                    });
-                  };
-                  return (
-                    <div key={m.id} id={`msg-${m.id}`} className={m.isTask ? 'project-chat-task project-chat-msg' : 'project-chat-msg'}>
-                      <div className="project-chat-meta">
-                        <strong>{m.senderName}</strong>
-                        <span className="settings-hint">{parseSqliteUtc(m.createdAt).toLocaleString()}</span>
-                        {m.isTask && <span className="role-badge role-badge-head"><CheckSquare size={11} /> {t('projects.chatTaskBadge')}</span>}
-                        <button className="reg-action-btn" style={{ marginLeft: 'auto' }} onClick={copyLink} title={t('projects.copyMsgLink')}>
-                          {copied ? <Check size={12} /> : <Link2 size={12} />}
-                        </button>
-                      </div>
-                      <div>{m.content}</div>
-                    </div>
-                  );
-                })
+                chat.map((m) => <ChatMessage key={m.id} m={m} t={t} />)
               )}
             </div>
 
@@ -394,3 +408,4 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
     </>
   );
 }
+

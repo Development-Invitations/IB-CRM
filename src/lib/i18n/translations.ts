@@ -1,6 +1,6 @@
 export const dictionaries = {
   ru: {
-    common: { loading: 'Загрузка…', cancel: 'Отмена', close: 'Закрыть' },
+    common: { loading: 'Загрузка…', cancel: 'Отмена', save: 'Сохранить', close: 'Закрыть' },
     firstRun: {
       title: 'Первый запуск IB CRM',
       subtitle:
@@ -325,6 +325,12 @@ export const dictionaries = {
       searchPlaceholder: 'Поиск по ID, номеру или названию…',
       backToList: 'К списку регламентов',
       noEntries: 'Записей пока нет',
+      overdueHint: 'Есть просроченные задачи!',
+      dueSoonHint: 'Срок скоро истекает',
+      noMemberTasks: 'Нет задач',
+      addReminderBtn: 'Добавить напоминание',
+      extendDeadlineBtn: 'Продлить срок',
+      reminderNotePlaceholder: 'Текст напоминания…',
       copyEntryLink: 'Скопировать ссылку на запись',
       membersTitle: 'Участники',
       addMemberBtn: 'Добавить',
@@ -432,7 +438,7 @@ export const dictionaries = {
     },
   },
   uz: {
-    common: { loading: 'Yuklanmoqda…', cancel: 'Bekor qilish', close: 'Yopish' },
+    common: { loading: 'Yuklanmoqda…', cancel: 'Bekor qilish', save: 'Saqlash', close: 'Yopish' },
     firstRun: {
       title: 'IB CRM birinchi ishga tushirish',
       subtitle:
@@ -757,6 +763,12 @@ export const dictionaries = {
       searchPlaceholder: "ID, raqam yoki nom bo'yicha qidiruv…",
       backToList: "Reglamentlar ro'yxatiga",
       noEntries: "Hozircha yozuvlar yo'q",
+      overdueHint: 'Muddati o\'tgan vazifalar bor!',
+      dueSoonHint: 'Muddat yaqinlashmoqda',
+      noMemberTasks: 'Vazifalar yo\'q',
+      addReminderBtn: 'Eslatma qo\'shish',
+      extendDeadlineBtn: 'Muddatni uzaytirish',
+      reminderNotePlaceholder: 'Eslatma matni…',
       copyEntryLink: 'Yozuvga havolani nusxalash',
       membersTitle: 'Ishtirokchilar',
       addMemberBtn: "Qo'shish",
@@ -865,7 +877,7 @@ export const dictionaries = {
     },
   },
   'uz-cyrl': {
-    common: { loading: 'Юкланмоқда…', cancel: 'Бекор қилиш', close: 'Ёпиш' },
+    common: { loading: 'Юкланмоқда…', cancel: 'Бекор қилиш', save: 'Сақлаш', close: 'Ёпиш' },
     firstRun: {
       title: 'IB CRM биринчи ишга тушириш',
       subtitle:
@@ -1190,6 +1202,12 @@ export const dictionaries = {
       searchPlaceholder: 'ID, рақам ёки ном бўйича қидирув…',
       backToList: 'Регламентлар рўйхатига',
       noEntries: 'Ҳозирча ёзувлар йўқ',
+      overdueHint: 'Муддати ўтган вазифалар бор!',
+      dueSoonHint: 'Муддат яқинлашмоқда',
+      noMemberTasks: 'Вазифалар йўқ',
+      addReminderBtn: 'Эслатма қўшиш',
+      extendDeadlineBtn: 'Муддатни узайтириш',
+      reminderNotePlaceholder: 'Эслатма матни…',
       copyEntryLink: 'Ёзувга ҳаволани нусхалаш',
       membersTitle: 'Иштирокчилар',
       addMemberBtn: 'Қўшиш',

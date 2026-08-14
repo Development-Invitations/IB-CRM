@@ -2198,6 +2198,13 @@ impl Db {
                 params![regulation_id, employee_id, role, actor_id],
             )
             .map_err(|e| e.to_string())?;
+
+        // Уведомляем добавленного участника
+        if employee_id != actor_id {
+            let title = format!("Вас добавили в регламент «{}»", reg.title);
+            self.notify(employee_id, "regulation_member_added", &title, None, Some("regulation"), Some(regulation_id));
+        }
+
         Ok(())
     }
 

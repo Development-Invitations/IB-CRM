@@ -13,7 +13,7 @@ export const LOCALE_LABELS: Record<Locale, string> = {
   'uz-cyrl': 'Ўзбекча (кирилл)',
 };
 
-type Dict = typeof dictionaries.ru;
+type Dict = (typeof dictionaries)[keyof typeof dictionaries];
 type TranslateFn = (key: string, vars?: Record<string, string | number>) => string;
 
 function getByPath(obj: unknown, path: string): string | undefined {

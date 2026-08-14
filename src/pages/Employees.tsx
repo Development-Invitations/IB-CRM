@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Pencil, ArrowRight } from 'lucide-react';
 import { api, type Employee, type Position, type Department, type AbsenceRequest, type Regulation } from '../lib/api';
 import { useLocale } from '../lib/i18n';
-import { parseSqliteUtc } from '../lib/date';
+import { parseSqliteUtc, formatLocalDate } from '../lib/date';
 import { formatWorkDays } from '../lib/schedule';
 import { ABSENCE_TYPE_LABEL_KEYS, formatDate } from '../lib/absenceTypes';
 import Drawer from '../components/Drawer';
@@ -171,6 +171,7 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
               <div>
                 <div className="employee-card-name">{selected.fullName || selected.login}</div>
                 <div className="settings-hint">{selected.employeeNumber}</div>
+                {selected.birthDate && <div className="settings-hint">{formatLocalDate(selected.birthDate)}</div>}
                 {(selected.headOfDepartmentName || selected.deputyOfDepartmentName) && (
                   <div className="role-badges">
                     {selected.headOfDepartmentName && (

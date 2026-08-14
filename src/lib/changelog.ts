@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.1.17';
+export const APP_VERSION = '0.1.22';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,59 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.1.22',
+      items: [
+        'Исправлено: редактор с форматированием теперь и в форме создания темы, не только при редактировании',
+        'Комментарии в блоге теперь тоже можно оформлять — жирный, списки, картинки и всё остальное',
+        'Тема блога поделена на 2 колонки: описание слева, комментарии справа',
+        'Своя отмена/повтор действий (Ctrl+Z/Ctrl+Y) в редакторе — надёжно работает и после вставки картинок',
+        'Можно менять цвет текста — палитра готовых цветов + свой на выбор',
+        'Редактировать тему блога теперь может только её автор (не любой админ)',
+      ],
+    },
+    {
+      version: '0.1.21',
+      items: [
+        'Темы блога теперь можно оформлять как в текстовом редакторе: жирный/курсив/подчёркивание, заголовки, списки, ссылки',
+        'В тему можно вставлять фото и видео прямо по тексту',
+        'Раскрывающиеся блоки ("спойлеры") для необязательной информации',
+        '"Путь чтения" — список разделов темы справа со ссылками для быстрого перехода',
+        'Сотрудники теперь уведомляются, когда у коллеги день рождения — с поздравлением',
+        'В кабинете сотрудника вместо логина теперь показана дата рождения',
+        'В карточке сотрудника дата рождения теперь видна сразу под ID',
+      ],
+    },
+    {
+      version: '0.1.20',
+      items: [
+        'Новый модуль "Календарь дней рождений" — кто и когда празднует, отсортировано по ближайшим датам',
+        'Баннер "Сегодня день рождения" наверху страницы',
+        'В форме сотрудника теперь можно указать дату рождения',
+      ],
+    },
+    {
+      version: '0.1.19',
+      items: [
+        'Новый модуль "Блог" — внутренние темы для обсуждений, объявлений и полезных материалов',
+        'Категории тем: объявление, обсуждение, полезное, вопрос-ответ, другое',
+        'Комментарии к темам с ответом конкретному человеку',
+        'Закрепление важных тем сверху списка (у администратора)',
+        'Поиск по темам блога',
+      ],
+    },
+    {
+      version: '0.1.18',
+      items: [
+        'Регламенты и проекты: у каждого участника теперь свой личный тред с задачами',
+        'Задачу можно передать коллеге вместе со сроком — она появится в его треде',
+        'Фото и видео во вложениях теперь показываются прямо в чате, картинки открываются на весь экран',
+        'При добавлении нового участника можно сразу поставить ему первую задачу со сроком',
+        'Записи регламента и сообщения проекта оформлены как чат с сообщениями',
+        'Поиск добавлен на страницы "Проекты" и "Клиенты"',
+        'Исправлено наложение полей при добавлении участника в проект',
+      ],
+    },
     {
       version: '0.1.17',
       items: [
@@ -186,6 +239,59 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.1.22',
+      items: [
+        "Tuzatildi: formatlash muharriri endi mavzu yaratish formasida ham, faqat tahrirlashda emas",
+        "Blog izohlarini ham endi bezash mumkin — qalin, ro'yxatlar, rasmlar va boshqa hammasi",
+        "Blog mavzusi 2 ustunga bo'lindi: chapda tavsif, o'ngda izohlar",
+        "Muharrirda o'zining bekor qilish/qaytarish (Ctrl+Z/Ctrl+Y) — rasm qo'shgandan keyin ham ishonchli ishlaydi",
+        "Matn rangini o'zgartirish mumkin — tayyor palitra + o'zingiz tanlagan rang",
+        "Blog mavzusini endi faqat uning muallifi tahrirlashi mumkin (istalgan administrator emas)",
+      ],
+    },
+    {
+      version: '0.1.21',
+      items: [
+        "Blog mavzularini endi matn muharriridagidek bezash mumkin: qalin/kursiv/tagi chizilgan, sarlavhalar, ro'yxatlar, havolalar",
+        "Mavzuga rasm va videoni to'g'ridan-to'g'ri matn ichiga qo'yish mumkin",
+        "Ixtiyoriy ma'lumot uchun ochiladigan bloklar",
+        "\"O'qish yo'li\" — tez o'tish uchun mavzu bo'limlari ro'yxati o'ng tomonda",
+        "Xodimlarga hamkasbining tug'ilgan kuni haqida tabrik bilan bildirishnoma keladi",
+        "Xodim kabinetida login o'rniga endi tug'ilgan sana ko'rsatiladi",
+        "Xodim kartochkasida tug'ilgan sana endi ID ostida darhol ko'rinadi",
+      ],
+    },
+    {
+      version: '0.1.20',
+      items: [
+        "Yangi \"Tug'ilgan kunlar taqvimi\" moduli — kim va qachon nishonlaydi, eng yaqin sanalar bo'yicha saralangan",
+        "Sahifa tepasida \"Bugun tug'ilgan kun\" banneri",
+        "Xodim formasida endi tug'ilgan sanani kiritish mumkin",
+      ],
+    },
+    {
+      version: '0.1.19',
+      items: [
+        "Yangi \"Blog\" moduli — muhokamalar, e'lonlar va foydali materiallar uchun ichki mavzular",
+        "Mavzu kategoriyalari: e'lon, muhokama, foydali, savol-javob, boshqa",
+        "Mavzularga izohlar, muayyan kishiga javob berish imkoniyati bilan",
+        "Muhim mavzularni ro'yxat tepasida mahkamlash (administrator uchun)",
+        "Blog mavzulari bo'yicha qidiruv",
+      ],
+    },
+    {
+      version: '0.1.18',
+      items: [
+        "Reglamentlar va loyihalar: endi har bir ishtirokchining o'z shaxsiy vazifalar tredi bor",
+        "Vazifani hamkasbga muddat bilan birga topshirish mumkin — u uning tredida paydo bo'ladi",
+        "Ilovadagi surat va videolar endi chatning o'zida ko'rinadi, rasmlar to'liq ekranda ochiladi",
+        "Yangi ishtirokchi qo'shilganda unga darhol muddatli birinchi vazifa qo'yish mumkin",
+        "Reglament yozuvlari va loyiha xabarlari chat ko'rinishida rasmiylashtirildi",
+        "\"Loyihalar\" va \"Mijozlar\" sahifalariga qidiruv qo'shildi",
+        "Loyihaga ishtirokchi qo'shishda maydonlar bir-birining ustiga chiqib ketishi tuzatildi",
+      ],
+    },
+    {
       version: '0.1.17',
       items: [
         "Har bir reglament ishtirokchisining paneli — vazifalar ro'yxati, holatlar, muddatlar",
@@ -355,6 +461,59 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.1.22',
+      items: [
+        'Тузатилди: форматлаш муҳаррири энди мавзу яратиш формасида ҳам, фақат таҳрирлашда эмас',
+        'Блог изоҳларини ҳам энди безаш мумкин — қалин, рўйхатлар, расмлар ва бошқа ҳаммаси',
+        'Блог мавзуси 2 устунга бўлинди: чапда тавсиф, ўнгда изоҳлар',
+        'Муҳаррирда ўзининг бекор қилиш/қайтариш (Ctrl+Z/Ctrl+Y) — расм қўшгандан кейин ҳам ишончли ишлайди',
+        'Матн рангини ўзгартириш мумкин — тайёр палитра + ўзингиз танлаган ранг',
+        'Блог мавзусини энди фақат унинг муаллифи таҳрирлаши мумкин (исталган администратор эмас)',
+      ],
+    },
+    {
+      version: '0.1.21',
+      items: [
+        'Блог мавзуларини энди матн муҳарриридагидек безаш мумкин: қалин/курсив/таги чизилган, сарлавҳалар, рўйхатлар, ҳаволалар',
+        'Мавзуга расм ва видеони тўғридан-тўғри матн ичига қўйиш мумкин',
+        'Ихтиёрий маълумот учун очиладиган блоклар',
+        '"Ўқиш йўли" — тез ўтиш учун мавзу бўлимлари рўйхати ўнг томонда',
+        'Ходимларга ҳамкасбининг туғилган куни ҳақида табрик билан билдиришнома келади',
+        'Ходим кабинетида логин ўрнига энди туғилган сана кўрсатилади',
+        'Ходим карточкасида туғилган сана энди ID остида дарҳол кўринади',
+      ],
+    },
+    {
+      version: '0.1.20',
+      items: [
+        'Янги "Туғилган кунлар тақвими" модули — ким ва қачон нишонлайди, энг яқин саналар бўйича саналанган',
+        'Саҳифа тепасида "Бугун туғилган кун" баннери',
+        'Ходим формасида энди туғилган сананы киритиш мумкин',
+      ],
+    },
+    {
+      version: '0.1.19',
+      items: [
+        'Янги "Блог" модули — муҳокамалар, эълонлар ва фойдали материаллар учун ички мавзулар',
+        'Мавзу категориялари: эълон, муҳокама, фойдали, савол-жавоб, бошқа',
+        'Мавзуларга изоҳлар, муайян кишига жавоб бериш имконияти билан',
+        'Муҳим мавзуларни рўйхат тепасида маҳкамлаш (администратор учун)',
+        'Блог мавзулари бўйича қидирув',
+      ],
+    },
+    {
+      version: '0.1.18',
+      items: [
+        'Регламентлар ва лойиҳалар: энди ҳар бир иштирокчининг ўз шахсий вазифалар треди бор',
+        'Вазифани ҳамкасбга муддат билан бирга топшириш мумкин — у унинг тредида пайдо бўлади',
+        'Иловадаги сурат ва видеолар энди чатнинг ўзида кўринади, расмлар тўлиқ экранда очилади',
+        'Янги иштирокчи қўшилганда унга дарҳол муддатли биринчи вазифа қўйиш мумкин',
+        'Регламент ёзувлари ва лойиҳа хабарлари чат кўринишида расмийлаштирилди',
+        '"Лойиҳалар" ва "Мижозлар" саҳифаларига қидирув қўшилди',
+        'Лойиҳага иштирокчи қўшишда майдонлар бир-бирининг устига чиқиб кетиши тузатилди',
+      ],
+    },
     {
       version: '0.1.17',
       items: [

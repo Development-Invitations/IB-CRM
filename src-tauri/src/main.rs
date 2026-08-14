@@ -59,6 +59,8 @@ struct Employee {
     head_of_department_name: Option<String>,
     #[serde(rename = "deputyOfDepartmentName")]
     deputy_of_department_name: Option<String>,
+    #[serde(rename = "birthDate")]
+    birth_date: Option<String>,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -386,6 +388,39 @@ struct Position {
     title: String,
 }
 
+#[derive(Clone, serde::Serialize)]
+struct BlogTopic {
+    id: String,
+    category: String,
+    title: String,
+    content: Option<String>,
+    #[serde(rename = "createdBy")]
+    created_by: String,
+    #[serde(rename = "createdByName")]
+    created_by_name: String,
+    pinned: bool,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+    #[serde(rename = "commentCount")]
+    comment_count: i64,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct BlogComment {
+    id: String,
+    #[serde(rename = "topicId")]
+    topic_id: String,
+    #[serde(rename = "authorId")]
+    author_id: String,
+    #[serde(rename = "authorName")]
+    author_name: String,
+    content: String,
+    #[serde(rename = "replyToId")]
+    reply_to_id: Option<String>,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+}
+
 #[derive(serde::Deserialize)]
 struct CreateAdminPayload {
     login: String,
@@ -429,6 +464,8 @@ struct CreateEmployeePayload {
     department_id: Option<String>,
     #[serde(rename = "avatarData")]
     avatar_data: Option<String>,
+    #[serde(rename = "birthDate")]
+    birth_date: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -450,6 +487,8 @@ struct UpdateEmployeePayload {
     department_id: Option<String>,
     #[serde(rename = "avatarData")]
     avatar_data: Option<String>,
+    #[serde(rename = "birthDate")]
+    birth_date: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -815,6 +854,51 @@ struct UpdateEntryDeadlinePayload {
 }
 
 #[derive(serde::Deserialize)]
+struct CreateBlogTopicPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    category: String,
+    title: String,
+    content: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct UpdateBlogTopicPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    id: String,
+    category: String,
+    title: String,
+    content: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct SetBlogTopicPinnedPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    id: String,
+    pinned: bool,
+}
+
+#[derive(serde::Deserialize)]
+struct DeleteBlogTopicPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct AddBlogCommentPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "topicId")]
+    topic_id: String,
+    content: String,
+    #[serde(rename = "replyToId")]
+    reply_to_id: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
 struct SetEmployeeSchedulePayload {
     #[serde(rename = "adminId")]
     admin_id: String,
@@ -883,6 +967,7 @@ fn to_employee(e: db::EmployeeRecord) -> Employee {
         work_end: e.work_end,
         head_of_department_name: e.head_of_department_name,
         deputy_of_department_name: e.deputy_of_department_name,
+        birth_date: e.birth_date,
     }
 }
 
@@ -1028,6 +1113,21 @@ fn to_position(p: db::PositionRecord) -> Position {
     Position { id: p.id, title: p.title }
 }
 
+fn to_blog_topic(t: db::BlogTopicRecord) -> BlogTopic {
+    BlogTopic {
+        id: t.id, category: t.category, title: t.title, content: t.content,
+        created_by: t.created_by, created_by_name: t.created_by_name,
+        pinned: t.pinned, created_at: t.created_at, comment_count: t.comment_count,
+    }
+}
+
+fn to_blog_comment(c: db::BlogCommentRecord) -> BlogComment {
+    BlogComment {
+        id: c.id, topic_id: c.topic_id, author_id: c.author_id, author_name: c.author_name,
+        content: c.content, reply_to_id: c.reply_to_id, created_at: c.created_at,
+    }
+}
+
 fn to_department(d: db::DepartmentRecord) -> Department {
     Department {
         id: d.id,
@@ -1121,6 +1221,7 @@ fn create_employee(payload: CreateEmployeePayload, state: tauri::State<AppState>
         payload.deputy_id.as_deref(),
         payload.department_id.as_deref(),
         payload.avatar_data.as_deref(),
+        payload.birth_date.as_deref(),
     )
     .map(to_employee)
 }
@@ -1138,6 +1239,7 @@ fn update_employee(payload: UpdateEmployeePayload, state: tauri::State<AppState>
         payload.deputy_id.as_deref(),
         payload.department_id.as_deref(),
         payload.avatar_data.as_deref(),
+        payload.birth_date.as_deref(),
     )
     .map(to_employee)
 }
@@ -1611,6 +1713,51 @@ fn update_regulation_entry_deadline(payload: UpdateEntryDeadlinePayload, state: 
 }
 
 #[tauri::command]
+fn list_blog_topics(state: tauri::State<AppState>) -> Vec<BlogTopic> {
+    let db = state.0.lock().unwrap();
+    db.list_blog_topics().into_iter().map(to_blog_topic).collect()
+}
+
+#[tauri::command]
+fn create_blog_topic(payload: CreateBlogTopicPayload, state: tauri::State<AppState>) -> Result<BlogTopic, String> {
+    let db = state.0.lock().unwrap();
+    db.create_blog_topic(&payload.actor_id, &payload.category, &payload.title, payload.content.as_deref())
+        .map(to_blog_topic)
+}
+
+#[tauri::command]
+fn update_blog_topic(payload: UpdateBlogTopicPayload, state: tauri::State<AppState>) -> Result<BlogTopic, String> {
+    let db = state.0.lock().unwrap();
+    db.update_blog_topic(&payload.actor_id, &payload.id, &payload.category, &payload.title, payload.content.as_deref())
+        .map(to_blog_topic)
+}
+
+#[tauri::command]
+fn set_blog_topic_pinned(payload: SetBlogTopicPinnedPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.set_blog_topic_pinned(&payload.admin_id, &payload.id, payload.pinned)
+}
+
+#[tauri::command]
+fn delete_blog_topic(payload: DeleteBlogTopicPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.delete_blog_topic(&payload.admin_id, &payload.id)
+}
+
+#[tauri::command]
+fn list_blog_comments(topic_id: String, state: tauri::State<AppState>) -> Vec<BlogComment> {
+    let db = state.0.lock().unwrap();
+    db.list_blog_comments(&topic_id).into_iter().map(to_blog_comment).collect()
+}
+
+#[tauri::command]
+fn add_blog_comment(payload: AddBlogCommentPayload, state: tauri::State<AppState>) -> Result<BlogComment, String> {
+    let db = state.0.lock().unwrap();
+    db.add_blog_comment(&payload.actor_id, &payload.topic_id, &payload.content, payload.reply_to_id.as_deref())
+        .map(to_blog_comment)
+}
+
+#[tauri::command]
 fn record_login(employee_id: String, state: tauri::State<AppState>) -> Result<(), String> {
     let db = state.0.lock().unwrap();
     db.record_login(&employee_id)
@@ -1707,6 +1854,13 @@ fn main() {
             add_regulation_reminder,
             list_regulation_reminders,
             update_regulation_entry_deadline,
+            list_blog_topics,
+            create_blog_topic,
+            update_blog_topic,
+            set_blog_topic_pinned,
+            delete_blog_topic,
+            list_blog_comments,
+            add_blog_comment,
             record_login,
             record_logout,
             list_recent_sessions

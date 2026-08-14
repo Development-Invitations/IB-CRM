@@ -38,6 +38,7 @@ pub struct EmployeeRecord {
     pub work_end: Option<String>,
     pub head_of_department_name: Option<String>,
     pub deputy_of_department_name: Option<String>,
+    pub birth_date: Option<String>,
 }
 
 pub struct SessionRecord {
@@ -245,6 +246,28 @@ pub struct PositionRecord {
     pub title: String,
 }
 
+pub struct BlogTopicRecord {
+    pub id: String,
+    pub category: String,
+    pub title: String,
+    pub content: Option<String>,
+    pub created_by: String,
+    pub created_by_name: String,
+    pub pinned: bool,
+    pub created_at: String,
+    pub comment_count: i64,
+}
+
+pub struct BlogCommentRecord {
+    pub id: String,
+    pub topic_id: String,
+    pub author_id: String,
+    pub author_name: String,
+    pub content: String,
+    pub reply_to_id: Option<String>,
+    pub created_at: String,
+}
+
 // SQLite не умеет "ADD COLUMN IF NOT EXISTS" — просто пробуем добавить
 // колонку и молча игнорируем ошибку, если она уже есть (на свежей базе
 // сработает сразу через CREATE TABLE, на старой — домигрирует один раз).
@@ -438,6 +461,23 @@ impl Db {
                 note TEXT NOT NULL,
                 fired INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS blog_topics (
+                id TEXT PRIMARY KEY,
+                category TEXT NOT NULL DEFAULT 'discussion',
+                title TEXT NOT NULL,
+                content TEXT,
+                created_by TEXT NOT NULL REFERENCES employees(id),
+                pinned INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS blog_comments (
+                id TEXT PRIMARY KEY,
+                topic_id TEXT NOT NULL REFERENCES blog_topics(id),
+                author_id TEXT NOT NULL REFERENCES employees(id),
+                content TEXT NOT NULL,
+                reply_to_id TEXT REFERENCES blog_comments(id),
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );",
         )
         .expect("не удалось инициализировать схему");
@@ -468,6 +508,10 @@ impl Db {
         // фронтенде до разумного размера перед отправкой, см. src/lib/photo.ts) —
         // для локального офлайн-режима этого достаточно, без файлового хранилища.
         add_column_if_missing(&conn, "employees", "avatar_data TEXT");
+        // Дата рождения — только день и месяц используются календарём ДР, год
+        // тоже хранится (проще взять готовый <input type="date">, чем городить
+        // отдельный день/месяц-пикер), но нигде не показывается в интерфейсе.
+        add_column_if_missing(&conn, "employees", "birth_date TEXT");
         add_column_if_missing(&conn, "employees", "manual_status TEXT");
         add_column_if_missing(&conn, "employees", "manual_status_until TEXT");
         // Рабочий график: дни недели — строка вида "1,2,3,4,5" (1=Пн..7=Вс),
@@ -533,7 +577,76 @@ impl Db {
             [],
         );
 
-        Db { conn }
+        let db = Db { conn };
+        db.notify_todays_birthdays();
+        db
+    }
+
+    // Поздравления для уведомлений о дне рождения — выбираются детерминированно
+    // по имени именинника (без crate rand), просто чтобы текст не повторялся
+    // один в один каждый раз у разных людей.
+    const BIRTHDAY_CONGRATS: [&'static str; 5] = [
+        "Пусть этот год принесёт много ярких моментов, успехов в делах и тепла в кругу близких!",
+        "Желаем крепкого здоровья, вдохновения и удачи во всех начинаниях!",
+        "Пусть каждый день радует новыми победами и приятными сюрпризами!",
+        "Счастья, благополучия и исполнения самых заветных желаний!",
+        "Пусть команда всегда будет рядом, а успех сопутствует во всём!",
+    ];
+
+    // Раз в день (по факту — раз при первом запуске приложения в этот день)
+    // уведомляем всех сотрудников о том, у кого сегодня день рождения. Дата
+    // хранится как полный YYYY-MM-DD (из <input type="date">), но сравниваем
+    // только день и месяц — год рождения тут не участвует.
+    fn notify_todays_birthdays(&self) {
+        let today: String = self.conn.query_row("SELECT date('now')", [], |row| row.get(0)).unwrap_or_default();
+        let last_notified: Option<String> = self.conn
+            .query_row("SELECT value FROM app_meta WHERE key = 'last_birthday_notify_date'", [], |row| row.get(0))
+            .ok();
+        if last_notified.as_deref() == Some(today.as_str()) {
+            return;
+        }
+
+        let birthday_people: Vec<(String, String)> = {
+            let mut stmt = match self.conn.prepare(
+                "SELECT id, full_name FROM employees
+                 WHERE birth_date IS NOT NULL AND strftime('%m-%d', birth_date) = strftime('%m-%d', 'now')",
+            ) {
+                Ok(s) => s,
+                Err(_) => return,
+            };
+            stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                .unwrap_or_default()
+        };
+
+        if !birthday_people.is_empty() {
+            let all_employee_ids: Vec<String> = {
+                let mut stmt = match self.conn.prepare("SELECT id FROM employees") {
+                    Ok(s) => s,
+                    Err(_) => return,
+                };
+                stmt.query_map([], |row| row.get::<_, String>(0))
+                    .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                    .unwrap_or_default()
+            };
+
+            for (index, (birthday_employee_id, birthday_name)) in birthday_people.iter().enumerate() {
+                let title = format!("Сегодня день рождения у {}! 🎉", birthday_name);
+                let body = Self::BIRTHDAY_CONGRATS[index % Self::BIRTHDAY_CONGRATS.len()];
+                for employee_id in &all_employee_ids {
+                    if employee_id == birthday_employee_id {
+                        continue;
+                    }
+                    self.notify(employee_id, "birthday", &title, Some(body), Some("employee"), Some(birthday_employee_id));
+                }
+            }
+        }
+
+        let _ = self.conn.execute(
+            "INSERT INTO app_meta (key, value) VALUES ('last_birthday_notify_date', ?1)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![today],
+        );
     }
 
     pub fn has_admin(&self) -> bool {
@@ -578,7 +691,8 @@ impl Db {
             e.manual_status, e.manual_status_until,
             e.work_days, e.work_start, e.work_end,
             (SELECT hd.name FROM departments hd WHERE hd.head_employee_id = e.id LIMIT 1),
-            (SELECT dd.name FROM departments dd WHERE dd.deputy_employee_id = e.id LIMIT 1)
+            (SELECT dd.name FROM departments dd WHERE dd.deputy_employee_id = e.id LIMIT 1),
+            e.birth_date
         FROM employees e
         LEFT JOIN positions p ON p.id = e.position_id
         LEFT JOIN employees m ON m.id = e.manager_id
@@ -614,6 +728,7 @@ impl Db {
             work_end: row.get(24)?,
             head_of_department_name: row.get(25)?,
             deputy_of_department_name: row.get(26)?,
+            birth_date: row.get(27)?,
         })
     }
 
@@ -734,6 +849,7 @@ impl Db {
         deputy_id: Option<&str>,
         department_id: Option<&str>,
         avatar_data: Option<&str>,
+        birth_date: Option<&str>,
     ) -> Result<EmployeeRecord, String> {
         if !self.is_admin(admin_id) {
             return Err("Недостаточно прав для добавления сотрудников".into());
@@ -750,9 +866,9 @@ impl Db {
 
         self.conn
             .execute(
-                "INSERT INTO employees (id, employee_number, login, password_hash, full_name, is_admin, phone, position_id, manager_id, deputy_id, department_id, avatar_data)
-                 VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7, ?8, ?9, ?10, ?11)",
-                params![id, employee_number, login, password_hash, full_name, phone, position_id, resolved_manager_id, deputy_id, department_id, avatar_data],
+                "INSERT INTO employees (id, employee_number, login, password_hash, full_name, is_admin, phone, position_id, manager_id, deputy_id, department_id, avatar_data, birth_date)
+                 VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                params![id, employee_number, login, password_hash, full_name, phone, position_id, resolved_manager_id, deputy_id, department_id, avatar_data, birth_date],
             )
             .map_err(|e| {
                 if e.to_string().contains("UNIQUE") {
@@ -777,6 +893,7 @@ impl Db {
         deputy_id: Option<&str>,
         department_id: Option<&str>,
         avatar_data: Option<&str>,
+        birth_date: Option<&str>,
     ) -> Result<EmployeeRecord, String> {
         if !self.is_admin(admin_id) {
             return Err("Недостаточно прав для редактирования сотрудников".into());
@@ -789,9 +906,9 @@ impl Db {
 
         self.conn
             .execute(
-                "UPDATE employees SET full_name = ?1, phone = ?2, position_id = ?3, manager_id = ?4, deputy_id = ?5, department_id = ?6, avatar_data = ?7
-                 WHERE id = ?8",
-                params![full_name, phone, position_id, resolved_manager_id, deputy_id, department_id, avatar_data, employee_id],
+                "UPDATE employees SET full_name = ?1, phone = ?2, position_id = ?3, manager_id = ?4, deputy_id = ?5, department_id = ?6, avatar_data = ?7, birth_date = ?8
+                 WHERE id = ?9",
+                params![full_name, phone, position_id, resolved_manager_id, deputy_id, department_id, avatar_data, birth_date, employee_id],
             )
             .map_err(|e| e.to_string())?;
 
@@ -2765,6 +2882,166 @@ impl Db {
             params![new_deadline, entry_id],
         ).map_err(|e| e.to_string())?;
         Ok(())
+    }
+
+    // ---- Блог ----
+
+    const BLOG_CATEGORIES: [&'static str; 5] = ["announcement", "discussion", "useful", "qna", "custom"];
+
+    pub fn list_blog_topics(&self) -> Vec<BlogTopicRecord> {
+        let mut stmt = match self.conn.prepare(
+            "SELECT t.id, t.category, t.title, t.content, t.created_by, e.full_name, t.pinned, t.created_at,
+                    (SELECT COUNT(*) FROM blog_comments c WHERE c.topic_id = t.id)
+             FROM blog_topics t JOIN employees e ON e.id = t.created_by
+             ORDER BY t.pinned DESC, t.created_at DESC",
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map([], |row| {
+            Ok(BlogTopicRecord {
+                id: row.get(0)?,
+                category: row.get(1)?,
+                title: row.get(2)?,
+                content: row.get(3)?,
+                created_by: row.get(4)?,
+                created_by_name: row.get(5)?,
+                pinned: row.get::<_, i64>(6)? != 0,
+                created_at: row.get(7)?,
+                comment_count: row.get(8)?,
+            })
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default()
+    }
+
+    fn get_blog_topic(&self, id: &str) -> Option<BlogTopicRecord> {
+        self.conn.query_row(
+            "SELECT t.id, t.category, t.title, t.content, t.created_by, e.full_name, t.pinned, t.created_at,
+                    (SELECT COUNT(*) FROM blog_comments c WHERE c.topic_id = t.id)
+             FROM blog_topics t JOIN employees e ON e.id = t.created_by
+             WHERE t.id = ?1",
+            params![id],
+            |row| {
+                Ok(BlogTopicRecord {
+                    id: row.get(0)?,
+                    category: row.get(1)?,
+                    title: row.get(2)?,
+                    content: row.get(3)?,
+                    created_by: row.get(4)?,
+                    created_by_name: row.get(5)?,
+                    pinned: row.get::<_, i64>(6)? != 0,
+                    created_at: row.get(7)?,
+                    comment_count: row.get(8)?,
+                })
+            },
+        ).ok()
+    }
+
+    pub fn create_blog_topic(&self, actor_id: &str, category: &str, title: &str, content: Option<&str>) -> Result<BlogTopicRecord, String> {
+        if title.trim().is_empty() {
+            return Err("Укажите заголовок темы".into());
+        }
+        if !Self::BLOG_CATEGORIES.contains(&category) {
+            return Err("Некорректная категория".into());
+        }
+        let id = Uuid::new_v4().to_string();
+        self.conn.execute(
+            "INSERT INTO blog_topics (id, category, title, content, created_by) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![id, category, title.trim(), content, actor_id],
+        ).map_err(|e| e.to_string())?;
+        self.get_blog_topic(&id).ok_or_else(|| "Тема не найдена".to_string())
+    }
+
+    pub fn update_blog_topic(&self, actor_id: &str, id: &str, category: &str, title: &str, content: Option<&str>) -> Result<BlogTopicRecord, String> {
+        let topic = self.get_blog_topic(id).ok_or_else(|| "Тема не найдена".to_string())?;
+        // Редактировать тему может только её создатель — даже админ не может
+        // менять чужой текст (в отличие от закрепления/удаления, это осталось
+        // админскими правами), по прямой просьбе пользователя.
+        if topic.created_by != actor_id {
+            return Err("Редактировать тему может только её автор".into());
+        }
+        if title.trim().is_empty() {
+            return Err("Укажите заголовок темы".into());
+        }
+        if !Self::BLOG_CATEGORIES.contains(&category) {
+            return Err("Некорректная категория".into());
+        }
+        self.conn.execute(
+            "UPDATE blog_topics SET category = ?1, title = ?2, content = ?3 WHERE id = ?4",
+            params![category, title.trim(), content, id],
+        ).map_err(|e| e.to_string())?;
+        self.get_blog_topic(id).ok_or_else(|| "Тема не найдена".to_string())
+    }
+
+    pub fn set_blog_topic_pinned(&self, admin_id: &str, id: &str, pinned: bool) -> Result<(), String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn.execute(
+            "UPDATE blog_topics SET pinned = ?1 WHERE id = ?2",
+            params![pinned as i64, id],
+        ).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn delete_blog_topic(&self, admin_id: &str, id: &str) -> Result<(), String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn.execute("DELETE FROM blog_comments WHERE topic_id = ?1", params![id]).ok();
+        self.conn.execute("DELETE FROM blog_topics WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn list_blog_comments(&self, topic_id: &str) -> Vec<BlogCommentRecord> {
+        let mut stmt = match self.conn.prepare(
+            "SELECT c.id, c.topic_id, c.author_id, e.full_name, c.content, c.reply_to_id, c.created_at
+             FROM blog_comments c JOIN employees e ON e.id = c.author_id
+             WHERE c.topic_id = ?1 ORDER BY c.created_at ASC",
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map(params![topic_id], |row| {
+            Ok(BlogCommentRecord {
+                id: row.get(0)?,
+                topic_id: row.get(1)?,
+                author_id: row.get(2)?,
+                author_name: row.get(3)?,
+                content: row.get(4)?,
+                reply_to_id: row.get(5)?,
+                created_at: row.get(6)?,
+            })
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default()
+    }
+
+    pub fn add_blog_comment(&self, actor_id: &str, topic_id: &str, content: &str, reply_to_id: Option<&str>) -> Result<BlogCommentRecord, String> {
+        if content.trim().is_empty() {
+            return Err("Комментарий не может быть пустым".into());
+        }
+        self.get_blog_topic(topic_id).ok_or_else(|| "Тема не найдена".to_string())?;
+        let id = Uuid::new_v4().to_string();
+        self.conn.execute(
+            "INSERT INTO blog_comments (id, topic_id, author_id, content, reply_to_id) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![id, topic_id, actor_id, content.trim(), reply_to_id],
+        ).map_err(|e| e.to_string())?;
+
+        let author_name: Option<String> = self.conn
+            .query_row("SELECT full_name FROM employees WHERE id = ?1", params![actor_id], |row| row.get(0))
+            .ok();
+
+        Ok(BlogCommentRecord {
+            id,
+            topic_id: topic_id.to_string(),
+            author_id: actor_id.to_string(),
+            author_name: author_name.unwrap_or_default(),
+            content: content.trim().to_string(),
+            reply_to_id: reply_to_id.map(str::to_string),
+            created_at: String::new(),
+        })
     }
 }
 

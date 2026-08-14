@@ -43,6 +43,7 @@ export default function EmployeeFormModal({
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [positionId, setPositionId] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   const [managerId, setManagerId] = useState('');
@@ -72,6 +73,7 @@ export default function EmployeeFormModal({
       setFullName(employee.fullName);
       setLogin(employee.login);
       setPhone(employee.phone ?? '');
+      setBirthDate(employee.birthDate ?? '');
       setPositionId(employee.positionId ?? '');
       setDepartmentId(employee.departmentId ?? '');
       setManagerId(employee.managerId ?? '');
@@ -85,6 +87,7 @@ export default function EmployeeFormModal({
       setLogin('');
       setPassword('');
       setPhone('');
+      setBirthDate('');
       setPositionId('');
       setDepartmentId('');
       setManagerId('');
@@ -146,6 +149,7 @@ export default function EmployeeFormModal({
     const shared = {
       fullName: fullName.trim(),
       phone: phone.trim() || null,
+      birthDate: birthDate || null,
       positionId: positionId || null,
       departmentId: departmentId || null,
       managerId: managerId || null,
@@ -277,6 +281,11 @@ export default function EmployeeFormModal({
             placeholder="+998 90 123 45 67"
             inputMode="numeric"
           />
+        </div>
+
+        <div className="field">
+          <label>{t('employees.birthDateLabel')}</label>
+          <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
         </div>
 
         <div className="field">

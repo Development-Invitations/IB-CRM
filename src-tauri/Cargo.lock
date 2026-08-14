@@ -1478,7 +1478,7 @@ dependencies = [
 
 [[package]]
 name = "ib-crm"
-version = "0.1.17"
+version = "0.1.22"
 dependencies = [
  "bcrypt",
  "rusqlite",

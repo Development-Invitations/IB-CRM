@@ -171,6 +171,30 @@ export type RegulationReminder = {
   createdAt: string;
 };
 
+export type BlogCategory = 'announcement' | 'discussion' | 'useful' | 'qna' | 'custom';
+
+export type BlogTopic = {
+  id: string;
+  category: BlogCategory;
+  title: string;
+  content: string | null;
+  createdBy: string;
+  createdByName: string;
+  pinned: boolean;
+  createdAt: string;
+  commentCount: number;
+};
+
+export type BlogComment = {
+  id: string;
+  topicId: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  replyToId: string | null;
+  createdAt: string;
+};
+
 export type Employee = {
   id: string;
   employeeNumber: string;
@@ -199,6 +223,7 @@ export type Employee = {
   workEnd: string | null;
   headOfDepartmentName: string | null;
   deputyOfDepartmentName: string | null;
+  birthDate: string | null;
 };
 
 export type Session = {
@@ -254,6 +279,7 @@ export type EmployeeFormPayload = {
   deputyId?: string | null;
   departmentId?: string | null;
   avatarData?: string | null;
+  birthDate?: string | null;
 };
 
 export const api = {
@@ -476,6 +502,18 @@ export const api = {
 
   updateRegulationEntryDeadline: (payload: { actorId: string; entryId: string; deadline: string | null }) =>
     invoke<void>('update_regulation_entry_deadline', { payload }),
+
+  listBlogTopics: () => invoke<BlogTopic[]>('list_blog_topics'),
+  createBlogTopic: (payload: { actorId: string; category: BlogCategory; title: string; content?: string | null }) =>
+    invoke<BlogTopic>('create_blog_topic', { payload }),
+  updateBlogTopic: (payload: { actorId: string; id: string; category: BlogCategory; title: string; content?: string | null }) =>
+    invoke<BlogTopic>('update_blog_topic', { payload }),
+  setBlogTopicPinned: (payload: { adminId: string; id: string; pinned: boolean }) =>
+    invoke<void>('set_blog_topic_pinned', { payload }),
+  deleteBlogTopic: (payload: { adminId: string; id: string }) => invoke<void>('delete_blog_topic', { payload }),
+  listBlogComments: (topicId: string) => invoke<BlogComment[]>('list_blog_comments', { topicId }),
+  addBlogComment: (payload: { actorId: string; topicId: string; content: string; replyToId?: string | null }) =>
+    invoke<BlogComment>('add_blog_comment', { payload }),
 
   recordLogin: (employeeId: string) => invoke<void>('record_login', { employeeId }),
 

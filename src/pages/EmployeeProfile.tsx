@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Phone, Briefcase, Building2, UserCog, Users, Clock, Send, Calendar, History, CalendarPlus } from 'lucide-react';
+import { ArrowLeft, Phone, Briefcase, Building2, UserCog, Users, Clock, Send, Calendar, History, CalendarPlus, Cake } from 'lucide-react';
 import { api, type Employee, type Session, type AbsenceRequest } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
 import { formatUzPhone } from '../lib/phone';
-import { parseSqliteUtc } from '../lib/date';
+import { parseSqliteUtc, formatLocalDate } from '../lib/date';
 import { ABSENCE_TYPE_LABEL_KEYS, formatDate } from '../lib/absenceTypes';
 import { formatWorkDays } from '../lib/schedule';
 import Avatar from '../components/Avatar';
@@ -156,8 +156,10 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
 
           <div className="profile-grid">
             <div className="profile-field">
-              <span className="settings-hint">{t('employees.colLogin')}</span>
-              <span>{employee.login}</span>
+              <span className="settings-hint">
+                <Cake size={13} /> {t('employees.birthDateLabel')}
+              </span>
+              <span>{employee.birthDate ? formatLocalDate(employee.birthDate) : '—'}</span>
             </div>
             <div className="profile-field">
               <span className="settings-hint">

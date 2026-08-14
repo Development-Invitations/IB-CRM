@@ -76,7 +76,7 @@ export default function DepartmentFormModal({
       }
       onSaved();
       onClose();
-    } catch (err: unknown) {
+    } catch (err: any) {
       setError(typeof err === 'string' ? err : t('departments.errorGeneric'));
     } finally {
       setBusy(false);
@@ -122,4 +122,3 @@ export default function DepartmentFormModal({
     </Modal>
   );
 }
-

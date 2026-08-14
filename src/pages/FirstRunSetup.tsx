@@ -1,5 +1,4 @@
 import { useState, FormEvent } from 'react';
-import type { Employee } from '../lib/api';
 import { api } from '../lib/api';
 import { rememberedLogin } from '../lib/session';
 import { useLocale } from '../lib/i18n';
@@ -28,7 +27,7 @@ export default function FirstRunSetup({ onCreated }: { onCreated: (emp: any) => 
       const emp = await api.createAdmin({ login, password, fullName });
       rememberedLogin.set(login);
       onCreated(emp);
-    } catch (err: unknown) {
+    } catch (err: any) {
       setError(err.message || t('firstRun.errorGeneric'));
     } finally {
       setBusy(false);
@@ -63,4 +62,3 @@ export default function FirstRunSetup({ onCreated }: { onCreated: (emp: any) => 
     </div>
   );
 }
-

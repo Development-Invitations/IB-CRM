@@ -27,7 +27,7 @@ export default function StatusPicker({
       const updated = await api.setEmployeeStatus({ employeeId: employee.id, status });
       onChanged(updated);
       showToast('success', t('employees.manualStatusSet'));
-    } catch (err: unknown) {
+    } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('employees.errorGeneric'));
     }
   };
@@ -55,4 +55,3 @@ export default function StatusPicker({
     </div>
   );
 }
-

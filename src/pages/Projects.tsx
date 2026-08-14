@@ -1,40 +1,222 @@
-import { useEffect, useState, useCallback, useContext } from 'react';
-import { Plus, Pencil, FolderKanban, Trash2, Send, UserPlus, X, Repeat, CheckSquare, ArrowLeft, Link2, Check } from 'lucide-react';
-import { api, type Employee, type Project, type ProjectMember, type ProjectChatMessage, type Client, type ProjectMemberRole } from '../lib/api';
+import { useEffect, useState, useRef, useContext } from 'react';
+import { Plus, Search, Pencil, Trash2, Send, UserPlus, X, Repeat, CheckSquare, XSquare, RotateCcw, ChevronDown, ChevronRight, ArrowLeft, Link2, Check, Paperclip, Forward, CalendarClock } from 'lucide-react';
+import { api, type Employee, type Project, type ProjectMember, type ProjectChatMessage, type ProjectChatReply, type Client, type ProjectMemberRole, type RegulationEntryStatus } from '../lib/api';
 import { FullscreenContext } from './Dashboard';
+import { useLocale } from '../lib/i18n';
+import { useToast } from '../lib/toast';
+import { parseSqliteUtc } from '../lib/date';
+import { prepareAttachment, classifyAttachment } from '../lib/attachment';
+import Modal from '../components/Modal';
+import Select from '../components/Select';
+import SearchableSelect from '../components/SearchableSelect';
+import ProjectFormModal from '../components/ProjectFormModal';
+import LoadingScreen from '../components/LoadingScreen';
+
+const MSG_STATUS_KEYS: Record<RegulationEntryStatus, string> = {
+  open: 'projects.entryStatusOpen',
+  done: 'projects.entryStatusDone',
+  cancelled: 'projects.entryStatusCancelled',
+};
+
+function AttachmentPreview({ dataUrl, name, onExpand }: { dataUrl: string; name: string | null; onExpand: () => void }) {
+  const kind = classifyAttachment(dataUrl);
+  if (kind === 'image') {
+    return (
+      <button type="button" className="reg-attachment-image-btn" onClick={onExpand} title={name ?? undefined}>
+        <img className="reg-attachment-image" src={dataUrl} alt={name ?? ''} />
+      </button>
+    );
+  }
+  if (kind === 'video') {
+    return <video className="reg-attachment-video" src={dataUrl} controls preload="metadata" />;
+  }
+  return (
+    <a className="reg-entry-attachment" href={dataUrl} target="_blank" rel="noreferrer" download={name ?? undefined}>
+      <Paperclip size={13} /> <span>{name}</span>
+    </a>
+  );
+}
 
 // Компонент одного сообщения чата — отдельно, чтобы useState работал корректно
-function ChatMessage({ m, t }: { m: ProjectChatMessage; t: (k: string) => string }) {
+function ChatMessage({
+  m,
+  currentEmployee,
+  projectOwnerId,
+  members,
+  onStatusChange,
+  onAddReply,
+  onAssign,
+  t,
+}: {
+  m: ProjectChatMessage;
+  currentEmployee: Employee;
+  projectOwnerId: string;
+  members: ProjectMember[];
+  onStatusChange: (messageId: string, status: RegulationEntryStatus) => void;
+  onAddReply: (messageId: string, content: string) => Promise<void>;
+  onAssign: (messageId: string, targetEmployeeId: string, deadline: string) => Promise<void>;
+  t: (k: string, vars?: Record<string, string | number>) => string;
+}) {
   const [copied, setCopied] = useState(false);
+  const [replies, setReplies] = useState<ProjectChatReply[]>([]);
+  const [expanded, setExpanded] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [replyBusy, setReplyBusy] = useState(false);
+  const [lightbox, setLightbox] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignTo, setAssignTo] = useState('');
+  const [assignDeadline, setAssignDeadline] = useState(m.deadline ?? '');
+  const [assignBusy, setAssignBusy] = useState(false);
+
   const copyLink = () => {
     navigator.clipboard.writeText(`${window.location.href.split('#')[0]}#msg-${m.id}`).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
   };
+
+  const loadReplies = async () => {
+    const data = await api.listProjectChatReplies(m.id);
+    setReplies(data);
+  };
+
+  const toggle = () => {
+    if (!expanded) loadReplies();
+    setExpanded((v) => !v);
+  };
+
+  const handleReply = async () => {
+    if (!replyText.trim()) return;
+    setReplyBusy(true);
+    try {
+      await onAddReply(m.id, replyText.trim());
+      setReplyText('');
+      await loadReplies();
+    } finally {
+      setReplyBusy(false);
+    }
+  };
+
+  const handleAssignSubmit = async () => {
+    if (!assignTo) return;
+    setAssignBusy(true);
+    try {
+      await onAssign(m.id, assignTo, assignDeadline);
+      setAssignOpen(false);
+    } finally {
+      setAssignBusy(false);
+    }
+  };
+
+  const canManage = currentEmployee.isAdmin || projectOwnerId === currentEmployee.id || m.senderId === currentEmployee.id;
+  const isOwn = m.senderId === currentEmployee.id;
+  const initials = m.senderName.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+  const assigneeOptions = members.filter((mm) => mm.employeeId !== m.targetEmployeeId).map((mm) => ({ value: mm.employeeId, label: mm.employeeName }));
+
   return (
-    <div id={`msg-${m.id}`} className={m.isTask ? 'project-chat-task project-chat-msg' : 'project-chat-msg'}>
-      <div className="project-chat-meta">
-        <strong>{m.senderName}</strong>
-        <span className="settings-hint">{new Date(m.createdAt).toLocaleString()}</span>
-        {m.isTask && <span className="role-badge role-badge-head"><CheckSquare size={11} /> {t('projects.chatTaskBadge')}</span>}
-        <button className="reg-action-btn" style={{ marginLeft: 'auto' }} onClick={copyLink} title={t('projects.copyMsgLink')}>
-          {copied ? <Check size={12} /> : <Link2 size={12} />}
+    <div id={`msg-${m.id}`} className={`reg-chat-msg${isOwn ? ' own' : ''}`}>
+      <div className="reg-chat-avatar">{initials || '?'}</div>
+      <div className="reg-chat-bubble">
+        <div className="reg-entry-header">
+          <div className="reg-entry-meta">
+            <strong>{m.senderName}</strong>
+            <span className="settings-hint">{parseSqliteUtc(m.createdAt).toLocaleString()}</span>
+          </div>
+          <div className="reg-entry-actions">
+            <button className="reg-action-btn" onClick={copyLink} title={t('projects.copyMsgLink')}>
+              {copied ? <Check size={13} /> : <Link2 size={13} />}
+            </button>
+            {canManage && (
+              <>
+                {m.status !== 'done' && (
+                  <button className="reg-action-btn done" onClick={() => onStatusChange(m.id, 'done')} title={t('projects.markDoneBtn')}>
+                    <CheckSquare size={14} />
+                  </button>
+                )}
+                {m.status === 'open' && (
+                  <button className="reg-action-btn cancel" onClick={() => onStatusChange(m.id, 'cancelled')} title={t('projects.markCancelBtn')}>
+                    <XSquare size={14} />
+                  </button>
+                )}
+                {m.status !== 'open' && (
+                  <button className="reg-action-btn reopen" onClick={() => onStatusChange(m.id, 'open')} title={t('projects.reopenEntryBtn')}>
+                    <RotateCcw size={14} />
+                  </button>
+                )}
+                <button className="reg-action-btn" onClick={() => { setAssignOpen((v) => !v); setAssignTo(''); }} title={t('projects.assignBtn')}>
+                  <Forward size={14} />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="reg-entry-content">{m.content}</div>
+
+        <div className="reg-chat-chips">
+          <span className={`absence-status reg-entry-badge-${m.status}`}>{t(MSG_STATUS_KEYS[m.status])}</span>
+          {m.deadline && <span className="reg-chip-deadline">📅 {m.deadline}</span>}
+        </div>
+
+        {m.attachmentData && (
+          <AttachmentPreview dataUrl={m.attachmentData} name={m.attachmentName} onExpand={() => setLightbox(true)} />
+        )}
+
+        {assignOpen && (
+          <div className="reg-assign-form">
+            <SearchableSelect
+              value={assignTo}
+              options={assigneeOptions}
+              onChange={setAssignTo}
+              searchPlaceholder={t('employees.searchPlaceholder')}
+              emptyLabel={t('employees.searchEmpty')}
+            />
+            <input type="date" value={assignDeadline} onChange={(e) => setAssignDeadline(e.target.value)} />
+            <button className="modal-btn" onClick={handleAssignSubmit} disabled={!assignTo || assignBusy}>
+              <Forward size={12} /> {t('projects.assignConfirmBtn')}
+            </button>
+            <button className="modal-btn" onClick={() => setAssignOpen(false)}><X size={12} /></button>
+          </div>
+        )}
+
+        <button className="link-btn reg-replies-toggle" onClick={toggle}>
+          {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+          {t('projects.repliesTitle')} {m.replyCount > 0 ? `(${m.replyCount})` : ''}
         </button>
+
+        {expanded && (
+          <div className="reg-replies">
+            {replies.map((r) => (
+              <div key={r.id} className="reg-reply">
+                <div className="reg-reply-meta">
+                  <strong>{r.authorName}</strong>
+                  <span className="settings-hint">{parseSqliteUtc(r.createdAt).toLocaleString()}</span>
+                </div>
+                <div>{r.content}</div>
+              </div>
+            ))}
+            <div className="reg-reply-form">
+              <input
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder={t('projects.addReplyPlaceholder')}
+                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleReply()}
+              />
+              <button className="modal-btn" onClick={handleReply} disabled={!replyText.trim() || replyBusy}>↵</button>
+            </div>
+          </div>
+        )}
       </div>
-      <div>{m.content}</div>
+
+      {lightbox && m.attachmentData && classifyAttachment(m.attachmentData) === 'image' && (
+        <div className="reg-lightbox" onClick={() => setLightbox(false)}>
+          <img src={m.attachmentData} alt={m.attachmentName ?? ''} />
+          <button className="reg-lightbox-close" onClick={() => setLightbox(false)}><X size={20} /></button>
+        </div>
+      )}
     </div>
   );
 }
-import { useLocale } from '../lib/i18n';
-import { useToast } from '../lib/toast';
-import { parseSqliteUtc } from '../lib/date';
-import Drawer from '../components/Drawer';
-import Modal from '../components/Modal';
-import Select from '../components/Select';
-import SearchableSelect from '../components/SearchableSelect';
-import ProjectFormModal from '../components/ProjectFormModal';
-import LoadingScreen from '../components/LoadingScreen';
 
 const STATUS_LABEL_KEYS: Record<Project['status'], string> = {
   planning: 'projects.statusPlanning',
@@ -53,6 +235,7 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
   const [clients, setClients] = useState<Client[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   const [selected, setSelected] = useState<Project | null>(null);
   const [members, setMembers] = useState<ProjectMember[]>([]);
@@ -72,8 +255,21 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
   const [transferBusy, setTransferBusy] = useState(false);
 
   const [chatText, setChatText] = useState('');
-  const [chatIsTask, setChatIsTask] = useState(false);
+  const [chatDeadline, setChatDeadline] = useState('');
+  const [attachData, setAttachData] = useState<string | null>(null);
+  const [attachName, setAttachName] = useState<string | null>(null);
+  const [attachBusy, setAttachBusy] = useState(false);
   const [chatBusy, setChatBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Чей тред сейчас открыт справа — по умолчанию свой
+  const [activeThreadId, setActiveThreadId] = useState<string>(currentEmployee.id);
+
+  // Первая задача при добавлении участника
+  const [firstTaskFor, setFirstTaskFor] = useState<ProjectMember | null>(null);
+  const [firstTaskDesc, setFirstTaskDesc] = useState('');
+  const [firstTaskDeadline, setFirstTaskDeadline] = useState('');
+  const [firstTaskBusy, setFirstTaskBusy] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -114,6 +310,9 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.id]);
 
+  // При открытии проекта (или переключении на другой) — сбрасываем на свой тред
+  useEffect(() => { setActiveThreadId(currentEmployee.id); }, [selected?.id]); // eslint-disable-line
+
   const isManager = !!selected && (currentEmployee.isAdmin || selected.ownerId === currentEmployee.id);
   const isParticipant =
     !!selected &&
@@ -137,7 +336,7 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
       setDeleteConfirmOpen(false);
       setSelected(null);
       load();
-    } catch (err: unknown) {
+    } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('projects.errorGeneric'));
     } finally {
       setDeleteBusy(false);
@@ -157,13 +356,20 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
     if (!selected || !addMemberId) return;
     setAddMemberBusy(true);
     try {
-      await api.addProjectMember({ actorId: currentEmployee.id, projectId: selected.id, employeeId: addMemberId, role: addMemberRole });
+      const addedId = addMemberId;
+      const addedOption = memberOptions.find((o) => o.value === addedId);
+      await api.addProjectMember({ actorId: currentEmployee.id, projectId: selected.id, employeeId: addedId, role: addMemberRole });
       showToast('success', t('projects.memberAdded'));
       setAddMemberId('');
       setAddMemberRole('member');
       loadDetail();
       load();
-    } catch (err: unknown) {
+      if (addedOption) {
+        setFirstTaskFor({ employeeId: addedId, employeeName: addedOption.label, roleInProject: addMemberRole, isOwner: false, addedAt: '' });
+        setFirstTaskDesc('');
+        setFirstTaskDeadline('');
+      }
+    } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('projects.errorGeneric'));
     } finally {
       setAddMemberBusy(false);
@@ -175,9 +381,10 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
     try {
       await api.removeProjectMember({ actorId: currentEmployee.id, projectId: selected.id, employeeId: m.employeeId });
       showToast('success', t('projects.memberRemoved'));
+      if (activeThreadId === m.employeeId) setActiveThreadId(currentEmployee.id);
       loadDetail();
       load();
-    } catch (err: unknown) {
+    } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('projects.errorGeneric'));
     }
   };
@@ -191,28 +398,112 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
       setTransferTarget(null);
       loadDetail();
       load();
-    } catch (err: unknown) {
+    } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('projects.errorGeneric'));
     } finally {
       setTransferBusy(false);
     }
   };
 
+  const handleFirstTaskSkip = () => setFirstTaskFor(null);
+
+  const handleFirstTaskSubmit = async () => {
+    if (!selected || !firstTaskFor || !firstTaskDesc.trim()) return;
+    setFirstTaskBusy(true);
+    try {
+      await api.sendProjectChatMessage({
+        actorId: currentEmployee.id,
+        projectId: selected.id,
+        targetEmployeeId: firstTaskFor.employeeId,
+        content: firstTaskDesc.trim(),
+        deadline: firstTaskDeadline || null,
+      });
+      showToast('success', t('projects.firstTaskCreated'));
+      setFirstTaskFor(null);
+      loadDetail();
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('projects.errorGeneric'));
+    } finally {
+      setFirstTaskBusy(false);
+    }
+  };
+
+  const handleFileAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setAttachBusy(true);
+    try {
+      const { data, name } = await prepareAttachment(file);
+      setAttachData(data);
+      setAttachName(name);
+    } catch {
+      showToast('error', t('projects.attachmentTooLarge'));
+    } finally {
+      setAttachBusy(false);
+    }
+  };
+
+  const handleAssignMessage = async (messageId: string, targetEmployeeId: string, deadline: string) => {
+    try {
+      await api.assignProjectChatMessage({ actorId: currentEmployee.id, messageId, targetEmployeeId, deadline: deadline || null });
+      showToast('success', t('projects.assigned'));
+      loadDetail();
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('projects.errorGeneric'));
+    }
+  };
+
+  const handleStatusChange = async (messageId: string, status: RegulationEntryStatus) => {
+    try {
+      await api.updateProjectChatMessageStatus({ actorId: currentEmployee.id, messageId, status });
+      loadDetail();
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('projects.errorGeneric'));
+    }
+  };
+
+  const handleAddReply = async (messageId: string, content: string) => {
+    await api.addProjectChatReply({ actorId: currentEmployee.id, messageId, content });
+    loadDetail();
+  };
+
   const handleSendChat = async () => {
     if (!selected || !chatText.trim()) return;
     setChatBusy(true);
     try {
-      await api.sendProjectChatMessage({ actorId: currentEmployee.id, projectId: selected.id, content: chatText.trim(), isTask: chatIsTask });
+      await api.sendProjectChatMessage({
+        actorId: currentEmployee.id,
+        projectId: selected.id,
+        targetEmployeeId: activeThreadId,
+        content: chatText.trim(),
+        attachmentData: attachData,
+        attachmentName: attachName,
+        deadline: chatDeadline || null,
+      });
       setChatText('');
-      setChatIsTask(false);
-      const messages = await api.listProjectChat(selected.id);
-      setChat(messages);
-    } catch (err: unknown) {
+      setChatDeadline('');
+      setAttachData(null);
+      setAttachName(null);
+      loadDetail();
+    } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('projects.errorGeneric'));
     } finally {
       setChatBusy(false);
     }
   };
+
+  const filteredProjects = search.trim()
+    ? projects.filter((p) => {
+        const q = search.trim().toLowerCase();
+        return (
+          p.projectNumber.toLowerCase().includes(q) ||
+          p.name.toLowerCase().includes(q) ||
+          (p.clientName || '').toLowerCase().includes(q) ||
+          p.ownerName.toLowerCase().includes(q)
+        );
+      })
+    : projects;
 
   return (
     <>
@@ -281,61 +572,109 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
                 <p className="settings-hint">{t('departments.noMembers')}</p>
               ) : (
                 <ul className="department-members-list">
-                  {members.map((m) => (
-                    <li key={m.employeeId} className="department-member-row">
-                      <span>
-                        {m.employeeName}
-                        {m.isOwner ? (
-                          <span className="role-badge role-badge-head" style={{ marginLeft: 8 }}>{t('projects.ownerLabel')}</span>
-                        ) : m.roleInProject === 'assistant' ? (
-                          <span className="role-badge role-badge-deputy" style={{ marginLeft: 8 }}>{t('projects.roleAssistant')}</span>
-                        ) : null}
-                      </span>
-                      {isManager && (
-                        <span className="project-member-actions">
-                          {!m.isOwner && (
-                            <button type="button" className="department-member-remove" title={t('projects.transferBtn')} onClick={() => setTransferTarget(m)}><Repeat size={13} /></button>
-                          )}
-                          {!m.isOwner && (
-                            <button type="button" className="department-member-remove" title={t('projects.removeMemberBtn')} onClick={() => handleRemoveMember(m)}><X size={13} /></button>
-                          )}
+                  {members.map((m) => {
+                    const canSwitch = isManager || m.employeeId === currentEmployee.id;
+                    const isActive = activeThreadId === m.employeeId;
+                    return (
+                      <li
+                        key={m.employeeId}
+                        className={`department-member-row reg-thread-row${isActive ? ' active' : ''}`}
+                        onClick={() => canSwitch && setActiveThreadId(m.employeeId)}
+                      >
+                        <span>
+                          {m.employeeName}
+                          {m.isOwner ? (
+                            <span className="role-badge role-badge-head" style={{ marginLeft: 8 }}>{t('projects.ownerLabel')}</span>
+                          ) : m.roleInProject === 'assistant' ? (
+                            <span className="role-badge role-badge-deputy" style={{ marginLeft: 8 }}>{t('projects.roleAssistant')}</span>
+                          ) : null}
                         </span>
-                      )}
-                    </li>
-                  ))}
+                        {isManager && (
+                          <span className="project-member-actions">
+                            {!m.isOwner && (
+                              <button type="button" className="department-member-remove" title={t('projects.transferBtn')} onClick={(ev) => { ev.stopPropagation(); setTransferTarget(m); }}><Repeat size={13} /></button>
+                            )}
+                            {!m.isOwner && (
+                              <button type="button" className="department-member-remove" title={t('projects.removeMemberBtn')} onClick={(ev) => { ev.stopPropagation(); handleRemoveMember(m); }}><X size={13} /></button>
+                            )}
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>
           </aside>
 
-          {/* Правая колонка — чат проекта */}
+          {/* Правая колонка — тред выбранного участника */}
           <div className="reg-entries-col">
-            <div className="department-members-title">{t('projects.chatTitle')}</div>
+            {(() => {
+              const threadMessages = chat.filter((m) => m.targetEmployeeId === activeThreadId);
+              const activeMember = members.find((m) => m.employeeId === activeThreadId);
+              const isOwnThread = activeThreadId === currentEmployee.id;
+              const openCount = threadMessages.filter((m) => m.status === 'open').length;
+              const doneCount = threadMessages.filter((m) => m.status === 'done').length;
+              const canPost = isParticipant && (isOwnThread || isManager);
 
-            <div className="reg-entries-list">
-              {detailLoading ? <LoadingScreen compact /> : chat.length === 0 ? (
-                <p className="settings-hint">{t('projects.chatEmpty')}</p>
-              ) : (
-                chat.map((m) => <ChatMessage key={m.id} m={m} t={t} />)
-              )}
-            </div>
+              return (
+                <>
+                  <div className="reg-thread-header">
+                    <div className="department-members-title">
+                      {isOwnThread ? t('projects.myThreadLabel') : t('projects.chatWithLabel', { name: activeMember?.employeeName ?? '' })}
+                    </div>
+                    <div className="reg-thread-stats">
+                      <span>{t('projects.entryStatusOpen')}: <strong>{openCount}</strong></span>
+                      <span>{t('projects.entryStatusDone')}: <strong>{doneCount}</strong></span>
+                    </div>
+                  </div>
 
-            {isParticipant ? (
-              <div className="project-chat-form">
-                <textarea rows={2} value={chatText} onChange={(e) => setChatText(e.target.value)} placeholder={t('projects.chatPlaceholder')} />
-                <div className="project-chat-form-actions">
-                  <label className="checkbox-row">
-                    <input type="checkbox" checked={chatIsTask} onChange={(e) => setChatIsTask(e.target.checked)} />
-                    {t('projects.chatTaskToggle')}
-                  </label>
-                  <button className="modal-btn" onClick={handleSendChat} disabled={!chatText.trim() || chatBusy}>
-                    <Send size={14} /> {t('projects.chatSendBtn')}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <p className="settings-hint">{t('projects.notAMemberHint')}</p>
-            )}
+                  <div className="reg-entries-list">
+                    {detailLoading ? <LoadingScreen compact /> : threadMessages.length === 0 ? (
+                      <p className="settings-hint">{t('projects.chatEmpty')}</p>
+                    ) : (
+                      threadMessages.map((m) => (
+                        <ChatMessage
+                          key={m.id}
+                          m={m}
+                          currentEmployee={currentEmployee}
+                          projectOwnerId={selected.ownerId}
+                          members={members}
+                          onStatusChange={handleStatusChange}
+                          onAddReply={handleAddReply}
+                          onAssign={handleAssignMessage}
+                          t={t}
+                        />
+                      ))
+                    )}
+                  </div>
+
+                  {canPost ? (
+                    <div className="reg-add-entry">
+                      <textarea rows={2} value={chatText} onChange={(e) => setChatText(e.target.value)} placeholder={t('projects.chatPlaceholder')} />
+                      <div className="reg-add-entry-row">
+                        <label className="reg-deadline-field">
+                          <CalendarClock size={14} />
+                          <span>{t('projects.deadlineLabel')}</span>
+                          <input type="date" value={chatDeadline} onChange={(e) => setChatDeadline(e.target.value)} />
+                        </label>
+                        <button className="modal-btn" onClick={() => fileInputRef.current?.click()} title={t('projects.attachBtn')} disabled={attachBusy}>
+                          <Paperclip size={14} />
+                          {attachName && <span style={{ maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachName}</span>}
+                        </button>
+                        <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleFileAttach} accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" />
+                        {attachName && <button className="regulation-remove-attach" onClick={() => { setAttachData(null); setAttachName(null); }}><X size={12} /></button>}
+                        <button className="modal-btn" onClick={handleSendChat} disabled={!chatText.trim() || chatBusy}>
+                          <Send size={14} /> {t('projects.chatSendBtn')}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="settings-hint">{t('projects.notAMemberHint')}</p>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </div>
 
@@ -358,6 +697,27 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
         >
           {t('projects.transferConfirmBody', { name: transferTarget?.employeeName ?? '' })}
         </Modal>
+
+        <Modal
+          open={!!firstTaskFor}
+          title={t('projects.firstTaskModalTitle', { name: firstTaskFor?.employeeName ?? '' })}
+          onClose={handleFirstTaskSkip}
+          actions={<>
+            <button className="modal-btn" onClick={handleFirstTaskSkip} disabled={firstTaskBusy}>{t('projects.firstTaskSkipBtn')}</button>
+            <button className="modal-btn danger" onClick={handleFirstTaskSubmit} disabled={!firstTaskDesc.trim() || firstTaskBusy}>
+              {firstTaskBusy ? t('common.loading') : t('projects.firstTaskCreateBtn')}
+            </button>
+          </>}
+        >
+          <div className="field">
+            <label>{t('projects.chatTitle')}</label>
+            <textarea rows={3} value={firstTaskDesc} onChange={(e) => setFirstTaskDesc(e.target.value)} placeholder={t('projects.firstTaskDescPlaceholder')} />
+          </div>
+          <div className="field">
+            <label>{t('projects.deadlineLabel')}</label>
+            <input type="date" value={firstTaskDeadline} onChange={(e) => setFirstTaskDeadline(e.target.value)} />
+          </div>
+        </Modal>
       </div>
     ) : (
       /* ---- Список проектов ---- */
@@ -369,9 +729,14 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
           </button>
         </div>
 
+        <div className="employees-search-row">
+          <Search size={15} className="employees-search-icon" />
+          <input className="employees-search-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('projects.searchPlaceholder')} />
+        </div>
+
         {loading ? (
           <LoadingScreen compact />
-        ) : projects.length === 0 ? (
+        ) : filteredProjects.length === 0 ? (
           <p className="settings-hint">{t('projects.empty')}</p>
         ) : (
           <table className="employees-table">
@@ -386,7 +751,7 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
               </tr>
             </thead>
             <tbody>
-              {projects.map((p) => (
+              {filteredProjects.map((p) => (
                 <tr key={p.id} className="employees-row" onClick={() => setSelected(p)}>
                   <td>{p.projectNumber}</td>
                   <td>{p.name}</td>
@@ -408,4 +773,3 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
     </>
   );
 }
-

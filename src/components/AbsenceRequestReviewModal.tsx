@@ -41,7 +41,7 @@ export default function AbsenceRequestReviewModal({
       showToast('success', t('absence.resolved'));
       onResolved();
       onClose();
-    } catch (err: unknown) {
+    } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('employees.errorGeneric'));
     } finally {
       setBusy(false);
@@ -104,4 +104,3 @@ export default function AbsenceRequestReviewModal({
     </Modal>
   );
 }
-

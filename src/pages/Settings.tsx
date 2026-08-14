@@ -35,7 +35,7 @@ export default function Settings({ employee }: { employee: Employee }) {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-    } catch (err: unknown) {
+    } catch (err: any) {
       setError(typeof err === 'string' ? err : t('settings.errorGeneric'));
     } finally {
       setBusy(false);
@@ -107,4 +107,3 @@ export default function Settings({ employee }: { employee: Employee }) {
     </div>
   );
 }
-

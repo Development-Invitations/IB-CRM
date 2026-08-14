@@ -53,7 +53,7 @@ export default function AbsenceRequestsPage({ currentEmployee }: { currentEmploy
       await api.resolveAbsenceRequest({ actorId: currentEmployee.id, requestId: id, approve });
       showToast('success', t('absence.resolved'));
       load();
-    } catch (err: unknown) {
+    } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('employees.errorGeneric'));
     } finally {
       setResolvingId(null);
@@ -188,4 +188,3 @@ export default function AbsenceRequestsPage({ currentEmployee }: { currentEmploy
     </div>
   );
 }
-

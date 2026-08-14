@@ -238,9 +238,33 @@ struct ProjectChatMessage {
     sender_id: String,
     #[serde(rename = "senderName")]
     sender_name: String,
+    #[serde(rename = "targetEmployeeId")]
+    target_employee_id: String,
+    #[serde(rename = "targetName")]
+    target_name: String,
     content: String,
-    #[serde(rename = "isTask")]
-    is_task: bool,
+    #[serde(rename = "attachmentData")]
+    attachment_data: Option<String>,
+    #[serde(rename = "attachmentName")]
+    attachment_name: Option<String>,
+    deadline: Option<String>,
+    status: String,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+    #[serde(rename = "replyCount")]
+    reply_count: i64,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct ProjectChatReply {
+    id: String,
+    #[serde(rename = "messageId")]
+    message_id: String,
+    #[serde(rename = "authorId")]
+    author_id: String,
+    #[serde(rename = "authorName")]
+    author_name: String,
+    content: String,
     #[serde(rename = "createdAt")]
     created_at: String,
 }
@@ -300,6 +324,10 @@ struct RegulationEntry {
     author_id: String,
     #[serde(rename = "authorName")]
     author_name: String,
+    #[serde(rename = "targetEmployeeId")]
+    target_employee_id: String,
+    #[serde(rename = "targetName")]
+    target_name: String,
     content: String,
     #[serde(rename = "attachmentData")]
     attachment_data: Option<String>,
@@ -325,6 +353,29 @@ struct RegulationReply {
     #[serde(rename = "authorName")]
     author_name: String,
     content: String,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct RegulationReminder {
+    id: String,
+    #[serde(rename = "regulationId")]
+    regulation_id: String,
+    #[serde(rename = "entryId")]
+    entry_id: Option<String>,
+    #[serde(rename = "createdBy")]
+    created_by: String,
+    #[serde(rename = "createdByName")]
+    created_by_name: String,
+    #[serde(rename = "targetEmployeeId")]
+    target_employee_id: String,
+    #[serde(rename = "targetName")]
+    target_name: String,
+    #[serde(rename = "remindAt")]
+    remind_at: String,
+    note: String,
+    fired: bool,
     #[serde(rename = "createdAt")]
     created_at: String,
 }
@@ -595,9 +646,43 @@ struct SendProjectChatMessagePayload {
     actor_id: String,
     #[serde(rename = "projectId")]
     project_id: String,
+    #[serde(rename = "targetEmployeeId")]
+    target_employee_id: String,
     content: String,
-    #[serde(rename = "isTask")]
-    is_task: bool,
+    #[serde(rename = "attachmentData")]
+    attachment_data: Option<String>,
+    #[serde(rename = "attachmentName")]
+    attachment_name: Option<String>,
+    deadline: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct AssignProjectChatMessagePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "messageId")]
+    message_id: String,
+    #[serde(rename = "targetEmployeeId")]
+    target_employee_id: String,
+    deadline: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct UpdateProjectChatMessageStatusPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "messageId")]
+    message_id: String,
+    status: String,
+}
+
+#[derive(serde::Deserialize)]
+struct AddProjectChatReplyPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "messageId")]
+    message_id: String,
+    content: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -658,11 +743,24 @@ struct AddRegulationEntryPayload {
     actor_id: String,
     #[serde(rename = "regulationId")]
     regulation_id: String,
+    #[serde(rename = "targetEmployeeId")]
+    target_employee_id: String,
     content: String,
     #[serde(rename = "attachmentData")]
     attachment_data: Option<String>,
     #[serde(rename = "attachmentName")]
     attachment_name: Option<String>,
+    deadline: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct AssignRegulationEntryPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "entryId")]
+    entry_id: String,
+    #[serde(rename = "targetEmployeeId")]
+    target_employee_id: String,
     deadline: Option<String>,
 }
 
@@ -682,6 +780,38 @@ struct AddRegulationReplyPayload {
     #[serde(rename = "entryId")]
     entry_id: String,
     content: String,
+}
+
+#[derive(serde::Deserialize)]
+struct AddRegulationReminderPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "regulationId")]
+    regulation_id: String,
+    #[serde(rename = "entryId")]
+    entry_id: Option<String>,
+    #[serde(rename = "targetEmployeeId")]
+    target_employee_id: String,
+    #[serde(rename = "remindAt")]
+    remind_at: String,
+    note: String,
+}
+
+#[derive(serde::Deserialize)]
+struct ListRegulationRemindersPayload {
+    #[serde(rename = "regulationId")]
+    regulation_id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct UpdateEntryDeadlinePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "entryId")]
+    entry_id: String,
+    deadline: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -842,9 +972,26 @@ fn to_project_chat_message(m: db::ProjectChatMessageRecord) -> ProjectChatMessag
         project_id: m.project_id,
         sender_id: m.sender_id,
         sender_name: m.sender_name,
+        target_employee_id: m.target_employee_id,
+        target_name: m.target_name,
         content: m.content,
-        is_task: m.is_task,
+        attachment_data: m.attachment_data,
+        attachment_name: m.attachment_name,
+        deadline: m.deadline,
+        status: m.status,
         created_at: m.created_at,
+        reply_count: m.reply_count,
+    }
+}
+
+fn to_project_chat_reply(r: db::ProjectChatReplyRecord) -> ProjectChatReply {
+    ProjectChatReply {
+        id: r.id,
+        message_id: r.message_id,
+        author_id: r.author_id,
+        author_name: r.author_name,
+        content: r.content,
+        created_at: r.created_at,
     }
 }
 
@@ -867,6 +1014,7 @@ fn to_reg_member(m: db::RegulationMemberRecord) -> RegulationMember {
 fn to_reg_entry(e: db::RegulationEntryRecord) -> RegulationEntry {
     RegulationEntry {
         id: e.id, regulation_id: e.regulation_id, author_id: e.author_id, author_name: e.author_name,
+        target_employee_id: e.target_employee_id, target_name: e.target_name,
         content: e.content, attachment_data: e.attachment_data, attachment_name: e.attachment_name,
         deadline: e.deadline, status: e.status, created_at: e.created_at, updated_at: e.updated_at, reply_count: e.reply_count,
     }
@@ -1292,8 +1440,33 @@ fn list_project_chat(project_id: String, state: tauri::State<AppState>) -> Vec<P
 #[tauri::command]
 fn send_project_chat_message(payload: SendProjectChatMessagePayload, state: tauri::State<AppState>) -> Result<ProjectChatMessage, String> {
     let db = state.0.lock().unwrap();
-    db.send_project_chat_message(&payload.actor_id, &payload.project_id, &payload.content, payload.is_task)
+    db.send_project_chat_message(&payload.actor_id, &payload.project_id, &payload.target_employee_id, &payload.content, payload.attachment_data.as_deref(), payload.attachment_name.as_deref(), payload.deadline.as_deref())
         .map(to_project_chat_message)
+}
+
+#[tauri::command]
+fn assign_project_chat_message(payload: AssignProjectChatMessagePayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.assign_project_chat_message(&payload.actor_id, &payload.message_id, &payload.target_employee_id, payload.deadline.as_deref())
+}
+
+#[tauri::command]
+fn update_project_chat_message_status(payload: UpdateProjectChatMessageStatusPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.update_project_chat_message_status(&payload.actor_id, &payload.message_id, &payload.status)
+}
+
+#[tauri::command]
+fn list_project_chat_replies(message_id: String, state: tauri::State<AppState>) -> Vec<ProjectChatReply> {
+    let db = state.0.lock().unwrap();
+    db.list_project_chat_replies(&message_id).into_iter().map(to_project_chat_reply).collect()
+}
+
+#[tauri::command]
+fn add_project_chat_reply(payload: AddProjectChatReplyPayload, state: tauri::State<AppState>) -> Result<ProjectChatReply, String> {
+    let db = state.0.lock().unwrap();
+    db.add_project_chat_reply(&payload.actor_id, &payload.message_id, &payload.content)
+        .map(to_project_chat_reply)
 }
 
 #[tauri::command]
@@ -1355,8 +1528,14 @@ fn list_regulation_entries(regulation_id: String, state: tauri::State<AppState>)
 #[tauri::command]
 fn add_regulation_entry(payload: AddRegulationEntryPayload, state: tauri::State<AppState>) -> Result<RegulationEntry, String> {
     let db = state.0.lock().unwrap();
-    db.add_regulation_entry(&payload.actor_id, &payload.regulation_id, &payload.content, payload.attachment_data.as_deref(), payload.attachment_name.as_deref(), payload.deadline.as_deref())
+    db.add_regulation_entry(&payload.actor_id, &payload.regulation_id, &payload.target_employee_id, &payload.content, payload.attachment_data.as_deref(), payload.attachment_name.as_deref(), payload.deadline.as_deref())
         .map(to_reg_entry)
+}
+
+#[tauri::command]
+fn assign_regulation_entry(payload: AssignRegulationEntryPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.assign_regulation_entry(&payload.actor_id, &payload.entry_id, &payload.target_employee_id, payload.deadline.as_deref())
 }
 
 #[tauri::command]
@@ -1376,6 +1555,59 @@ fn add_regulation_reply(payload: AddRegulationReplyPayload, state: tauri::State<
     let db = state.0.lock().unwrap();
     db.add_regulation_reply(&payload.actor_id, &payload.entry_id, &payload.content)
         .map(to_reg_reply)
+}
+
+#[tauri::command]
+fn add_regulation_reminder(payload: AddRegulationReminderPayload, state: tauri::State<AppState>) -> Result<RegulationReminder, String> {
+    let db = state.0.lock().unwrap();
+    db.add_regulation_reminder(
+        &payload.actor_id,
+        &payload.regulation_id,
+        payload.entry_id.as_deref(),
+        &payload.target_employee_id,
+        &payload.remind_at,
+        &payload.note,
+    )
+    .map(|r| RegulationReminder {
+        id: r.id,
+        regulation_id: r.regulation_id,
+        entry_id: r.entry_id,
+        created_by: r.created_by,
+        created_by_name: r.created_by_name,
+        target_employee_id: r.target_employee_id,
+        target_name: r.target_name,
+        remind_at: r.remind_at,
+        note: r.note,
+        fired: r.fired,
+        created_at: r.created_at,
+    })
+}
+
+#[tauri::command]
+fn list_regulation_reminders(payload: ListRegulationRemindersPayload, state: tauri::State<AppState>) -> Vec<RegulationReminder> {
+    let db = state.0.lock().unwrap();
+    db.list_regulation_reminders(&payload.regulation_id, &payload.employee_id)
+        .into_iter()
+        .map(|r| RegulationReminder {
+            id: r.id,
+            regulation_id: r.regulation_id,
+            entry_id: r.entry_id,
+            created_by: r.created_by,
+            created_by_name: r.created_by_name,
+            target_employee_id: r.target_employee_id,
+            target_name: r.target_name,
+            remind_at: r.remind_at,
+            note: r.note,
+            fired: r.fired,
+            created_at: r.created_at,
+        })
+        .collect()
+}
+
+#[tauri::command]
+fn update_regulation_entry_deadline(payload: UpdateEntryDeadlinePayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.update_regulation_entry_deadline(&payload.actor_id, &payload.entry_id, payload.deadline.as_deref())
 }
 
 #[tauri::command]
@@ -1454,6 +1686,10 @@ fn main() {
             transfer_project_ownership,
             list_project_chat,
             send_project_chat_message,
+            assign_project_chat_message,
+            update_project_chat_message_status,
+            list_project_chat_replies,
+            add_project_chat_reply,
             list_regulations,
             get_regulation,
             create_regulation,
@@ -1464,9 +1700,13 @@ fn main() {
             remove_regulation_member,
             list_regulation_entries,
             add_regulation_entry,
+            assign_regulation_entry,
             update_entry_status,
             list_regulation_replies,
             add_regulation_reply,
+            add_regulation_reminder,
+            list_regulation_reminders,
+            update_regulation_entry_deadline,
             record_login,
             record_logout,
             list_recent_sessions

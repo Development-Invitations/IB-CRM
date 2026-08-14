@@ -1074,6 +1074,8 @@ button.employees-add-btn {
 .employee-card-row {
   display: flex;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 10px;
   padding: 10px 0;
   border-top: 1px solid var(--color-border);
   font-size: 13px;
@@ -1346,6 +1348,12 @@ button.employees-add-btn {
   justify-content: space-between;
   gap: 10px;
 }
+.department-member-row > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .department-member-remove {
   display: flex;
@@ -1366,8 +1374,13 @@ button.employees-add-btn {
   color: #fff;
 }
 
+/* Ряду тесно, если пихать поиск сотрудника + выбор роли + кнопку в одну
+   линию (см. project-select уже теснее, чем 220px по умолчанию у
+   .custom-select) — переносим выбор роли и кнопку на вторую строку,
+   а поиск сотрудника занимает всю первую строку. */
 .department-add-member-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: flex-start;
   margin-top: 16px;
@@ -1375,12 +1388,33 @@ button.employees-add-btn {
   border-top: 1px solid var(--color-border);
 }
 
-.department-add-member-row .custom-select { flex: 1; }
+.department-add-member-row > .custom-select:first-child {
+  flex: 1 1 100%;
+}
+.department-add-member-row > .custom-select:not(:first-child) {
+  flex: 1;
+  min-width: 140px;
+}
+.department-add-member-row .custom-select-trigger span,
+.regulation-add-member .custom-select-trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .department-add-member-row .modal-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+}
+
+/* Тред-переключатель участника (Проекты) — тот же список, что и в других
+   местах, но кликабельный: переключает ленту справа на тред этого участника. */
+.reg-thread-row { cursor: pointer; transition: background 0.15s, border-color 0.15s; border: 1px solid transparent; }
+.reg-thread-row:hover { background: var(--color-border); }
+.reg-thread-row.active {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface-2));
 }
 
 /* ---- Заявки на отсутствие ---- */
@@ -1656,68 +1690,6 @@ button.employees-add-btn {
   flex-shrink: 0;
 }
 
-/* ---- Чат проекта ---- */
-
-.project-chat-list {
-  list-style: none;
-  margin: 0 0 14px;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 260px;
-  overflow-y: auto;
-}
-
-.project-chat-list li {
-  padding: 10px 12px;
-  background: var(--color-surface-2);
-  border-radius: var(--radius);
-  font-size: 13px;
-}
-
-.project-chat-task {
-  border: 1px solid var(--color-accent);
-}
-
-.project-chat-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-  font-size: 12px;
-}
-
-.project-chat-form textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: var(--radius);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-2);
-  color: var(--color-text);
-  font-size: 13px;
-  font-family: inherit;
-  resize: vertical;
-  margin-bottom: 10px;
-}
-
-.project-chat-form-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.project-chat-form-actions .checkbox-row {
-  font-size: 12px;
-  gap: 6px;
-}
-
-.project-chat-form-actions .modal-btn {
-  width: auto;
-  padding: 8px 14px;
-}
-
 /* ---- Поиск сотрудников ---- */
 
 .employees-search-row {
@@ -1831,6 +1803,7 @@ button.employees-add-btn {
 }
 
 .regulation-add-member { display: flex; gap: 8px; margin-bottom: 12px; }
+.regulation-add-member .custom-select { flex: 1; }
 
 /* ---- Форма добавления записи ---- */
 .reg-add-entry textarea {
@@ -1853,15 +1826,6 @@ button.employees-add-btn {
   margin-bottom: 8px;
 }
 
-.reg-add-entry-row input[type="date"] {
-  padding: 8px 10px;
-  border-radius: var(--radius);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-2);
-  color: var(--color-text);
-  font-size: 12px;
-}
-
 .regulation-remove-attach {
   background: none;
   border: none;
@@ -1870,20 +1834,57 @@ button.employees-add-btn {
   display: flex;
 }
 
-/* ---- Запись регламента ---- */
-.reg-entries-list { display: flex; flex-direction: column; gap: 10px; }
+/* ---- Записи регламента как чат-бабблы ---- */
+.reg-entries-list { display: flex; flex-direction: column; gap: 14px; }
 
-.reg-entry {
-  padding: 12px;
+.reg-chat-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 78%;
+}
+.reg-chat-msg.own {
+  flex-direction: row-reverse;
+  margin-left: auto;
+}
+
+.reg-chat-avatar {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+.reg-chat-msg.own .reg-chat-avatar {
+  background: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  color: var(--color-accent);
+  border-color: transparent;
+}
+
+.reg-chat-bubble {
+  min-width: 0;
+  flex: 1;
+  padding: 10px 12px;
   border-radius: var(--radius);
   background: var(--color-surface-2);
   border: 1px solid var(--color-border);
 }
+.reg-chat-msg.own .reg-chat-bubble {
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface-2));
+  border-color: color-mix(in srgb, var(--color-accent) 35%, var(--color-border));
+}
 
-.reg-entry-done { border-color: var(--color-success); opacity: 0.8; }
-.reg-entry-cancelled { opacity: 0.5; }
+.reg-entry-done .reg-chat-bubble { border-color: var(--color-success); opacity: 0.85; }
+.reg-entry-cancelled .reg-chat-bubble { opacity: 0.55; }
 
-.reg-entry-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.reg-entry-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
 .reg-entry-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
 .reg-entry-actions { display: flex; gap: 4px; flex-shrink: 0; }
 
@@ -1897,12 +1898,86 @@ button.employees-add-btn {
 .reg-action-btn.reopen { color: var(--color-text-muted); }
 .reg-action-btn:hover { background: var(--color-border); }
 
-.reg-entry-content { font-size: 13px; line-height: 1.5; margin-bottom: 8px; }
+.reg-entry-content { font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+
+.reg-chat-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 .reg-entry-badge-open { background: color-mix(in srgb, var(--color-primary) 20%, transparent); color: var(--color-primary); }
 .reg-entry-badge-done { background: color-mix(in srgb, var(--color-success) 18%, transparent); color: var(--color-success); }
 .reg-entry-badge-cancelled { background: color-mix(in srgb, var(--color-text-muted) 20%, transparent); color: var(--color-text-muted); }
+.reg-chip-deadline {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
 
-.reg-entry-attachment { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-muted); margin-bottom: 8px; }
+.reg-entry-attachment { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-muted); margin-top: 8px; text-decoration: none; }
+.reg-entry-attachment:hover { color: var(--color-accent); }
+
+.reg-attachment-image-btn { display: block; border: none; background: none; padding: 0; margin-top: 8px; cursor: zoom-in; }
+.reg-attachment-image {
+  display: block;
+  max-width: 100%;
+  max-height: 220px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  object-fit: cover;
+}
+.reg-attachment-video {
+  display: block;
+  max-width: 100%;
+  max-height: 260px;
+  border-radius: var(--radius);
+  margin-top: 8px;
+  background: #000;
+}
+
+.reg-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+  padding: 32px;
+}
+.reg-lightbox img { max-width: 100%; max-height: 100%; border-radius: var(--radius); }
+.reg-lightbox-close {
+  position: absolute;
+  top: 20px; right: 20px;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+
+.reg-assign-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+.reg-assign-form > *:first-child { flex: 1; min-width: 140px; }
+.reg-assign-form input[type="date"] {
+  padding: 7px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: 12px;
+}
 
 .reg-replies-toggle {
   font-size: 12px;
@@ -1910,7 +1985,7 @@ button.employees-add-btn {
   align-items: center;
   gap: 4px;
   color: var(--color-text-muted);
-  margin-top: 4px;
+  margin-top: 8px;
 }
 
 /* ---- Ответы ---- */
@@ -1928,10 +2003,6 @@ button.employees-add-btn {
   color: var(--color-text);
   font-size: 12px;
 }
-
-/* ---- Правка карточки проекта (тесный низ) ---- */
-.project-chat-form { margin-top: 8px; }
-.project-chat-form textarea { min-height: 60px; }
 
 /* ---- Исправление drawer — фиксированная ширина ---- */
 .drawer-panel { min-width: 360px; }
@@ -2001,6 +2072,7 @@ button.employees-add-btn {
 .reg-sidebar {
   border-right: 1px solid var(--color-border);
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -2030,6 +2102,21 @@ button.employees-add-btn {
   flex-direction: column;
   gap: 10px;
   padding-right: 6px;
+}
+
+.reg-thread-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.reg-thread-stats {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--color-text-muted);
 }
 
 .reg-deadline-badge {
@@ -2114,12 +2201,35 @@ button.employees-add-btn {
   font-size: 13px;
   text-align: left;
   padding: 8px 10px;
-  transition: background 0.15s;
+  transition: background 0.15s, border-color 0.15s;
 }
-.reg-member-btn:hover { background: var(--color-border); }
-.reg-member-btn.active { border-color: var(--color-accent); }
+.reg-member-btn:hover:not(:disabled) { background: var(--color-border); }
+.reg-member-btn:disabled { cursor: default; }
+.reg-member-btn.active {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface-2));
+}
 
-.reg-member-name { flex: 1; }
+.reg-member-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reg-member-kebab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.reg-member-kebab:hover { background: var(--color-border); color: var(--color-text); }
 
 .reg-deadline-dot {
   display: inline-flex;
@@ -2135,12 +2245,18 @@ button.employees-add-btn {
 .reg-deadline-dot.overdue { background: var(--color-danger); color: #fff; }
 .reg-deadline-dot.due-soon { background: var(--color-accent); color: #14213D; }
 
-.reg-member-menu {
+.reg-member-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
   margin: 0 0 8px;
   padding: 10px 12px;
   background: var(--color-surface);
   border-radius: var(--radius);
   border: 1px solid var(--color-accent);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -2159,27 +2275,6 @@ button.employees-add-btn {
   padding-bottom: 4px;
   border-bottom: 1px solid var(--color-border);
 }
-
-.reg-member-menu-tasks {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 130px;
-  overflow-y: auto;
-}
-
-.reg-member-task-row {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  padding: 4px 6px;
-  border-radius: 4px;
-  background: var(--color-surface-2);
-}
-.reg-member-task-row.overdue { background: color-mix(in srgb, var(--color-danger) 15%, transparent); }
-.reg-member-task-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .reg-member-menu-actions {
   display: flex;
@@ -2210,30 +2305,101 @@ button.employees-add-btn {
 }
 .reg-member-menu-form .modal-btn { padding: 6px 12px; font-size: 12px; }
 
-/* ---- Сообщение чата проекта (полноэкранный вид) ---- */
-.project-chat-msg {
-  padding: 10px 14px;
-  background: var(--color-surface-2);
-  border-radius: var(--radius);
-  border: 1px solid var(--color-border);
-  font-size: 13px;
-}
-.project-chat-msg.project-chat-task {
-  border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface-2));
-}
-.project-chat-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 5px;
-  font-size: 12px;
-  flex-wrap: wrap;
-}
-
 /* ---- Форма добавления записи в регламент (улучшенная) ---- */
 .reg-add-entry {
   flex-shrink: 0;
   border-top: 1px solid var(--color-border);
   padding-top: 10px;
+}
+
+/* ---- Блок формы в меню участника (напоминание/продление) ---- */
+.reg-member-menu-form-block {
+  padding: 10px;
+  background: var(--color-bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reg-member-menu-form-block input[type="date"],
+.reg-member-menu-form-block input[type="time"],
+.reg-member-menu-form-block textarea {
+  padding: 7px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.reg-member-menu-form-block textarea {
+  resize: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.reg-member-menu-form-block .modal-btn {
+  font-size: 11px;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.reg-add-entry-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Поле срока задачи в форме записи — оформлено как единая "пилюля" на
+   уровне остальных кнопок тулбара (скрепка/отправить), с подписью внутри,
+   чтобы было понятно, что это, без нужды наводить курсор ради тултипа. */
+.reg-deadline-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0 12px;
+  height: 38px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+.reg-deadline-field:focus-within { border-color: var(--color-accent); }
+.reg-deadline-field svg { flex-shrink: 0; color: var(--color-accent); }
+.reg-deadline-field span {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.reg-deadline-field input[type="date"] {
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  height: 100%;
+  color: var(--color-text);
+  font-size: 12px;
+  width: 108px;
+}
+.reg-deadline-field input[type="date"]:focus { outline: none; }
+
+.reg-add-entry textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 70px;
+  box-sizing: border-box;
 }

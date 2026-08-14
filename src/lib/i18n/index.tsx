@@ -13,7 +13,6 @@ export const LOCALE_LABELS: Record<Locale, string> = {
   'uz-cyrl': 'Ўзбекча (кирилл)',
 };
 
-type Dict = (typeof dictionaries)[keyof typeof dictionaries];
 type TranslateFn = (key: string, vars?: Record<string, string | number>) => string;
 
 function getByPath(obj: unknown, path: string): string | undefined {
@@ -34,7 +33,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   };
 
   const t: TranslateFn = (key, vars) => {
-    const dict: Dict = dictionaries[locale];
+    const dict = dictionaries[locale];
     let value = getByPath(dict, key) ?? getByPath(dictionaries.ru, key) ?? key;
     if (vars) {
       for (const [k, v] of Object.entries(vars)) {

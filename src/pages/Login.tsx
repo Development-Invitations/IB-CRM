@@ -33,7 +33,7 @@ export default function Login({ onLogin }: { onLogin: (emp: Employee) => void })
       } else {
         setError(res.message);
       }
-    } catch (err: unknown) {
+    } catch (err: any) {
       setError(t('login.errorGeneric'));
     } finally {
       setBusy(false);
@@ -66,4 +66,3 @@ export default function Login({ onLogin }: { onLogin: (emp: Employee) => void })
     </div>
   );
 }
-

@@ -61,7 +61,7 @@ export default function Departments({ currentEmployee }: { currentEmployee: Empl
       setDeleteConfirmOpen(false);
       setSelected(null);
       load();
-    } catch (err: unknown) {
+    } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('departments.errorGeneric'));
     } finally {
       setDeleteBusy(false);
@@ -92,7 +92,7 @@ export default function Departments({ currentEmployee }: { currentEmployee: Empl
       showToast('success', t('departments.memberAdded'));
       setAddMemberId('');
       load();
-    } catch (err: unknown) {
+    } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('departments.errorGeneric'));
     } finally {
       setAddMemberBusy(false);
@@ -119,7 +119,7 @@ export default function Departments({ currentEmployee }: { currentEmployee: Empl
       });
       showToast('success', t('departments.memberRemoved'));
       load();
-    } catch (err: unknown) {
+    } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('departments.errorGeneric'));
     } finally {
       setRemovingMemberId(null);
@@ -294,4 +294,3 @@ export default function Departments({ currentEmployee }: { currentEmployee: Empl
     </div>
   );
 }
-

@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.1.16';
+export const APP_VERSION = '0.1.17';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,16 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.1.17',
+      items: [
+        'Панель каждого участника регламента — список задач, статусы, дедлайны',
+        'Добавить напоминание: календарь, время, текст — приходит уведомление',
+        'Продлить срок: выбрать новую дату из календаря',
+        'Закрыть и возобновить задачу прямо из панели участника',
+        'Ссылки на напоминания появляются автоматически в ленте записей',
+      ],
+    },
     {
       version: '0.1.16',
       items: [
@@ -176,6 +186,16 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.1.17',
+      items: [
+        "Har bir reglament ishtirokchisining paneli — vazifalar ro'yxati, holatlar, muddatlar",
+        "Eslatma qo'shish: taqvim, vaqt, matn — bildirishnoma keladi",
+        "Muddatni uzaytirish: taqvimdan yangi sana tanlash",
+        "Ishtirokchi panelidan to'g'ridan-to'g'ri vazifani yopish va qayta tiklash",
+        "Eslatma havolalari yozuvlar lentasida avtomatik paydo bo'ladi",
+      ],
+    },
+    {
       version: '0.1.16',
       items: [
         "Reglamentlar to'liq ekranda ikki ustunli ko'rinishda ochiladi (ishtirokchilar / yozuvlar)",
@@ -335,6 +355,16 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.1.17',
+      items: [
+        'Ҳар бир регламент иштирокчисининг панели — вазифалар рўйхати, ҳолатлар, муддатлар',
+        'Эслатма қўшиш: тақвим, вақт, матн — билдиришнома келади',
+        'Муддатни узайтириш: тақвимдан янги сана танлаш',
+        'Иштирокчи панелидан тўғридан-тўғри вазифани ёпиш ва қайта тиклаш',
+        'Эслатма ҳаволалари ёзувлар лентасида автоматик пайдо бўлади',
+      ],
+    },
     {
       version: '0.1.16',
       items: [

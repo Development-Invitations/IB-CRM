@@ -79,8 +79,23 @@ export type ProjectChatMessage = {
   projectId: string;
   senderId: string;
   senderName: string;
+  targetEmployeeId: string;
+  targetName: string;
   content: string;
-  isTask: boolean;
+  attachmentData: string | null;
+  attachmentName: string | null;
+  deadline: string | null;
+  status: RegulationEntryStatus;
+  createdAt: string;
+  replyCount: number;
+};
+
+export type ProjectChatReply = {
+  id: string;
+  messageId: string;
+  authorId: string;
+  authorName: string;
+  content: string;
   createdAt: string;
 };
 
@@ -121,6 +136,8 @@ export type RegulationEntry = {
   regulationId: string;
   authorId: string;
   authorName: string;
+  targetEmployeeId: string;
+  targetName: string;
   content: string;
   attachmentData: string | null;
   attachmentName: string | null;
@@ -137,6 +154,20 @@ export type RegulationReply = {
   authorId: string;
   authorName: string;
   content: string;
+  createdAt: string;
+};
+
+export type RegulationReminder = {
+  id: string;
+  regulationId: string;
+  entryId: string | null;
+  createdBy: string;
+  createdByName: string;
+  targetEmployeeId: string;
+  targetName: string;
+  remindAt: string;
+  note: string;
+  fired: boolean;
   createdAt: string;
 };
 
@@ -391,8 +422,19 @@ export const api = {
 
   listProjectChat: (projectId: string) => invoke<ProjectChatMessage[]>('list_project_chat', { projectId }),
 
-  sendProjectChatMessage: (payload: { actorId: string; projectId: string; content: string; isTask: boolean }) =>
+  sendProjectChatMessage: (payload: { actorId: string; projectId: string; targetEmployeeId: string; content: string; attachmentData?: string | null; attachmentName?: string | null; deadline?: string | null }) =>
     invoke<ProjectChatMessage>('send_project_chat_message', { payload }),
+
+  assignProjectChatMessage: (payload: { actorId: string; messageId: string; targetEmployeeId: string; deadline?: string | null }) =>
+    invoke<void>('assign_project_chat_message', { payload }),
+
+  updateProjectChatMessageStatus: (payload: { actorId: string; messageId: string; status: RegulationEntryStatus }) =>
+    invoke<void>('update_project_chat_message_status', { payload }),
+
+  listProjectChatReplies: (messageId: string) => invoke<ProjectChatReply[]>('list_project_chat_replies', { messageId }),
+
+  addProjectChatReply: (payload: { actorId: string; messageId: string; content: string }) =>
+    invoke<ProjectChatReply>('add_project_chat_reply', { payload }),
 
   listRegulations: () => invoke<Regulation[]>('list_regulations'),
   getRegulation: (id: string) => invoke<Regulation | null>('get_regulation', { id }),
@@ -409,14 +451,31 @@ export const api = {
     invoke<void>('remove_regulation_member', { payload }),
 
   listRegulationEntries: (regulationId: string) => invoke<RegulationEntry[]>('list_regulation_entries', { regulationId }),
-  addRegulationEntry: (payload: { actorId: string; regulationId: string; content: string; attachmentData?: string | null; attachmentName?: string | null; deadline?: string | null }) =>
+  addRegulationEntry: (payload: { actorId: string; regulationId: string; targetEmployeeId: string; content: string; attachmentData?: string | null; attachmentName?: string | null; deadline?: string | null }) =>
     invoke<RegulationEntry>('add_regulation_entry', { payload }),
+  assignRegulationEntry: (payload: { actorId: string; entryId: string; targetEmployeeId: string; deadline?: string | null }) =>
+    invoke<void>('assign_regulation_entry', { payload }),
   updateEntryStatus: (payload: { actorId: string; entryId: string; status: RegulationEntryStatus }) =>
     invoke<void>('update_entry_status', { payload }),
 
   listRegulationReplies: (entryId: string) => invoke<RegulationReply[]>('list_regulation_replies', { entryId }),
   addRegulationReply: (payload: { actorId: string; entryId: string; content: string }) =>
     invoke<RegulationReply>('add_regulation_reply', { payload }),
+
+  addRegulationReminder: (payload: {
+    actorId: string;
+    regulationId: string;
+    entryId?: string | null;
+    targetEmployeeId: string;
+    remindAt: string;
+    note: string;
+  }) => invoke<RegulationReminder>('add_regulation_reminder', { payload }),
+
+  listRegulationReminders: (payload: { regulationId: string; employeeId: string }) =>
+    invoke<RegulationReminder[]>('list_regulation_reminders', { payload }),
+
+  updateRegulationEntryDeadline: (payload: { actorId: string; entryId: string; deadline: string | null }) =>
+    invoke<void>('update_regulation_entry_deadline', { payload }),
 
   recordLogin: (employeeId: string) => invoke<void>('record_login', { employeeId }),
 

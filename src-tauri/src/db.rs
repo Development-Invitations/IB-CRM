@@ -152,8 +152,23 @@ pub struct ProjectChatMessageRecord {
     pub project_id: String,
     pub sender_id: String,
     pub sender_name: String,
+    pub target_employee_id: String,
+    pub target_name: String,
     pub content: String,
-    pub is_task: bool,
+    pub attachment_data: Option<String>,
+    pub attachment_name: Option<String>,
+    pub deadline: Option<String>,
+    pub status: String,
+    pub created_at: String,
+    pub reply_count: i64,
+}
+
+pub struct ProjectChatReplyRecord {
+    pub id: String,
+    pub message_id: String,
+    pub author_id: String,
+    pub author_name: String,
+    pub content: String,
     pub created_at: String,
 }
 
@@ -190,6 +205,8 @@ pub struct RegulationEntryRecord {
     pub regulation_id: String,
     pub author_id: String,
     pub author_name: String,
+    pub target_employee_id: String,
+    pub target_name: String,
     pub content: String,
     pub attachment_data: Option<String>,
     pub attachment_name: Option<String>,
@@ -206,6 +223,20 @@ pub struct RegulationReplyRecord {
     pub author_id: String,
     pub author_name: String,
     pub content: String,
+    pub created_at: String,
+}
+
+pub struct RegulationReminderRecord {
+    pub id: String,
+    pub regulation_id: String,
+    pub entry_id: Option<String>,
+    pub created_by: String,
+    pub created_by_name: String,
+    pub target_employee_id: String,
+    pub target_name: String,
+    pub remind_at: String,
+    pub note: String,
+    pub fired: bool,
     pub created_at: String,
 }
 
@@ -348,6 +379,13 @@ impl Db {
                 is_task INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
+            CREATE TABLE IF NOT EXISTS project_chat_replies (
+                id TEXT PRIMARY KEY,
+                message_id TEXT NOT NULL REFERENCES project_chat_messages(id),
+                author_id TEXT NOT NULL REFERENCES employees(id),
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
             CREATE TABLE IF NOT EXISTS regulations (
                 id TEXT PRIMARY KEY,
                 reg_number TEXT UNIQUE NOT NULL,
@@ -389,9 +427,35 @@ impl Db {
                 author_id TEXT NOT NULL REFERENCES employees(id),
                 content TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS regulation_reminders (
+                id TEXT PRIMARY KEY,
+                regulation_id TEXT NOT NULL REFERENCES regulations(id),
+                entry_id TEXT REFERENCES regulation_entries(id),
+                created_by TEXT NOT NULL REFERENCES employees(id),
+                target_employee_id TEXT NOT NULL REFERENCES employees(id),
+                remind_at TEXT NOT NULL,
+                note TEXT NOT NULL,
+                fired INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );",
         )
         .expect("не удалось инициализировать схему");
+
+        // Миграция — добавляем таблицу напоминаний если её нет (для старых баз)
+        let _ = conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS regulation_reminders (
+                id TEXT PRIMARY KEY,
+                regulation_id TEXT NOT NULL,
+                entry_id TEXT,
+                created_by TEXT NOT NULL,
+                target_employee_id TEXT NOT NULL,
+                remind_at TEXT NOT NULL,
+                note TEXT NOT NULL,
+                fired INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );"
+        );
 
         // Миграции для баз, созданных более ранними версиями.
         add_column_if_missing(&conn, "employees", "phone TEXT");
@@ -418,6 +482,26 @@ impl Db {
         add_column_if_missing(&conn, "clients", "contact_person TEXT");
         add_column_if_missing(&conn, "clients", "contact_position TEXT");
         add_column_if_missing(&conn, "departments", "deputy_employee_id TEXT REFERENCES employees(id)");
+        // Запись регламента теперь принадлежит чьему-то персональному треду — по
+        // умолчанию треду автора, а при передаче задачи коллеге переставляется на
+        // получателя (см. assign_regulation_entry).
+        add_column_if_missing(&conn, "regulation_entries", "target_employee_id TEXT REFERENCES employees(id)");
+        let _ = conn.execute(
+            "UPDATE regulation_entries SET target_employee_id = author_id WHERE target_employee_id IS NULL",
+            [],
+        );
+
+        // Сообщение чата проекта тоже принадлежит чьему-то персональному треду —
+        // та же модель, что и у записей регламента (см. выше).
+        add_column_if_missing(&conn, "project_chat_messages", "target_employee_id TEXT REFERENCES employees(id)");
+        add_column_if_missing(&conn, "project_chat_messages", "deadline TEXT");
+        add_column_if_missing(&conn, "project_chat_messages", "attachment_data TEXT");
+        add_column_if_missing(&conn, "project_chat_messages", "attachment_name TEXT");
+        add_column_if_missing(&conn, "project_chat_messages", "status TEXT NOT NULL DEFAULT 'open'");
+        let _ = conn.execute(
+            "UPDATE project_chat_messages SET target_employee_id = sender_id WHERE target_employee_id IS NULL",
+            [],
+        );
 
         // Ретроактивно проставляем department_id всем руководителям подразделений,
         // у которых оно не заполнено (было сознательно не заполнено в ранних версиях,
@@ -1942,8 +2026,12 @@ impl Db {
 
     pub fn list_project_chat(&self, project_id: &str) -> Vec<ProjectChatMessageRecord> {
         let mut stmt = match self.conn.prepare(
-            "SELECT m.id, m.project_id, m.sender_id, e.full_name, m.content, m.is_task, m.created_at
-             FROM project_chat_messages m JOIN employees e ON e.id = m.sender_id
+            "SELECT m.id, m.project_id, m.sender_id, e.full_name, m.target_employee_id, t.full_name,
+                    m.content, m.attachment_data, m.attachment_name, m.deadline, m.status, m.created_at,
+                    (SELECT COUNT(*) FROM project_chat_replies r WHERE r.message_id = m.id)
+             FROM project_chat_messages m
+             JOIN employees e ON e.id = m.sender_id
+             JOIN employees t ON t.id = m.target_employee_id
              WHERE m.project_id = ?1 ORDER BY m.created_at ASC",
         ) {
             Ok(s) => s,
@@ -1955,19 +2043,38 @@ impl Db {
                 project_id: row.get(1)?,
                 sender_id: row.get(2)?,
                 sender_name: row.get(3)?,
-                content: row.get(4)?,
-                is_task: row.get::<_, i64>(5)? != 0,
-                created_at: row.get(6)?,
+                target_employee_id: row.get(4)?,
+                target_name: row.get(5)?,
+                content: row.get(6)?,
+                attachment_data: row.get(7)?,
+                attachment_name: row.get(8)?,
+                deadline: row.get(9)?,
+                status: row.get(10)?,
+                created_at: row.get(11)?,
+                reply_count: row.get(12)?,
             })
         })
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
         .unwrap_or_default()
     }
 
-    pub fn send_project_chat_message(&self, actor_id: &str, project_id: &str, content: &str, is_task: bool) -> Result<ProjectChatMessageRecord, String> {
+    pub fn send_project_chat_message(
+        &self,
+        actor_id: &str,
+        project_id: &str,
+        target_employee_id: &str,
+        content: &str,
+        attachment_data: Option<&str>,
+        attachment_name: Option<&str>,
+        deadline: Option<&str>,
+    ) -> Result<ProjectChatMessageRecord, String> {
         let project = self.get_project(project_id).ok_or_else(|| "Проект не найден".to_string())?;
         if !self.is_project_participant(actor_id, &project) {
             return Err("Вы не участник этого проекта".into());
+        }
+        let is_manager = self.can_manage_project(actor_id, &project.owner_id);
+        if target_employee_id != actor_id && !is_manager {
+            return Err("Только владелец проекта может ставить задачи другим участникам".into());
         }
         if content.trim().is_empty() {
             return Err("Пустое сообщение".into());
@@ -1976,23 +2083,136 @@ impl Db {
         let id = Uuid::new_v4().to_string();
         self.conn
             .execute(
-                "INSERT INTO project_chat_messages (id, project_id, sender_id, content, is_task) VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![id, project_id, actor_id, content.trim(), is_task as i64],
+                "INSERT INTO project_chat_messages (id, project_id, sender_id, target_employee_id, content, attachment_data, attachment_name, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![id, project_id, actor_id, target_employee_id, content.trim(), attachment_data, attachment_name, deadline],
             )
             .map_err(|e| e.to_string())?;
 
-        let (sender_name,): (Option<String>,) = self
-            .conn
-            .query_row("SELECT full_name FROM employees WHERE id = ?1", params![actor_id], |row| Ok((row.get(0)?,)))
-            .unwrap_or((None,));
+        if target_employee_id != actor_id {
+            let title = format!("Вам поставили задачу в проекте «{}»", project.name);
+            self.notify(target_employee_id, "project_message_assigned", &title, Some(content.trim()), Some("project"), Some(project_id));
+        }
+
+        let sender_name: Option<String> = self.conn
+            .query_row("SELECT full_name FROM employees WHERE id = ?1", params![actor_id], |row| row.get(0))
+            .ok();
+        let target_name: Option<String> = self.conn
+            .query_row("SELECT full_name FROM employees WHERE id = ?1", params![target_employee_id], |row| row.get(0))
+            .ok();
 
         Ok(ProjectChatMessageRecord {
             id,
             project_id: project_id.to_string(),
             sender_id: actor_id.to_string(),
             sender_name: sender_name.unwrap_or_default(),
+            target_employee_id: target_employee_id.to_string(),
+            target_name: target_name.unwrap_or_default(),
             content: content.trim().to_string(),
-            is_task,
+            attachment_data: attachment_data.map(str::to_string),
+            attachment_name: attachment_name.map(str::to_string),
+            deadline: deadline.map(str::to_string),
+            status: "open".to_string(),
+            created_at: String::new(),
+            reply_count: 0,
+        })
+    }
+
+    pub fn assign_project_chat_message(&self, actor_id: &str, message_id: &str, target_employee_id: &str, deadline: Option<&str>) -> Result<(), String> {
+        let (project_id, sender_id): (String, String) = self.conn
+            .query_row("SELECT project_id, sender_id FROM project_chat_messages WHERE id = ?1", params![message_id], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|_| "Сообщение не найдено".to_string())?;
+        let project = self.get_project(&project_id).ok_or_else(|| "Проект не найден".to_string())?;
+        if !self.can_manage_project(actor_id, &project.owner_id) && sender_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        let is_target_member = project.owner_id == target_employee_id || self.conn
+            .query_row("SELECT 1 FROM project_members WHERE project_id = ?1 AND employee_id = ?2", params![project_id, target_employee_id], |_| Ok(()))
+            .is_ok();
+        if !is_target_member {
+            return Err("Получатель должен быть участником проекта".into());
+        }
+        self.conn.execute(
+            "UPDATE project_chat_messages SET target_employee_id = ?1, deadline = ?2 WHERE id = ?3",
+            params![target_employee_id, deadline, message_id],
+        ).map_err(|e| e.to_string())?;
+
+        if target_employee_id != actor_id {
+            let title = format!("Вам передали задачу в проекте «{}»", project.name);
+            self.notify(target_employee_id, "project_message_assigned", &title, None, Some("project"), Some(&project_id));
+        }
+        Ok(())
+    }
+
+    pub fn update_project_chat_message_status(&self, actor_id: &str, message_id: &str, new_status: &str) -> Result<(), String> {
+        if !["open", "done", "cancelled"].contains(&new_status) {
+            return Err("Некорректный статус задачи".into());
+        }
+        let (project_id, sender_id): (String, String) = self.conn
+            .query_row("SELECT project_id, sender_id FROM project_chat_messages WHERE id = ?1", params![message_id], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|_| "Сообщение не найдено".to_string())?;
+        let project = self.get_project(&project_id).ok_or_else(|| "Проект не найден".to_string())?;
+        if !self.can_manage_project(actor_id, &project.owner_id) && sender_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn.execute("UPDATE project_chat_messages SET status = ?1 WHERE id = ?2", params![new_status, message_id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn list_project_chat_replies(&self, message_id: &str) -> Vec<ProjectChatReplyRecord> {
+        let mut stmt = match self.conn.prepare(
+            "SELECT r.id, r.message_id, r.author_id, e.full_name, r.content, r.created_at
+             FROM project_chat_replies r JOIN employees e ON e.id = r.author_id
+             WHERE r.message_id = ?1 ORDER BY r.created_at ASC",
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map(params![message_id], |row| {
+            Ok(ProjectChatReplyRecord {
+                id: row.get(0)?,
+                message_id: row.get(1)?,
+                author_id: row.get(2)?,
+                author_name: row.get(3)?,
+                content: row.get(4)?,
+                created_at: row.get(5)?,
+            })
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default()
+    }
+
+    pub fn add_project_chat_reply(&self, actor_id: &str, message_id: &str, content: &str) -> Result<ProjectChatReplyRecord, String> {
+        if content.trim().is_empty() {
+            return Err("Ответ не может быть пустым".into());
+        }
+        let project_id: String = self.conn
+            .query_row("SELECT project_id FROM project_chat_messages WHERE id = ?1", params![message_id], |row| row.get(0))
+            .map_err(|_| "Сообщение не найдено".to_string())?;
+        let project = self.get_project(&project_id).ok_or_else(|| "Проект не найден".to_string())?;
+        if !self.is_project_participant(actor_id, &project) {
+            return Err("Вы не участник этого проекта".into());
+        }
+
+        let id = Uuid::new_v4().to_string();
+        self.conn
+            .execute(
+                "INSERT INTO project_chat_replies (id, message_id, author_id, content) VALUES (?1, ?2, ?3, ?4)",
+                params![id, message_id, actor_id, content.trim()],
+            )
+            .map_err(|e| e.to_string())?;
+
+        let author_name: Option<String> = self.conn
+            .query_row("SELECT full_name FROM employees WHERE id = ?1", params![actor_id], |row| row.get(0))
+            .ok();
+
+        Ok(ProjectChatReplyRecord {
+            id,
+            message_id: message_id.to_string(),
+            author_id: actor_id.to_string(),
+            author_name: author_name.unwrap_or_default(),
+            content: content.trim().to_string(),
             created_at: String::new(),
         })
     }
@@ -2224,11 +2444,13 @@ impl Db {
 
     pub fn list_regulation_entries(&self, regulation_id: &str) -> Vec<RegulationEntryRecord> {
         let mut stmt = match self.conn.prepare(
-            "SELECT e.id, e.regulation_id, e.author_id, a.full_name, e.content,
-                    e.attachment_data, e.attachment_name, e.deadline, e.status,
+            "SELECT e.id, e.regulation_id, e.author_id, a.full_name, e.target_employee_id, t.full_name,
+                    e.content, e.attachment_data, e.attachment_name, e.deadline, e.status,
                     e.created_at, e.updated_at,
                     (SELECT COUNT(*) FROM regulation_replies rr WHERE rr.entry_id = e.id)
-             FROM regulation_entries e JOIN employees a ON a.id = e.author_id
+             FROM regulation_entries e
+             JOIN employees a ON a.id = e.author_id
+             JOIN employees t ON t.id = e.target_employee_id
              WHERE e.regulation_id = ?1 ORDER BY e.created_at ASC",
         ) {
             Ok(s) => s,
@@ -2240,14 +2462,16 @@ impl Db {
                 regulation_id: row.get(1)?,
                 author_id: row.get(2)?,
                 author_name: row.get(3)?,
-                content: row.get(4)?,
-                attachment_data: row.get(5)?,
-                attachment_name: row.get(6)?,
-                deadline: row.get(7)?,
-                status: row.get(8)?,
-                created_at: row.get(9)?,
-                updated_at: row.get(10)?,
-                reply_count: row.get(11)?,
+                target_employee_id: row.get(4)?,
+                target_name: row.get(5)?,
+                content: row.get(6)?,
+                attachment_data: row.get(7)?,
+                attachment_name: row.get(8)?,
+                deadline: row.get(9)?,
+                status: row.get(10)?,
+                created_at: row.get(11)?,
+                updated_at: row.get(12)?,
+                reply_count: row.get(13)?,
             })
         })
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
@@ -2258,6 +2482,7 @@ impl Db {
         &self,
         actor_id: &str,
         regulation_id: &str,
+        target_employee_id: &str,
         content: &str,
         attachment_data: Option<&str>,
         attachment_name: Option<&str>,
@@ -2267,11 +2492,15 @@ impl Db {
         if reg.status == "closed" {
             return Err("Регламент закрыт — новые записи нельзя добавлять".into());
         }
-        let is_participant = self.is_admin(actor_id) || reg.owner_id == actor_id || self.conn
+        let is_manager = self.is_admin(actor_id) || reg.owner_id == actor_id;
+        let is_participant = is_manager || self.conn
             .query_row("SELECT 1 FROM regulation_members WHERE regulation_id = ?1 AND employee_id = ?2", params![regulation_id, actor_id], |_| Ok(()))
             .is_ok();
         if !is_participant {
             return Err("Вы не участник этого регламента".into());
+        }
+        if target_employee_id != actor_id && !is_manager {
+            return Err("Только ответственный может ставить задачи другим участникам".into());
         }
         if content.trim().is_empty() {
             return Err("Запись не может быть пустой".into());
@@ -2280,15 +2509,23 @@ impl Db {
         let id = Uuid::new_v4().to_string();
         self.conn
             .execute(
-                "INSERT INTO regulation_entries (id, regulation_id, author_id, content, attachment_data, attachment_name, deadline) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                params![id, regulation_id, actor_id, content.trim(), attachment_data, attachment_name, deadline],
+                "INSERT INTO regulation_entries (id, regulation_id, author_id, target_employee_id, content, attachment_data, attachment_name, deadline) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![id, regulation_id, actor_id, target_employee_id, content.trim(), attachment_data, attachment_name, deadline],
             )
             .map_err(|e| e.to_string())?;
 
         self.conn.execute("UPDATE regulations SET updated_at = datetime('now') WHERE id = ?1", params![regulation_id]).ok();
 
+        if target_employee_id != actor_id {
+            let title = format!("Вам поставили задачу в регламенте «{}»", reg.title);
+            self.notify(target_employee_id, "regulation_entry_assigned", &title, Some(content.trim()), Some("regulation"), Some(regulation_id));
+        }
+
         let author_name: Option<String> = self.conn
             .query_row("SELECT full_name FROM employees WHERE id = ?1", params![actor_id], |row| row.get(0))
+            .ok();
+        let target_name: Option<String> = self.conn
+            .query_row("SELECT full_name FROM employees WHERE id = ?1", params![target_employee_id], |row| row.get(0))
             .ok();
 
         Ok(RegulationEntryRecord {
@@ -2296,6 +2533,8 @@ impl Db {
             regulation_id: regulation_id.to_string(),
             author_id: actor_id.to_string(),
             author_name: author_name.unwrap_or_default(),
+            target_employee_id: target_employee_id.to_string(),
+            target_name: target_name.unwrap_or_default(),
             content: content.trim().to_string(),
             attachment_data: attachment_data.map(str::to_string),
             attachment_name: attachment_name.map(str::to_string),
@@ -2305,6 +2544,32 @@ impl Db {
             updated_at: String::new(),
             reply_count: 0,
         })
+    }
+
+    pub fn assign_regulation_entry(&self, actor_id: &str, entry_id: &str, target_employee_id: &str, deadline: Option<&str>) -> Result<(), String> {
+        let (regulation_id, author_id): (String, String) = self.conn
+            .query_row("SELECT regulation_id, author_id FROM regulation_entries WHERE id = ?1", params![entry_id], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|_| "Запись не найдена".to_string())?;
+        let reg = self.get_regulation(&regulation_id).ok_or_else(|| "Регламент не найден".to_string())?;
+        if !self.is_admin(actor_id) && reg.owner_id != actor_id && author_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        let is_target_member = reg.owner_id == target_employee_id || self.conn
+            .query_row("SELECT 1 FROM regulation_members WHERE regulation_id = ?1 AND employee_id = ?2", params![regulation_id, target_employee_id], |_| Ok(()))
+            .is_ok();
+        if !is_target_member {
+            return Err("Получатель должен быть участником регламента".into());
+        }
+        self.conn.execute(
+            "UPDATE regulation_entries SET target_employee_id = ?1, deadline = ?2, updated_at = datetime('now') WHERE id = ?3",
+            params![target_employee_id, deadline, entry_id],
+        ).map_err(|e| e.to_string())?;
+
+        if target_employee_id != actor_id {
+            let title = format!("Вам передали задачу в регламенте «{}»", reg.title);
+            self.notify(target_employee_id, "regulation_entry_assigned", &title, None, Some("regulation"), Some(&regulation_id));
+        }
+        Ok(())
     }
 
     pub fn update_entry_status(&self, actor_id: &str, entry_id: &str, new_status: &str) -> Result<(), String> {
@@ -2387,4 +2652,119 @@ impl Db {
             created_at: String::new(),
         })
     }
+
+    // ---- Напоминания по задачам регламента ----
+
+    pub fn add_regulation_reminder(
+        &self,
+        actor_id: &str,
+        regulation_id: &str,
+        entry_id: Option<&str>,
+        target_employee_id: &str,
+        remind_at: &str,
+        note: &str,
+    ) -> Result<RegulationReminderRecord, String> {
+        if note.trim().is_empty() {
+            return Err("Укажите текст напоминания".into());
+        }
+
+        let id = Uuid::new_v4().to_string();
+        self.conn
+            .execute(
+                "INSERT INTO regulation_reminders (id, regulation_id, entry_id, created_by, target_employee_id, remind_at, note)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![id, regulation_id, entry_id, actor_id, target_employee_id, remind_at, note.trim()],
+            )
+            .map_err(|e| e.to_string())?;
+
+        // Создаём запись-ответ в регламенте о напоминании
+        let (actor_name, target_name): (Option<String>, Option<String>) = (
+            self.conn.query_row("SELECT full_name FROM employees WHERE id = ?1", params![actor_id], |r| r.get(0)).ok(),
+            self.conn.query_row("SELECT full_name FROM employees WHERE id = ?1", params![target_employee_id], |r| r.get(0)).ok(),
+        );
+        let reg = self.get_regulation(regulation_id);
+        let reg_title = reg.as_ref().map(|r| r.title.as_str()).unwrap_or("регламент");
+        let msg = format!(
+            "📅 Напоминание для {}: {} ({})",
+            target_name.as_deref().unwrap_or("—"),
+            note.trim(),
+            remind_at
+        );
+
+        // Если есть конкретная запись — пишем ответ на неё, иначе — новую запись
+        if let Some(eid) = entry_id {
+            let _ = self.conn.execute(
+                "INSERT INTO regulation_replies (id, entry_id, author_id, content) VALUES (?1, ?2, ?3, ?4)",
+                params![Uuid::new_v4().to_string(), eid, actor_id, msg],
+            );
+        } else {
+            let _ = self.add_regulation_entry(actor_id, regulation_id, target_employee_id, &msg, None, None, Some(remind_at));
+        }
+
+        // Уведомляем получателя
+        let notif_title = format!("Напоминание по регламенту «{}»", reg_title);
+        self.notify(target_employee_id, "regulation_reminder", &notif_title, Some(note.trim()), Some("regulation"), Some(regulation_id));
+
+        Ok(RegulationReminderRecord {
+            id,
+            regulation_id: regulation_id.to_string(),
+            entry_id: entry_id.map(str::to_string),
+            created_by: actor_id.to_string(),
+            created_by_name: actor_name.unwrap_or_default(),
+            target_employee_id: target_employee_id.to_string(),
+            target_name: target_name.unwrap_or_default(),
+            remind_at: remind_at.to_string(),
+            note: note.trim().to_string(),
+            fired: false,
+            created_at: String::new(),
+        })
+    }
+
+    pub fn list_regulation_reminders(&self, regulation_id: &str, employee_id: &str) -> Vec<RegulationReminderRecord> {
+        let mut stmt = match self.conn.prepare(
+            "SELECT r.id, r.regulation_id, r.entry_id, r.created_by, cb.full_name,
+                    r.target_employee_id, t.full_name, r.remind_at, r.note, r.fired, r.created_at
+             FROM regulation_reminders r
+             LEFT JOIN employees cb ON cb.id = r.created_by
+             LEFT JOIN employees t ON t.id = r.target_employee_id
+             WHERE r.regulation_id = ?1 AND (r.created_by = ?2 OR r.target_employee_id = ?2)
+             ORDER BY r.remind_at ASC",
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map(params![regulation_id, employee_id], |row| {
+            Ok(RegulationReminderRecord {
+                id: row.get(0)?,
+                regulation_id: row.get(1)?,
+                entry_id: row.get(2)?,
+                created_by: row.get(3)?,
+                created_by_name: row.get::<_, Option<String>>(4)?.unwrap_or_default(),
+                target_employee_id: row.get(5)?,
+                target_name: row.get::<_, Option<String>>(6)?.unwrap_or_default(),
+                remind_at: row.get(7)?,
+                note: row.get(8)?,
+                fired: row.get::<_, i64>(9)? != 0,
+                created_at: row.get(10)?,
+            })
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default()
+    }
+
+    pub fn update_regulation_entry_deadline(&self, actor_id: &str, entry_id: &str, new_deadline: Option<&str>) -> Result<(), String> {
+        let (regulation_id, author_id): (String, String) = self.conn
+            .query_row("SELECT regulation_id, author_id FROM regulation_entries WHERE id = ?1", params![entry_id], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|_| "Запись не найдена".to_string())?;
+        let reg = self.get_regulation(&regulation_id).ok_or_else(|| "Регламент не найден".to_string())?;
+        if !self.is_admin(actor_id) && reg.owner_id != actor_id && author_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn.execute(
+            "UPDATE regulation_entries SET deadline = ?1, updated_at = datetime('now') WHERE id = ?2",
+            params![new_deadline, entry_id],
+        ).map_err(|e| e.to_string())?;
+        Ok(())
+    }
 }
+

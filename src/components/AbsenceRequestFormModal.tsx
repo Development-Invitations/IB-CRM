@@ -60,7 +60,7 @@ export default function AbsenceRequestFormModal({
       setReason('');
       onSubmitted();
       onClose();
-    } catch (err: unknown) {
+    } catch (err: any) {
       setError(typeof err === 'string' ? err : t('absence.errorGeneric'));
     } finally {
       setBusy(false);
@@ -139,4 +139,3 @@ export default function AbsenceRequestFormModal({
     </Modal>
   );
 }
-

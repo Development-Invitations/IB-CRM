@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Contact, Trash2, Send, ExternalLink } from 'lucide-react';
+import { Plus, Search, Pencil, Contact, Trash2, Send, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api, type Employee, type Client, type ClientHistoryEntry, type Regulation } from '../lib/api';
 import { useLocale } from '../lib/i18n';
@@ -16,6 +16,7 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   const [selected, setSelected] = useState<Client | null>(null);
   const [history, setHistory] = useState<ClientHistoryEntry[]>([]);
@@ -78,7 +79,7 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
       setDeleteConfirmOpen(false);
       setSelected(null);
       load();
-    } catch (err: unknown) {
+    } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('clients.errorGeneric'));
     } finally {
       setDeleteBusy(false);
@@ -93,12 +94,24 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
       setNewNote('');
       const entries = await api.listClientHistory(selected.id);
       setHistory(entries);
-    } catch (err: unknown) {
+    } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('clients.errorGeneric'));
     } finally {
       setNoteBusy(false);
     }
   };
+
+  const filteredClients = search.trim()
+    ? clients.filter((c) => {
+        const q = search.trim().toLowerCase();
+        return (
+          c.clientNumber.toLowerCase().includes(q) ||
+          c.name.toLowerCase().includes(q) ||
+          (c.phone || '').toLowerCase().includes(q) ||
+          (c.email || '').toLowerCase().includes(q)
+        );
+      })
+    : clients;
 
   return (
     <div className="employees-page">
@@ -109,9 +122,14 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
         </button>
       </div>
 
+      <div className="employees-search-row">
+        <Search size={15} className="employees-search-icon" />
+        <input className="employees-search-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('clients.searchPlaceholder')} />
+      </div>
+
       {loading ? (
         <LoadingScreen compact />
-      ) : clients.length === 0 ? (
+      ) : filteredClients.length === 0 ? (
         <p className="settings-hint">{t('clients.empty')}</p>
       ) : (
         <table className="employees-table">
@@ -125,7 +143,7 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
             </tr>
           </thead>
           <tbody>
-            {clients.map((c) => (
+            {filteredClients.map((c) => (
               <tr key={c.id} className="employees-row" onClick={() => setSelected(c)}>
                 <td>{c.clientNumber}</td>
                 <td>{c.name}</td>
@@ -296,4 +314,3 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
     </div>
   );
 }
-

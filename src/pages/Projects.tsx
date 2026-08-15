@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useContext } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Plus, Search, Pencil, Trash2, Send, UserPlus, X, Repeat, CheckSquare, XSquare, RotateCcw, ChevronDown, ChevronRight, ArrowLeft, Link2, Check, Paperclip, Forward, CalendarClock } from 'lucide-react';
 import { api, type Employee, type Project, type ProjectMember, type ProjectChatMessage, type ProjectChatReply, type Client, type ProjectMemberRole, type RegulationEntryStatus } from '../lib/api';
 import { FullscreenContext } from './Dashboard';
@@ -7,6 +7,7 @@ import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
 import { parseSqliteUtc } from '../lib/date';
 import { prepareAttachment, classifyAttachment } from '../lib/attachment';
+import { buildProjectMessageLink, linkifyEntryContent } from '../lib/entryLink';
 import Modal from '../components/Modal';
 import Select from '../components/Select';
 import SearchableSelect from '../components/SearchableSelect';
@@ -58,6 +59,7 @@ function ChatMessage({
   onAssign: (messageId: string, targetEmployeeId: string, deadline: string) => Promise<void>;
   t: (k: string, vars?: Record<string, string | number>) => string;
 }) {
+  const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
   const [replies, setReplies] = useState<ProjectChatReply[]>([]);
   const [expanded, setExpanded] = useState(false);
@@ -70,7 +72,7 @@ function ChatMessage({
   const [assignBusy, setAssignBusy] = useState(false);
 
   const copyLink = () => {
-    navigator.clipboard.writeText(`${window.location.href.split('#')[0]}#msg-${m.id}`).then(() => {
+    navigator.clipboard.writeText(buildProjectMessageLink(m.projectId, m.id)).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -152,7 +154,7 @@ function ChatMessage({
           </div>
         </div>
 
-        <div className="reg-entry-content">{m.content}</div>
+        <div className="reg-entry-content">{linkifyEntryContent(m.content, navigate)}</div>
 
         <div className="reg-chat-chips">
           <span className={`absence-status reg-entry-badge-${m.status}`}>{t(MSG_STATUS_KEYS[m.status])}</span>
@@ -193,7 +195,7 @@ function ChatMessage({
                   <strong>{r.authorName}</strong>
                   <span className="settings-hint">{parseSqliteUtc(r.createdAt).toLocaleString()}</span>
                 </div>
-                <div>{r.content}</div>
+                <div>{linkifyEntryContent(r.content, navigate)}</div>
               </div>
             ))}
             <div className="reg-reply-form">
@@ -275,13 +277,18 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
 
   const load = () => {
     setLoading(true);
-    Promise.all([api.listProjects(), api.listClients(), api.listEmployees()]).then(([p, c, e]) => {
-      setProjects(p);
-      setClients(c);
-      setEmployees(e);
-      setLoading(false);
-      setSelected((prev) => (prev ? p.find((x) => x.id === prev.id) ?? null : null));
-    });
+    Promise.all([api.listProjects(), api.listClients(), api.listEmployees()])
+      .then(([p, c, e]) => {
+        setProjects(p);
+        setClients(c);
+        setEmployees(e);
+        setLoading(false);
+        setSelected((prev) => (prev ? p.find((x) => x.id === prev.id) ?? null : null));
+      })
+      .catch(() => {
+        setLoading(false);
+        showToast('error', t('common.loadError'));
+      });
   };
 
   useEffect(() => {
@@ -307,11 +314,16 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
   const loadDetail = () => {
     if (!selected) return;
     setDetailLoading(true);
-    Promise.all([api.listProjectMembers(selected.id), api.listProjectChat(selected.id)]).then(([m, c]) => {
-      setMembers(m);
-      setChat(c);
-      setDetailLoading(false);
-    });
+    Promise.all([api.listProjectMembers(selected.id), api.listProjectChat(selected.id)])
+      .then(([m, c]) => {
+        setMembers(m);
+        setChat(c);
+        setDetailLoading(false);
+      })
+      .catch(() => {
+        setDetailLoading(false);
+        showToast('error', t('common.loadError'));
+      });
   };
 
   useEffect(() => {
@@ -322,10 +334,28 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
   // При открытии проекта (или переключении на другой) — сбрасываем на свой тред
   useEffect(() => { setActiveThreadId(currentEmployee.id); }, [selected?.id]); // eslint-disable-line
 
+  // Переход по ссылке на конкретное сообщение (см. lib/entryLink.tsx) — как
+  // только чат загрузился, переключаемся на тред нужного участника и
+  // прокручиваем к самому сообщению.
+  useEffect(() => {
+    const openMessageId = (location.state as any)?.openMessageId;
+    if (!openMessageId || chat.length === 0) return;
+    const msg = chat.find((m) => m.id === openMessageId);
+    if (!msg) return;
+    setActiveThreadId(msg.targetEmployeeId);
+    setTimeout(() => {
+      document.getElementById(`msg-${msg.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+  }, [chat, location.state]);
+
   const isManager = !!selected && (currentEmployee.isAdmin || selected.ownerId === currentEmployee.id);
   const isParticipant =
     !!selected &&
     (currentEmployee.isAdmin || selected.ownerId === currentEmployee.id || members.some((m) => m.employeeId === currentEmployee.id));
+  // Добавлять участников может владелец/админ (isManager) или тот, кому
+  // владелец назначил роль "Помощник" — по прямому запросу пользователя.
+  const myProjectRole = members.find((m) => m.employeeId === currentEmployee.id)?.roleInProject;
+  const canAddMembers = isManager || myProjectRole === 'assistant';
 
   const openCreate = () => {
     setEditingProject(undefined);
@@ -570,7 +600,7 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
 
             <div className="reg-sidebar-section">
               <div className="department-members-title">{t('projects.membersTitle')}</div>
-              {isManager && (
+              {canAddMembers && (
                 <div className="department-add-member-row">
                   <SearchableSelect value={addMemberId} options={memberOptions} onChange={setAddMemberId} searchPlaceholder={t('employees.searchPlaceholder')} emptyLabel={t('employees.searchEmpty')} />
                   <Select value={addMemberRole} options={[{ value: 'member', label: t('projects.roleMember') }, { value: 'assistant', label: t('projects.roleAssistant') }]} onChange={(v) => setAddMemberRole(v as ProjectMemberRole)} />
@@ -582,7 +612,11 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
               ) : (
                 <ul className="department-members-list">
                   {members.map((m) => {
-                    const canSwitch = isManager || m.employeeId === currentEmployee.id;
+                    // Любой участник может переключиться в тред любого другого
+                    // участника — смотреть его задачи, отвечать, назначать
+                    // новые. По прямому запросу пользователя открыто всем
+                    // участникам проекта (раньше — только владельцу/себе).
+                    const canSwitch = isParticipant;
                     const isActive = activeThreadId === m.employeeId;
                     return (
                       <li
@@ -624,7 +658,10 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
               const isOwnThread = activeThreadId === currentEmployee.id;
               const openCount = threadMessages.filter((m) => m.status === 'open').length;
               const doneCount = threadMessages.filter((m) => m.status === 'done').length;
-              const canPost = isParticipant && (isOwnThread || isManager);
+              // Раньше писать/отвечать/назначать задачи можно было только в
+              // своём треде или если ты владелец/админ — теперь любой участник
+              // может писать в тред любого другого участника.
+              const canPost = isParticipant;
 
               return (
                 <>

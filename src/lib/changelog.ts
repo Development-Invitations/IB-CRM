@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.2.2';
+export const APP_VERSION = '0.2.5';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,35 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.2.5',
+      items: [
+        'Уведомления теперь дублируются нативным всплывающим окном Windows — не нужно постоянно проверять колокольчик',
+        'Удалять свою тему в блоге теперь может её автор, не только админ',
+        'Исправлен большой пустой пробел в окне комментариев блога перед формой отправки',
+      ],
+    },
+    {
+      version: '0.2.4',
+      items: [
+        'Исправлен серьёзный баг режима сервера: добавление сотрудника в регламент/проект и открытие чужого кабинета не работали при подключении по сети',
+        'Реальный текст ошибки теперь виден при подключении к серверу, а не общее "не удалось сохранить"',
+        'Добавлять участников в регламент/проект теперь может не только владелец, но и участник с ролью "Помощник"',
+        'Любой участник регламента/проекта теперь может переключиться в тред коллеги — посмотреть, ответить, поставить задачу (раньше только владелец/сам себе)',
+        'Ссылка на задачу/сообщение теперь кликабельна и сразу открывает нужный регламент/проект с прокруткой к нужной записи',
+        'Страницы, которые раньше зависали на загрузке при сбое сети, теперь честно показывают ошибку с кнопкой "Повторить"',
+      ],
+    },
+    {
+      version: '0.2.3',
+      items: [
+        'Главная страница теперь настоящий дашборд: количество сотрудников, активных регламентов, проектов и клиентов — с переходом по клику',
+        'Виджет "Мои задачи в регламентах" — сколько у вас открытых задач, ближайшие по сроку показаны первыми, просроченные подсвечены красным',
+        'Клик по задаче в дашборде сразу открывает нужный регламент',
+        'Страница кабинета сотрудника стала шире и просторнее на больших экранах',
+        'Теперь можно самостоятельно менять фото профиля в своём кабинете — не только через администратора',
+      ],
+    },
     {
       version: '0.2.2',
       items: [
@@ -265,6 +294,35 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.2.5',
+      items: [
+        "Bildirishnomalar endi Windows'ning tabiiy oynachasida ham ko'rsatiladi — qo'ng'iroqchani doim tekshirib turish shart emas",
+        "Blogda o'z mavzusini o'chirish endi uning muallifiga ham ruxsat, faqat administratorga emas",
+        "Blog izohlar oynasida yuborish formasi oldidagi katta bo'sh joy tuzatildi",
+      ],
+    },
+    {
+      version: '0.2.4',
+      items: [
+        "Server rejimidagi jiddiy xato tuzatildi: reglament/loyihaga xodim qo'shish va boshqa birovning kabinetini ochish tarmoq orqali ulanganda ishlamasdi",
+        "Serverga ulanganda haqiqiy xato matni endi ko'rinadi, umumiy \"saqlab bo'lmadi\" o'rniga",
+        "Reglament/loyihaga ishtirokchi qo'shishni endi nafaqat egasi, balki \"Yordamchi\" rolidagi ishtirokchi ham qila oladi",
+        "Reglament/loyihaning istalgan ishtirokchisi endi hamkasbining tredi ga o'tishi mumkin — ko'rish, javob berish, vazifa qo'yish (avval faqat egasi/o'ziga)",
+        "Vazifa/xabarga havola endi bosiladigan bo'ldi va darhol kerakli reglament/loyihani kerakli yozuvga aylantirib ochadi",
+        "Tarmoq nosozligida yuklanishda osilib qolgan sahifalar endi \"Qayta urinish\" tugmasi bilan xatoni ko'rsatadi",
+      ],
+    },
+    {
+      version: '0.2.3',
+      items: [
+        "Bosh sahifa endi haqiqiy dashboard: xodimlar, faol reglamentlar, loyihalar va mijozlar soni — bosish orqali o'tish bilan",
+        "\"Reglamentlardagi vazifalarim\" vidjeti — nechta ochiq vazifangiz bor, muddati yaqinlari birinchi ko'rsatiladi, kechikkanlari qizil rangda",
+        "Dashboarddagi vazifani bosish darhol kerakli reglamentni ochadi",
+        "Xodim kabineti sahifasi katta ekranlarda kengroq va bo'shroq bo'ldi",
+        "Endi profil rasmini o'zingiz o'z kabinetingizdan o'zgartira olasiz — faqat administrator orqali emas",
+      ],
+    },
+    {
       version: '0.2.2',
       items: [
         "Sozlamalarda allaqachon ishlayotgan ilovani serverga ulash imkoniyati paydo bo'ldi — avval bu faqat birinchi o'rnatishda mavjud edi",
@@ -513,6 +571,35 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.2.5',
+      items: [
+        "Билдиришномалар энди Windows'нинг табиий ойначасида ҳам кўрсатилади — қўнғироқчани доим текшириб туриш шарт эмас",
+        "Блогда ўз мавзусини ўчириш энди унинг муаллифига ҳам рухсат, фақат администраторга эмас",
+        'Блог изоҳлар ойнасида юбориш формаси олдидаги катта бўш жой тузатилди',
+      ],
+    },
+    {
+      version: '0.2.4',
+      items: [
+        "Сервер режимидаги жиддий хато тузатилди: регламент/лойиҳага ходим қўшиш ва бошқа бировнинг кабинетини очиш тармоқ орқали уланганда ишламасди",
+        'Серверга уланганда ҳақиқий хато матни энди кўринади, умумий "сақлаб бўлмади" ўрнига',
+        "Регламент/лойиҳага иштирокчи қўшишни энди нафақат эгаси, балки \"Ёрдамчи\" ролидаги иштирокчи ҳам қила олади",
+        "Регламент/лойиҳанинг исталган иштирокчиси энди ҳамкасбининг тредига ўтиши мумкин — кўриш, жавоб бериш, вазифа қўйиш (аввал фақат эгаси/ўзига)",
+        "Вазифа/хабарга ҳавола энди босиладиган бўлди ва дарҳол керакли регламент/лойиҳани керакли ёзувга айлантириб очади",
+        "Тармоқ носозлигида юкланишда осилиб қолган саҳифалар энди \"Қайта уриниш\" тугмаси билан хатони кўрсатади",
+      ],
+    },
+    {
+      version: '0.2.3',
+      items: [
+        "Бош саҳифа энди ҳақиқий дашборд: ходимлар, фаол регламентлар, лойиҳалар ва мижозлар сони — босиш орқали ўтиш билан",
+        "\"Регламентлардаги вазифаларим\" виджети — нечта очиқ вазифангиз бор, муддати яқинлари биринчи кўрсатилади, кечикканлари қизил рангда",
+        "Дашборддаги вазифани босиш дарҳол керакли регламентни очади",
+        "Ходим кабинети саҳифаси катта экранларда кенгроқ ва бўшроқ бўлди",
+        "Энди профиль расмини ўзингиз ўз кабинетингиздан ўзгартира оласиз — фақат администратор орқали эмас",
+      ],
+    },
     {
       version: '0.2.2',
       items: [

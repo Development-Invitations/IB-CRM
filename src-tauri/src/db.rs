@@ -218,6 +218,17 @@ pub struct RegulationEntryRecord {
     pub reply_count: i64,
 }
 
+pub struct MyTaskRecord {
+    pub entry_id: String,
+    pub regulation_id: String,
+    pub reg_number: String,
+    pub regulation_title: String,
+    pub slug: String,
+    pub content: String,
+    pub deadline: Option<String>,
+    pub created_at: String,
+}
+
 pub struct RegulationReplyRecord {
     pub id: String,
     pub entry_id: String,
@@ -1646,6 +1657,17 @@ impl Db {
         self.get_employee(employee_id).ok_or_else(|| "Сотрудник не найден".to_string())
     }
 
+    // Фото профиля — единственное поле, которое сотрудник может менять сам в
+    // любой момент, без выдачи временного доступа админом (в отличие от ФИО/
+    // телефона выше): это чисто косметическая правка, не влияющая на данные,
+    // которыми оперируют другие модули (отчёты, поиск и т.д.).
+    pub fn update_own_avatar(&self, employee_id: &str, avatar_data: Option<&str>) -> Result<EmployeeRecord, String> {
+        self.conn
+            .execute("UPDATE employees SET avatar_data = ?1 WHERE id = ?2", params![avatar_data, employee_id])
+            .map_err(|e| e.to_string())?;
+        self.get_employee(employee_id).ok_or_else(|| "Сотрудник не найден".to_string())
+    }
+
     // ---- Ручной статус сотрудника ("Отошёл на 15 мин", "Обед", "Отпуск", "Отгул") ----
     // Отдельно от онлайн/офлайн (тот вычисляется по сессиям автоматически) — это то,
     // что сотрудник сам про себя указывает, по аналогии со статусом в Slack/Teams.
@@ -1932,6 +1954,23 @@ impl Db {
         self.is_admin(actor_id) || owner_id == actor_id
     }
 
+    // Добавлять новых участников в проект может владелец (создатель) или
+    // тот, кому владелец назначил роль "Помощник" — обычный "Участник"
+    // добавлять других не может. По прямому запросу пользователя.
+    fn can_add_project_members(&self, actor_id: &str, project: &ProjectRecord) -> bool {
+        if self.is_admin(actor_id) || project.owner_id == actor_id {
+            return true;
+        }
+        self.conn
+            .query_row(
+                "SELECT role_in_project FROM project_members WHERE project_id = ?1 AND employee_id = ?2",
+                params![project.id, actor_id],
+                |row| row.get::<_, String>(0),
+            )
+            .map(|role| role == "assistant")
+            .unwrap_or(false)
+    }
+
     fn is_project_participant(&self, actor_id: &str, project: &ProjectRecord) -> bool {
         if self.is_admin(actor_id) || project.owner_id == actor_id {
             return true;
@@ -2073,8 +2112,8 @@ impl Db {
 
     pub fn add_project_member(&self, actor_id: &str, project_id: &str, employee_id: &str, role: &str) -> Result<(), String> {
         let project = self.get_project(project_id).ok_or_else(|| "Проект не найден".to_string())?;
-        if !self.can_manage_project(actor_id, &project.owner_id) {
-            return Err("Недостаточно прав".into());
+        if !self.can_add_project_members(actor_id, &project) {
+            return Err("Добавлять участников может только владелец проекта или помощник".into());
         }
         if !["member", "assistant"].contains(&role) {
             return Err("Некорректная роль".into());
@@ -2501,6 +2540,24 @@ impl Db {
         Ok(())
     }
 
+    // Добавлять новых участников в регламент может владелец (создатель) или
+    // тот, кому владелец назначил роль "Помощник" — обычный "Участник"
+    // добавлять других не может. По прямому запросу пользователя, зеркально
+    // такому же правилу для проектов (см. can_add_project_members).
+    fn can_add_regulation_members(&self, actor_id: &str, reg: &RegulationRecord) -> bool {
+        if self.is_admin(actor_id) || reg.owner_id == actor_id {
+            return true;
+        }
+        self.conn
+            .query_row(
+                "SELECT role_in_reg FROM regulation_members WHERE regulation_id = ?1 AND employee_id = ?2",
+                params![reg.id, actor_id],
+                |row| row.get::<_, String>(0),
+            )
+            .map(|role| role == "assistant")
+            .unwrap_or(false)
+    }
+
     pub fn list_regulation_members(&self, regulation_id: &str) -> Vec<RegulationMemberRecord> {
         let mut stmt = match self.conn.prepare(
             "SELECT rm.employee_id, e.full_name, rm.role_in_reg, rm.added_at
@@ -2524,8 +2581,11 @@ impl Db {
 
     pub fn add_regulation_member(&self, actor_id: &str, regulation_id: &str, employee_id: &str, role: &str) -> Result<(), String> {
         let reg = self.get_regulation(regulation_id).ok_or_else(|| "Регламент не найден".to_string())?;
-        if !self.is_admin(actor_id) && reg.owner_id != actor_id {
-            return Err("Недостаточно прав".into());
+        if !self.can_add_regulation_members(actor_id, &reg) {
+            return Err("Добавлять участников может только владелец регламента или помощник".into());
+        }
+        if !["member", "assistant"].contains(&role) {
+            return Err("Некорректная роль".into());
         }
         self.conn
             .execute(
@@ -2589,6 +2649,37 @@ impl Db {
                 created_at: row.get(11)?,
                 updated_at: row.get(12)?,
                 reply_count: row.get(13)?,
+            })
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default()
+    }
+
+    // Открытые задачи сотрудника по всем регламентам сразу — для виджета
+    // "Мои срочные задачи" на дашборде. Сортировка: без дедлайна — в конец,
+    // иначе ближайший дедлайн первым (просроченные тоже окажутся первыми,
+    // т.к. их дата раньше текущей).
+    pub fn list_my_open_tasks(&self, employee_id: &str) -> Vec<MyTaskRecord> {
+        let mut stmt = match self.conn.prepare(
+            "SELECT e.id, e.regulation_id, r.reg_number, r.title, r.slug, e.content, e.deadline, e.created_at
+             FROM regulation_entries e
+             JOIN regulations r ON r.id = e.regulation_id
+             WHERE e.target_employee_id = ?1 AND e.status = 'open' AND r.status = 'active'
+             ORDER BY CASE WHEN e.deadline IS NULL THEN 1 ELSE 0 END, e.deadline ASC, e.created_at ASC",
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map(params![employee_id], |row| {
+            Ok(MyTaskRecord {
+                entry_id: row.get(0)?,
+                regulation_id: row.get(1)?,
+                reg_number: row.get(2)?,
+                regulation_title: row.get(3)?,
+                slug: row.get(4)?,
+                content: row.get(5)?,
+                deadline: row.get(6)?,
+                created_at: row.get(7)?,
             })
         })
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
@@ -2985,8 +3076,11 @@ impl Db {
         Ok(())
     }
 
-    pub fn delete_blog_topic(&self, admin_id: &str, id: &str) -> Result<(), String> {
-        if !self.is_admin(admin_id) {
+    pub fn delete_blog_topic(&self, actor_id: &str, id: &str) -> Result<(), String> {
+        let topic = self.get_blog_topic(id).ok_or_else(|| "Тема не найдена".to_string())?;
+        // Удалять тему может её автор или админ — по прямому запросу
+        // пользователя (раньше было только у админа).
+        if !self.is_admin(actor_id) && topic.created_by != actor_id {
             return Err("Недостаточно прав".into());
         }
         self.conn.execute("DELETE FROM blog_comments WHERE topic_id = ?1", params![id]).ok();

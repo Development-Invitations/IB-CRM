@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, ChangeEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Phone, Briefcase, Building2, UserCog, Users, Clock, Send, Calendar, History, CalendarPlus, Cake } from 'lucide-react';
+import { ArrowLeft, Phone, Briefcase, Building2, UserCog, Users, Clock, Send, Calendar, History, CalendarPlus, Cake, Camera, X } from 'lucide-react';
 import { api, type Employee, type Session, type AbsenceRequest } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
@@ -8,6 +8,7 @@ import { formatUzPhone } from '../lib/phone';
 import { parseSqliteUtc, formatLocalDate } from '../lib/date';
 import { ABSENCE_TYPE_LABEL_KEYS, formatDate } from '../lib/absenceTypes';
 import { formatWorkDays } from '../lib/schedule';
+import { compressImageFile } from '../lib/photo';
 import Avatar from '../components/Avatar';
 import Checkbox from '../components/Checkbox';
 import StatusBadge from '../components/StatusBadge';
@@ -26,18 +27,23 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
   const [absenceRequests, setAbsenceRequests] = useState<AbsenceRequest[]>([]);
   const [absenceFormOpen, setAbsenceFormOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const load = () => {
     if (!id) return;
     setLoading(true);
-    Promise.all([api.getEmployee(id), api.listRecentSessions(id), api.listAbsenceRequestsForEmployee(id)]).then(
-      ([emp, sess, absences]) => {
+    setLoadError(false);
+    Promise.all([api.getEmployee(id), api.listRecentSessions(id), api.listAbsenceRequestsForEmployee(id)])
+      .then(([emp, sess, absences]) => {
         setEmployee(emp);
         setSessions(sess);
         setAbsenceRequests(absences);
         setLoading(false);
-      }
-    );
+      })
+      .catch(() => {
+        setLoading(false);
+        setLoadError(true);
+      });
   };
 
   useEffect(() => {
@@ -47,6 +53,39 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
 
   const isOwnProfile = currentEmployee.id === id;
   const selfEditActive = !!employee?.selfEditUntil && parseSqliteUtc(employee.selfEditUntil) > new Date();
+
+  // ---- Своё фото профиля — можно менять в любой момент, без выдачи доступа ----
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+
+  const handleAvatarChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !employee) return;
+    setAvatarBusy(true);
+    try {
+      const compressed = await compressImageFile(file);
+      await api.updateOwnAvatar({ employeeId: employee.id, avatarData: compressed });
+      load();
+    } catch {
+      showToast('error', t('employees.avatarError'));
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
+  const handleAvatarRemove = async () => {
+    if (!employee) return;
+    setAvatarBusy(true);
+    try {
+      await api.updateOwnAvatar({ employeeId: employee.id, avatarData: null });
+      load();
+    } catch {
+      showToast('error', t('employees.avatarError'));
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
 
   // ---- Режим "временный доступ выдан" — редактирование прямо тут ----
   const [editFullName, setEditFullName] = useState('');
@@ -125,13 +164,51 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
 
       {loading ? (
         <LoadingScreen compact />
+      ) : loadError ? (
+        <div className="load-error-block">
+          <p className="settings-hint">{t('common.loadError')}</p>
+          <button className="modal-btn" onClick={load}>{t('common.retryBtn')}</button>
+        </div>
       ) : !employee ? (
         <p className="settings-hint">{t('employees.notFound')}</p>
       ) : (
         <div className="profile-card">
           <div className="profile-card-banner" />
           <div className="profile-card-head">
-            <Avatar name={employee.fullName || employee.login} size={84} src={employee.avatarData} />
+            <div className="profile-avatar-wrap">
+              <Avatar name={employee.fullName || employee.login} size={84} src={employee.avatarData} />
+              {isOwnProfile && (
+                <>
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={handleAvatarChange}
+                  />
+                  <button
+                    type="button"
+                    className="profile-avatar-edit-btn"
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={avatarBusy}
+                    title={t('employees.avatarUploadBtn')}
+                  >
+                    <Camera size={14} />
+                  </button>
+                  {employee.avatarData && (
+                    <button
+                      type="button"
+                      className="profile-avatar-remove-btn"
+                      onClick={handleAvatarRemove}
+                      disabled={avatarBusy}
+                      title={t('employees.avatarRemoveBtn')}
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
             <div>
               <h1>{employee.fullName || employee.login}</h1>
               <p className="settings-hint">

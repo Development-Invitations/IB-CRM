@@ -32,11 +32,16 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
 
   const load = () => {
     setLoading(true);
-    api.listClients().then((list) => {
-      setClients(list);
-      setLoading(false);
-      setSelected((prev) => (prev ? list.find((c) => c.id === prev.id) ?? null : null));
-    });
+    api.listClients()
+      .then((list) => {
+        setClients(list);
+        setLoading(false);
+        setSelected((prev) => (prev ? list.find((c) => c.id === prev.id) ?? null : null));
+      })
+      .catch(() => {
+        setLoading(false);
+        showToast('error', t('common.loadError'));
+      });
   };
 
   useEffect(() => {
@@ -53,11 +58,16 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
     Promise.all([
       api.listClientHistory(selected.id),
       api.listRegulations(),
-    ]).then(([entries, allRegs]) => {
-      setHistory(entries);
-      setClientRegs(allRegs.filter((r) => r.clientId === selected.id));
-      setHistoryLoading(false);
-    });
+    ])
+      .then(([entries, allRegs]) => {
+        setHistory(entries);
+        setClientRegs(allRegs.filter((r) => r.clientId === selected.id));
+        setHistoryLoading(false);
+      })
+      .catch(() => {
+        setHistoryLoading(false);
+        showToast('error', t('common.loadError'));
+      });
   }, [selected?.id]);
 
   const openCreate = () => {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Cake, PartyPopper } from 'lucide-react';
 import { api, type Employee } from '../lib/api';
 import { useLocale } from '../lib/i18n';
+import { useToast } from '../lib/toast';
 import Avatar from '../components/Avatar';
 import LoadingScreen from '../components/LoadingScreen';
 

@@ -34,12 +34,17 @@ export default function AbsenceRequestsPage({ currentEmployee }: { currentEmploy
     ];
     if (currentEmployee.isAdmin) calls.push(api.listAllAbsenceRequests(currentEmployee.id));
 
-    Promise.all(calls).then((results) => {
-      setMyRequests(results[0]);
-      setPending(results[1]);
-      if (currentEmployee.isAdmin && results[2]) setAllRequests(results[2]);
-      setLoading(false);
-    });
+    Promise.all(calls)
+      .then((results) => {
+        setMyRequests(results[0]);
+        setPending(results[1]);
+        if (currentEmployee.isAdmin && results[2]) setAllRequests(results[2]);
+        setLoading(false);
+      })
+      .catch(() => {
+        setLoading(false);
+        showToast('error', t('common.loadError'));
+      });
   };
 
   useEffect(() => {

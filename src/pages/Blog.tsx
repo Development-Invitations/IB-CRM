@@ -53,11 +53,16 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
 
   const load = () => {
     setLoading(true);
-    api.listBlogTopics().then((list) => {
-      setTopics(list);
-      setLoading(false);
-      setSelected((prev) => (prev ? list.find((x) => x.id === prev.id) ?? null : null));
-    });
+    api.listBlogTopics()
+      .then((list) => {
+        setTopics(list);
+        setLoading(false);
+        setSelected((prev) => (prev ? list.find((x) => x.id === prev.id) ?? null : null));
+      })
+      .catch(() => {
+        setLoading(false);
+        showToast('error', t('common.loadError'));
+      });
   };
 
   useEffect(() => { load(); }, []);
@@ -70,10 +75,15 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
   const loadComments = () => {
     if (!selected) return;
     setDetailLoading(true);
-    api.listBlogComments(selected.id).then((list) => {
-      setComments(list);
-      setDetailLoading(false);
-    });
+    api.listBlogComments(selected.id)
+      .then((list) => {
+        setComments(list);
+        setDetailLoading(false);
+      })
+      .catch(() => {
+        setDetailLoading(false);
+        showToast('error', t('common.loadError'));
+      });
   };
 
   useEffect(() => { loadComments(); setReplyTo(null); }, [selected?.id]); // eslint-disable-line
@@ -140,7 +150,7 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
     if (!selected) return;
     setDeleteBusy(true);
     try {
-      await api.deleteBlogTopic({ adminId: currentEmployee.id, id: selected.id });
+      await api.deleteBlogTopic({ actorId: currentEmployee.id, id: selected.id });
       showToast('success', t('blog.deleted'));
       setDeleteConfirmOpen(false);
       setSelected(null);
@@ -192,7 +202,7 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
               </button>
             )}
             {canEditTopic && <button className="modal-btn" onClick={() => openEdit(selected)}><Pencil size={14} /></button>}
-            {currentEmployee.isAdmin && (
+            {(currentEmployee.isAdmin || canEditTopic) && (
               <button className="modal-btn danger" onClick={() => setDeleteConfirmOpen(true)}><Trash2 size={14} /></button>
             )}
           </div>

@@ -97,7 +97,7 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
         <Topbar employee={employee} />
         <main className="content">
           <Routes>
-            <Route index element={<Home />} />
+            <Route index element={<Home employee={employee} />} />
             <Route path="employees" element={<EmployeesPage currentEmployee={employee} />} />
             <Route path="employees/:id" element={<EmployeeProfile currentEmployee={employee} />} />
             <Route path="departments" element={<DepartmentsPage currentEmployee={employee} />} />

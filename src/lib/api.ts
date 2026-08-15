@@ -14,7 +14,14 @@ async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
 
   const serverUrl = connection.getServerUrl();
   if (!serverUrl) {
-    throw new Error('Не задан адрес сервера');
+    // Кидаем именно строку, а не Error — весь остальной код (все catch-блоки
+    // по всему приложению) писался под конвенцию локального Tauri IPC, где
+    // ошибка Rust-команды (Result<T, String>) приходит в JS как голая строка,
+    // а не объект Error. Если тут бросить Error, каждый `typeof err ===
+    // 'string' ? err : ...` по всему приложению перестаёт находить реальный
+    // текст ошибки и молча показывает общий фоллбэк — так и произошло, пока
+    // это не поправили.
+    throw 'Не задан адрес сервера';
   }
 
   // Tauri сам решает, как разложить args по параметрам Rust-команды: если
@@ -29,26 +36,36 @@ async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
   const token = sessionToken.get();
   if (token) headers['X-Session-Token'] = token;
 
+  // Таймаут на сетевой запрос — без него зависшее соединение (сервер не
+  // отвечает, но и не рвёт TCP-соединение явно) вешало бы страницу в
+  // состоянии "загрузка" навсегда, даже после того как все catch-блоки по
+  // всему приложению уже научились обрабатывать реальные ошибки.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
   let response: Awaited<ReturnType<typeof tauriFetch>>;
   try {
     response = await tauriFetch(`${serverUrl}/api/invoke`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ command: cmd, payload: body }),
+      signal: controller.signal,
     });
   } catch {
-    throw new Error('Нет соединения с сервером');
+    throw 'Нет соединения с сервером';
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   let result: { ok: boolean; data?: T; error?: string; token?: string };
   try {
     result = await response.json();
   } catch {
-    throw new Error(`Сервер вернул некорректный ответ (HTTP ${response.status})`);
+    throw `Сервер вернул некорректный ответ (HTTP ${response.status})`;
   }
 
   if (result.token) sessionToken.set(result.token);
-  if (!result.ok) throw new Error(result.error || 'Ошибка сервера');
+  if (!result.ok) throw result.error || 'Ошибка сервера';
   return result.data as T;
 }
 
@@ -153,7 +170,7 @@ export type ProjectChatReply = {
 
 export type RegulationStatus = 'active' | 'closed';
 export type RegulationEntryStatus = 'open' | 'done' | 'cancelled';
-export type RegulationMemberRole = 'owner' | 'member';
+export type RegulationMemberRole = 'owner' | 'member' | 'assistant';
 
 export type Regulation = {
   id: string;
@@ -198,6 +215,17 @@ export type RegulationEntry = {
   createdAt: string;
   updatedAt: string;
   replyCount: number;
+};
+
+export type MyTask = {
+  entryId: string;
+  regulationId: string;
+  regNumber: string;
+  regulationTitle: string;
+  slug: string;
+  content: string;
+  deadline: string | null;
+  createdAt: string;
 };
 
 export type RegulationReply = {
@@ -403,6 +431,9 @@ export const api = {
   selfUpdateEmployee: (payload: { employeeId: string; fullName: string; phone?: string | null }) =>
     invoke<Employee>('self_update_employee', { payload }),
 
+  updateOwnAvatar: (payload: { employeeId: string; avatarData: string | null }) =>
+    invoke<Employee>('update_own_avatar', { payload }),
+
   setEmployeeStatus: (payload: { employeeId: string; status: EmployeeStatus | null }) =>
     invoke<Employee>('set_employee_status', { payload }),
 
@@ -534,6 +565,7 @@ export const api = {
     invoke<void>('remove_regulation_member', { payload }),
 
   listRegulationEntries: (regulationId: string) => invoke<RegulationEntry[]>('list_regulation_entries', { regulationId }),
+  listMyOpenTasks: (employeeId: string) => invoke<MyTask[]>('list_my_open_tasks', { employeeId }),
   addRegulationEntry: (payload: { actorId: string; regulationId: string; targetEmployeeId: string; content: string; attachmentData?: string | null; attachmentName?: string | null; deadline?: string | null }) =>
     invoke<RegulationEntry>('add_regulation_entry', { payload }),
   assignRegulationEntry: (payload: { actorId: string; entryId: string; targetEmployeeId: string; deadline?: string | null }) =>
@@ -567,7 +599,7 @@ export const api = {
     invoke<BlogTopic>('update_blog_topic', { payload }),
   setBlogTopicPinned: (payload: { adminId: string; id: string; pinned: boolean }) =>
     invoke<void>('set_blog_topic_pinned', { payload }),
-  deleteBlogTopic: (payload: { adminId: string; id: string }) => invoke<void>('delete_blog_topic', { payload }),
+  deleteBlogTopic: (payload: { actorId: string; id: string }) => invoke<void>('delete_blog_topic', { payload }),
   listBlogComments: (topicId: string) => invoke<BlogComment[]>('list_blog_comments', { topicId }),
   addBlogComment: (payload: { actorId: string; topicId: string; content: string; replyToId?: string | null }) =>
     invoke<BlogComment>('add_blog_comment', { payload }),

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, Settings as SettingsIcon, User } from 'lucide-react';
+import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import { api, type Employee, type Notification } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import EditRequestReviewModal from './EditRequestReviewModal';
@@ -15,8 +16,48 @@ export default function Topbar({ employee }: { employee: Employee }) {
   const [reviewRequestId, setReviewRequestId] = useState<string | null>(null);
   const [reviewAbsenceId, setReviewAbsenceId] = useState<string | null>(null);
 
+  // Разрешение на нативные уведомления Windows запрашиваем один раз при
+  // монтировании, не на каждый опрос. `null` — ещё не знаем, `true`/`false` —
+  // результат (или тихий отказ, если плагин недоступен вне Tauri-контекста).
+  const osPermissionRef = useRef<boolean | null>(null);
+  // id уведомлений, уже показанных как нативный тост — чтобы не дублировать
+  // при каждом опросе, и чтобы НЕ засыпать пользователя пачкой старых
+  // уведомлений при первом запуске (уведомляем только про новые после старта).
+  const seenIdsRef = useRef<Set<string> | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        let granted = await isPermissionGranted();
+        if (!granted) {
+          const perm = await requestPermission();
+          granted = perm === 'granted';
+        }
+        osPermissionRef.current = granted;
+      } catch {
+        osPermissionRef.current = false;
+      }
+    })();
+  }, []);
+
   const loadNotifications = () => {
-    api.listNotifications(employee.id).then(setNotifications);
+    api.listNotifications(employee.id)
+      .then((list) => {
+        setNotifications(list);
+        const unreadIds = list.filter((n) => !n.isRead);
+        if (seenIdsRef.current === null) {
+          seenIdsRef.current = new Set(unreadIds.map((n) => n.id));
+        } else {
+          const newOnes = unreadIds.filter((n) => !seenIdsRef.current!.has(n.id));
+          if (newOnes.length > 0 && osPermissionRef.current) {
+            for (const n of newOnes) {
+              sendNotification({ title: n.title, body: n.body ?? undefined });
+            }
+          }
+          seenIdsRef.current = new Set(unreadIds.map((n) => n.id));
+        }
+      })
+      .catch(() => {});
   };
 
   useEffect(() => {

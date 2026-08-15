@@ -1,12 +1,13 @@
 import { useEffect, useState, useRef, useCallback, useContext } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate, type NavigateFunction } from 'react-router-dom';
 import { FullscreenContext } from './Dashboard';
 import { Plus, Pencil, FileText, Trash2, UserPlus, X, Paperclip, CheckSquare, XSquare, RotateCcw, ChevronDown, ChevronRight, Search, Copy, Check, ArrowLeft, Link2, Bell, CalendarClock, MoreVertical, Forward } from 'lucide-react';
-import { api, type Employee, type Regulation, type RegulationMember, type RegulationEntry, type RegulationReply, type RegulationStatus, type RegulationEntryStatus, type Client } from '../lib/api';
+import { api, type Employee, type Regulation, type RegulationMember, type RegulationMemberRole, type RegulationEntry, type RegulationReply, type RegulationStatus, type RegulationEntryStatus, type Client } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
 import { parseSqliteUtc } from '../lib/date';
 import { prepareAttachment, classifyAttachment } from '../lib/attachment';
+import { buildRegulationEntryLink, linkifyEntryContent } from '../lib/entryLink';
 import Modal from '../components/Modal';
 import Select from '../components/Select';
 import SearchableSelect from '../components/SearchableSelect';
@@ -60,6 +61,7 @@ function EntryRow({
   onAssign: (entryId: string, targetEmployeeId: string, deadline: string) => Promise<void>;
   t: (k: string) => string;
 }) {
+  const navigate = useNavigate();
   const [replies, setReplies] = useState<RegulationReply[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [replyText, setReplyText] = useState('');
@@ -94,7 +96,7 @@ function EntryRow({
   };
 
   const handleCopyLink = () => {
-    const url = `${window.location.href.split('#')[0]}#entry-${entry.id}`;
+    const url = buildRegulationEntryLink(entry.regulationId, entry.id);
     navigator.clipboard.writeText(url).then(() => {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
@@ -159,7 +161,7 @@ function EntryRow({
           </div>
         </div>
 
-        <div className="reg-entry-content">{entry.content}</div>
+        <div className="reg-entry-content">{linkifyEntryContent(entry.content, navigate)}</div>
 
         <div className="reg-chat-chips">
           <span className={`absence-status reg-entry-badge-${entry.status}`}>{t(ENTRY_STATUS_KEYS[entry.status])}</span>
@@ -200,7 +202,7 @@ function EntryRow({
                   <strong>{r.authorName}</strong>
                   <span className="settings-hint">{parseSqliteUtc(r.createdAt).toLocaleString()}</span>
                 </div>
-                <div>{r.content}</div>
+                <div>{linkifyEntryContent(r.content, navigate)}</div>
               </div>
             ))}
             {!isClosed && (
@@ -260,6 +262,7 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
   const [deleteBusy, setDeleteBusy] = useState(false);
 
   const [addMemberId, setAddMemberId] = useState('');
+  const [addMemberRole, setAddMemberRole] = useState<RegulationMemberRole>('member');
   const [addMemberBusy, setAddMemberBusy] = useState(false);
 
   const [newEntry, setNewEntry] = useState('');
@@ -297,14 +300,19 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
 
   const load = useCallback(() => {
     setLoading(true);
-    Promise.all([api.listRegulations(), api.listClients(), api.listEmployees()]).then(([regs, cls, emps]) => {
-      setRegulations(regs);
-      setClients(cls);
-      setEmployees(emps);
-      setLoading(false);
-      setSelected((prev) => (prev ? regs.find((r) => r.id === prev.id) ?? null : null));
-      // Если был открыт регламент — остаёмся в fullscreen
-    });
+    Promise.all([api.listRegulations(), api.listClients(), api.listEmployees()])
+      .then(([regs, cls, emps]) => {
+        setRegulations(regs);
+        setClients(cls);
+        setEmployees(emps);
+        setLoading(false);
+        setSelected((prev) => (prev ? regs.find((r) => r.id === prev.id) ?? null : null));
+        // Если был открыт регламент — остаёмся в fullscreen
+      })
+      .catch(() => {
+        setLoading(false);
+        showToast('error', t('common.loadError'));
+      });
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -328,25 +336,36 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
   const loadDetail = useCallback(() => {
     if (!selected) return;
     setDetailLoading(true);
-    Promise.all([api.listRegulationMembers(selected.id), api.listRegulationEntries(selected.id)]).then(([m, e]) => {
-      setMembers(m);
-      setEntries(e);
-      setDetailLoading(false);
-      // Прокручиваем к якорю из URL если есть
-      const hash = window.location.hash;
-      if (hash.startsWith('#entry-')) {
-        setTimeout(() => {
-          const el = document.getElementById(hash.slice(1));
-          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 100);
-      }
-    });
+    Promise.all([api.listRegulationMembers(selected.id), api.listRegulationEntries(selected.id)])
+      .then(([m, e]) => {
+        setMembers(m);
+        setEntries(e);
+        setDetailLoading(false);
+      })
+      .catch(() => {
+        setDetailLoading(false);
+        showToast('error', t('common.loadError'));
+      });
   }, [selected?.id]); // eslint-disable-line
 
   useEffect(() => { loadDetail(); }, [loadDetail]);
 
   // При открытии регламента (или переключении на другой) — сбрасываем на свой тред
   useEffect(() => { setActiveThreadId(currentEmployee.id); }, [selected?.id]); // eslint-disable-line
+
+  // Переход по ссылке на конкретную запись (см. lib/entryLink.tsx) — как
+  // только записи загрузились, переключаемся на тред нужного участника и
+  // прокручиваем к самой записи.
+  useEffect(() => {
+    const openEntryId = (location.state as any)?.openEntryId;
+    if (!openEntryId || entries.length === 0) return;
+    const entry = entries.find((e) => e.id === openEntryId);
+    if (!entry) return;
+    setActiveThreadId(entry.targetEmployeeId);
+    setTimeout(() => {
+      document.getElementById(`entry-${entry.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+  }, [entries, location.state]);
 
   const filtered = search.trim()
     ? regulations.filter((r) => {
@@ -360,6 +379,10 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
     !!selected &&
     (currentEmployee.isAdmin || selected.ownerId === currentEmployee.id || members.some((m) => m.employeeId === currentEmployee.id));
   const isClosed = selected?.status === 'closed';
+  // Добавлять участников может владелец/админ (isManager) или тот, кому
+  // владелец назначил роль "Помощник" — по прямому запросу пользователя.
+  const myRegRole = members.find((m) => m.employeeId === currentEmployee.id)?.roleInReg;
+  const canAddMembers = isManager || myRegRole === 'assistant';
 
   const openCreate = () => {
     setEditingReg(undefined);
@@ -434,12 +457,13 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
     try {
       const addedId = addMemberId;
       const addedOption = memberOptions.find((o) => o.value === addedId);
-      await api.addRegulationMember({ actorId: currentEmployee.id, regulationId: selected.id, employeeId: addedId, role: 'member' });
+      await api.addRegulationMember({ actorId: currentEmployee.id, regulationId: selected.id, employeeId: addedId, role: addMemberRole });
       showToast('success', t('regulations.memberAdded'));
       setAddMemberId('');
+      setAddMemberRole('member');
       loadDetail(); load();
       if (addedOption) {
-        setFirstTaskFor({ employeeId: addedId, employeeName: addedOption.label, roleInReg: 'member', addedAt: '' });
+        setFirstTaskFor({ employeeId: addedId, employeeName: addedOption.label, roleInReg: addMemberRole, addedAt: '' });
         setFirstTaskDesc('');
         setFirstTaskDeadline('');
       }
@@ -618,9 +642,10 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
 
             <div className="reg-sidebar-section">
               <div className="department-members-title">{t('regulations.membersTitle')}</div>
-              {isManager && (
-                <div className="regulation-add-member">
+              {canAddMembers && (
+                <div className="department-add-member-row">
                   <SearchableSelect value={addMemberId} options={memberOptions} onChange={setAddMemberId} searchPlaceholder={t('employees.searchPlaceholder')} emptyLabel={t('employees.searchEmpty')} />
+                  <Select value={addMemberRole} options={[{ value: 'member', label: t('regulations.roleMember') }, { value: 'assistant', label: t('regulations.roleAssistant') }]} onChange={(v) => setAddMemberRole(v as RegulationMemberRole)} />
                   <button className="modal-btn" onClick={handleAddMember} disabled={!addMemberId || addMemberBusy}><UserPlus size={14} /></button>
                 </div>
               )}
@@ -640,7 +665,12 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
                       .filter((e) => e.deadline)
                       .sort((a, b) => a.deadline!.localeCompare(b.deadline!))
                       .at(0)?.deadline;
-                    const canSwitch = isManager || m.employeeId === currentEmployee.id;
+                    // Любой участник может переключиться в тред любого другого
+                    // участника — смотреть его задачи, отвечать, назначать
+                    // новые. Раньше это было доступно только владельцу/админу
+                    // или самому себе — по прямому запросу пользователя открыто
+                    // всем участникам регламента.
+                    const canSwitch = isParticipant;
                     const isActive = activeThreadId === m.employeeId;
                     const isPopoverOpen = memberMenuId === m.employeeId;
 
@@ -655,6 +685,7 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
                           <span className="reg-member-name">
                             {m.employeeName}
                             {m.roleInReg === 'owner' && <span className="role-badge role-badge-head" style={{ marginLeft: 6 }}>{t('regulations.roleOwner')}</span>}
+                            {m.roleInReg === 'assistant' && <span className="role-badge role-badge-deputy" style={{ marginLeft: 6 }}>{t('regulations.roleAssistant')}</span>}
                           </span>
                           {hasOverdue && <span className="reg-deadline-dot overdue" title={t('regulations.overdueHint')}>!</span>}
                           {hasDueSoon && !hasOverdue && <span className="reg-deadline-dot due-soon" title={t('regulations.dueSoonHint')}>~</span>}
@@ -830,7 +861,10 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
               const isOwnThread = activeThreadId === currentEmployee.id;
               const openCount = threadEntries.filter((e) => e.status === 'open').length;
               const doneCount = threadEntries.filter((e) => e.status === 'done').length;
-              const canPost = !isClosed && isParticipant && (isOwnThread || isManager);
+              // Раньше писать/отвечать/назначать задачи можно было только в
+              // своём треде или если ты владелец/админ — теперь любой участник
+              // может писать в тред любого другого участника.
+              const canPost = !isClosed && isParticipant;
 
               return (
                 <>

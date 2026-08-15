@@ -348,6 +348,23 @@ struct RegulationEntry {
 }
 
 #[derive(Clone, serde::Serialize)]
+struct MyTask {
+    #[serde(rename = "entryId")]
+    entry_id: String,
+    #[serde(rename = "regulationId")]
+    regulation_id: String,
+    #[serde(rename = "regNumber")]
+    reg_number: String,
+    #[serde(rename = "regulationTitle")]
+    regulation_title: String,
+    slug: String,
+    content: String,
+    deadline: Option<String>,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+}
+
+#[derive(Clone, serde::Serialize)]
 struct RegulationReply {
     id: String,
     #[serde(rename = "entryId")]
@@ -890,8 +907,8 @@ struct SetBlogTopicPinnedPayload {
 
 #[derive(serde::Deserialize)]
 struct DeleteBlogTopicPayload {
-    #[serde(rename = "adminId")]
-    admin_id: String,
+    #[serde(rename = "actorId")]
+    actor_id: String,
     id: String,
 }
 
@@ -935,6 +952,14 @@ struct SelfUpdateEmployeePayload {
     #[serde(rename = "fullName")]
     full_name: String,
     phone: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct UpdateOwnAvatarPayload {
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+    #[serde(rename = "avatarData")]
+    avatar_data: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -1122,6 +1147,14 @@ fn to_reg_entry(e: db::RegulationEntryRecord) -> RegulationEntry {
         target_employee_id: e.target_employee_id, target_name: e.target_name,
         content: e.content, attachment_data: e.attachment_data, attachment_name: e.attachment_name,
         deadline: e.deadline, status: e.status, created_at: e.created_at, updated_at: e.updated_at, reply_count: e.reply_count,
+    }
+}
+
+fn to_my_task(t: db::MyTaskRecord) -> MyTask {
+    MyTask {
+        entry_id: t.entry_id, regulation_id: t.regulation_id, reg_number: t.reg_number,
+        regulation_title: t.regulation_title, slug: t.slug, content: t.content,
+        deadline: t.deadline, created_at: t.created_at,
     }
 }
 
@@ -1374,6 +1407,12 @@ fn self_update_employee(payload: SelfUpdateEmployeePayload, state: tauri::State<
     let db = state.0.lock().unwrap();
     db.self_update_employee(&payload.employee_id, &payload.full_name, payload.phone.as_deref())
         .map(to_employee)
+}
+
+#[tauri::command]
+fn update_own_avatar(payload: UpdateOwnAvatarPayload, state: tauri::State<AppState>) -> Result<Employee, String> {
+    let db = state.0.lock().unwrap();
+    db.update_own_avatar(&payload.employee_id, payload.avatar_data.as_deref()).map(to_employee)
 }
 
 #[tauri::command]
@@ -1668,6 +1707,12 @@ fn list_regulation_entries(regulation_id: String, state: tauri::State<AppState>)
 }
 
 #[tauri::command]
+fn list_my_open_tasks(employee_id: String, state: tauri::State<AppState>) -> Vec<MyTask> {
+    let db = state.0.lock().unwrap();
+    db.list_my_open_tasks(&employee_id).into_iter().map(to_my_task).collect()
+}
+
+#[tauri::command]
 fn add_regulation_entry(payload: AddRegulationEntryPayload, state: tauri::State<AppState>) -> Result<RegulationEntry, String> {
     let db = state.0.lock().unwrap();
     db.add_regulation_entry(&payload.actor_id, &payload.regulation_id, &payload.target_employee_id, &payload.content, payload.attachment_data.as_deref(), payload.attachment_name.as_deref(), payload.deadline.as_deref())
@@ -1757,7 +1802,7 @@ fn set_blog_topic_pinned(payload: SetBlogTopicPinnedPayload, state: tauri::State
 #[tauri::command]
 fn delete_blog_topic(payload: DeleteBlogTopicPayload, state: tauri::State<AppState>) -> Result<(), String> {
     let db = state.0.lock().unwrap();
-    db.delete_blog_topic(&payload.admin_id, &payload.id)
+    db.delete_blog_topic(&payload.actor_id, &payload.id)
 }
 
 #[tauri::command]
@@ -1822,6 +1867,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir().expect("нет app data dir");
             std::fs::create_dir_all(&app_data_dir).ok();
@@ -1863,6 +1909,7 @@ fn main() {
             list_edit_requests,
             resolve_edit_request,
             self_update_employee,
+            update_own_avatar,
             set_employee_status,
             set_employee_schedule,
             create_absence_request,
@@ -1902,6 +1949,7 @@ fn main() {
             add_regulation_member,
             remove_regulation_member,
             list_regulation_entries,
+            list_my_open_tasks,
             add_regulation_entry,
             assign_regulation_entry,
             update_entry_status,

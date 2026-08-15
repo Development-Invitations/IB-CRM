@@ -49,10 +49,27 @@ struct InvokeResponse {
 // устанавливают сессию (или проверяют, есть ли вообще администратор).
 const PUBLIC_COMMANDS: &[&str] = &["has_admin", "create_admin", "login"];
 
-// Поля, которые могут быть в теле запроса и означают "от чьего имени
-// действие" — сверяем с владельцем токена, чтобы залогиненный сотрудник не
-// мог подставить чужой id и действовать от его имени.
-const ACTOR_FIELDS: &[&str] = &["actorId", "adminId", "employeeId"];
+// Поля, которые всегда означают "от чьего имени действие" — сверяем с
+// владельцем токена, чтобы залогиненный сотрудник не мог подставить чужой id
+// и действовать от его имени. Именно эти два имени по всей кодовой базе
+// последовательно означают "актёр", а не цель действия.
+const ACTOR_FIELDS: &[&str] = &["actorId", "adminId"];
+
+// В отличие от actorId/adminId, поле employeeId в разных командах означает
+// РАЗНОЕ: иногда это сам вызывающий (self-service — сменить своё фото,
+// подать заявку на отсутствие за себя), а иногда — цель чужого действия
+// (например, кого добавить в регламент/проект, кому админ правит профиль).
+// Единая проверка "employeeId всегда = вызывающий" ломала все админские
+// действия над ДРУГИМИ сотрудниками (нельзя было добавить коллегу в
+// регламент/проект — 403, потому что employeeId коллеги ≠ id админа).
+// Поэтому сверяем employeeId с владельцем токена только для команд, где
+// это поле действительно означает "сам вызывающий".
+const SELF_EMPLOYEE_ID_COMMANDS: &[&str] = &[
+    "self_update_employee",
+    "update_own_avatar",
+    "create_absence_request",
+    "create_edit_request",
+];
 
 fn unauthorized(msg: &str) -> (StatusCode, Json<InvokeResponse>) {
     (
@@ -79,8 +96,12 @@ async fn invoke_handler(
     }
 
     if let (Some(emp_id), Value::Object(map)) = (&authed_employee_id, &req.payload) {
-        for key in ACTOR_FIELDS {
-            if let Some(v) = map.get(*key) {
+        let mut fields_to_check: Vec<&str> = ACTOR_FIELDS.to_vec();
+        if SELF_EMPLOYEE_ID_COMMANDS.contains(&req.command.as_str()) {
+            fields_to_check.push("employeeId");
+        }
+        for key in fields_to_check {
+            if let Some(v) = map.get(key) {
                 if v.as_str() != Some(emp_id.as_str()) {
                     return (
                         StatusCode::FORBIDDEN,

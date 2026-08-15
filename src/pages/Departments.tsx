@@ -28,12 +28,17 @@ export default function Departments({ currentEmployee }: { currentEmployee: Empl
 
   const load = () => {
     setLoading(true);
-    Promise.all([api.listDepartments(), api.listEmployees()]).then(([deps, emps]) => {
-      setDepartments(deps);
-      setEmployees(emps);
-      setLoading(false);
-      setSelected((prev) => (prev ? deps.find((d) => d.id === prev.id) ?? null : null));
-    });
+    Promise.all([api.listDepartments(), api.listEmployees()])
+      .then(([deps, emps]) => {
+        setDepartments(deps);
+        setEmployees(emps);
+        setLoading(false);
+        setSelected((prev) => (prev ? deps.find((d) => d.id === prev.id) ?? null : null));
+      })
+      .catch(() => {
+        setLoading(false);
+        showToast('error', t('common.loadError'));
+      });
   };
 
   useEffect(() => {

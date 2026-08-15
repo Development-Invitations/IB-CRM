@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Pencil, ArrowRight } from 'lucide-react';
 import { api, type Employee, type Position, type Department, type AbsenceRequest, type Regulation } from '../lib/api';
 import { useLocale } from '../lib/i18n';
+import { useToast } from '../lib/toast';
 import { parseSqliteUtc, formatLocalDate } from '../lib/date';
 import { formatWorkDays } from '../lib/schedule';
 import { ABSENCE_TYPE_LABEL_KEYS, formatDate } from '../lib/absenceTypes';
@@ -14,6 +15,7 @@ import LoadingScreen from '../components/LoadingScreen';
 
 export default function Employees({ currentEmployee }: { currentEmployee: Employee }) {
   const { t } = useLocale();
+  const { showToast } = useToast();
   const navigate = useNavigate();
 
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -33,11 +35,13 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
       Promise.all([
         api.listAbsenceRequestsForEmployee(selected.id),
         api.listRegulations(),
-      ]).then(([absences, allRegs]) => {
-        setSelectedAbsences(absences);
-        // Показываем регламенты где сотрудник — ответственный
-        setEmpRegs(allRegs.filter((r) => r.ownerId === selected.id));
-      });
+      ])
+        .then(([absences, allRegs]) => {
+          setSelectedAbsences(absences);
+          // Показываем регламенты где сотрудник — ответственный
+          setEmpRegs(allRegs.filter((r) => r.ownerId === selected.id));
+        })
+        .catch(() => showToast('error', t('common.loadError')));
     } else {
       setSelectedAbsences([]);
       setEmpRegs([]);
@@ -46,13 +50,18 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
 
   const load = () => {
     setLoading(true);
-    Promise.all([api.listEmployees(), api.listPositions(), api.listDepartments()]).then(([emps, pos, deps]) => {
-      setEmployees(emps);
-      setPositions(pos);
-      setDepartments(deps);
-      setLoading(false);
-      setSelected((prev) => (prev ? emps.find((e) => e.id === prev.id) ?? null : null));
-    });
+    Promise.all([api.listEmployees(), api.listPositions(), api.listDepartments()])
+      .then(([emps, pos, deps]) => {
+        setEmployees(emps);
+        setPositions(pos);
+        setDepartments(deps);
+        setLoading(false);
+        setSelected((prev) => (prev ? emps.find((e) => e.id === prev.id) ?? null : null));
+      })
+      .catch(() => {
+        setLoading(false);
+        showToast('error', t('common.loadError'));
+      });
   };
 
   useEffect(() => {

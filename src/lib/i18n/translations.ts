@@ -1,6 +1,6 @@
 export const dictionaries = {
   ru: {
-    common: { loading: 'Загрузка…', cancel: 'Отмена', save: 'Сохранить', close: 'Закрыть' },
+    common: { loading: 'Загрузка…', cancel: 'Отмена', save: 'Сохранить', close: 'Закрыть', loadError: 'Не удалось загрузить данные. Проверьте соединение и попробуйте ещё раз.', retryBtn: 'Повторить' },
     firstRun: {
       title: 'Первый запуск IB CRM',
       subtitle:
@@ -64,8 +64,14 @@ export const dictionaries = {
       cabinet: 'Мой кабинет',
     },
     home: {
-      body:
-        'Это тестовая сборка v0.1.0 — офлайн-каркас приложения. Работает вход/создание администратора, смена пароля в личном кабинете и общая оболочка интерфейса. Модули (сотрудники, проекты, регламенты, клиенты, блог, подключение к серверу) подключаются в следующих версиях по мере готовности бэкенда — см. docs/TZ.md.',
+      statEmployees: 'Сотрудники',
+      statActiveRegulations: 'Активные регламенты',
+      statActiveProjects: 'Активные проекты',
+      statClients: 'Клиенты',
+      myTasksTitle: 'Мои задачи в регламентах',
+      myTasksEmpty: 'Нет открытых задач — можно выдохнуть.',
+      myTasksMore: 'И ещё {count}',
+      goToRegulations: 'Все регламенты',
     },
     settings: {
       title: 'Настройки',
@@ -390,6 +396,7 @@ export const dictionaries = {
       addMemberBtn: 'Добавить',
       roleMember: 'Участник',
       roleOwner: 'Ответственный',
+      roleAssistant: 'Помощник',
       removeMemberBtn: 'Убрать',
       memberAdded: 'Участник добавлен',
       memberRemoved: 'Участник убран',
@@ -578,7 +585,7 @@ export const dictionaries = {
     },
   },
   uz: {
-    common: { loading: 'Yuklanmoqda…', cancel: 'Bekor qilish', save: 'Saqlash', close: 'Yopish' },
+    common: { loading: 'Yuklanmoqda…', cancel: 'Bekor qilish', save: 'Saqlash', close: 'Yopish', loadError: "Ma'lumotlarni yuklab bo'lmadi. Ulanishni tekshirib, qayta urinib ko'ring.", retryBtn: 'Qayta urinish' },
     firstRun: {
       title: 'IB CRM birinchi ishga tushirish',
       subtitle:
@@ -642,8 +649,14 @@ export const dictionaries = {
       cabinet: 'Mening kabinetim',
     },
     home: {
-      body:
-        "Bu sinov versiyasi v0.1.0 — ilovaning oflayn asosi. Administrator yaratish/kirish, shaxsiy kabinetda parolni almashtirish va umumiy interfeys ishlaydi. Modullar (xodimlar, loyihalar, reglamentlar, mijozlar, blog, serverga ulanish) backend tayyor bo'lgani sari keyingi versiyalarda qo'shiladi — qarang docs/TZ.md.",
+      statEmployees: 'Xodimlar',
+      statActiveRegulations: 'Faol reglamentlar',
+      statActiveProjects: 'Faol loyihalar',
+      statClients: 'Mijozlar',
+      myTasksTitle: 'Reglamentlardagi vazifalarim',
+      myTasksEmpty: "Ochiq vazifalar yo'q — nafas olsangiz bo'ladi.",
+      myTasksMore: "Yana {count} ta",
+      goToRegulations: 'Barcha reglamentlar',
     },
     settings: {
       title: 'Sozlamalar',
@@ -968,6 +981,7 @@ export const dictionaries = {
       addMemberBtn: "Qo'shish",
       roleMember: 'Ishtirokchi',
       roleOwner: "Mas'ul",
+      roleAssistant: 'Yordamchi',
       removeMemberBtn: 'Olib tashlash',
       memberAdded: "Ishtirokchi qo'shildi",
       memberRemoved: 'Ishtirokchi olib tashlandi',
@@ -1157,7 +1171,7 @@ export const dictionaries = {
     },
   },
   'uz-cyrl': {
-    common: { loading: 'Юкланмоқда…', cancel: 'Бекор қилиш', save: 'Сақлаш', close: 'Ёпиш' },
+    common: { loading: 'Юкланмоқда…', cancel: 'Бекор қилиш', save: 'Сақлаш', close: 'Ёпиш', loadError: "Маълумотларни юклаб бўлмади. Уланишни текшириб, қайта уриниб кўринг.", retryBtn: 'Қайта уриниш' },
     firstRun: {
       title: 'IB CRM биринчи ишга тушириш',
       subtitle:
@@ -1221,8 +1235,14 @@ export const dictionaries = {
       cabinet: 'Менинг кабинетим',
     },
     home: {
-      body:
-        'Бу синов версияси v0.1.0 — илованинг офлайн асоси. Администратор яратиш/кириш, шахсий кабинетда паролни алмаштириш ва умумий интерфейс ишлайди. Модуллар (ходимлар, лойиҳалар, регламентлар, мижозлар, блог, серверга улаш) бэкенд тайёр бўлган сари кейинги версияларда қўшилади — қаранг docs/TZ.md.',
+      statEmployees: 'Ходимлар',
+      statActiveRegulations: 'Фаол регламентлар',
+      statActiveProjects: 'Фаол лойиҳалар',
+      statClients: 'Мижозлар',
+      myTasksTitle: 'Регламентлардаги вазифаларим',
+      myTasksEmpty: "Очиқ вазифалар йўқ — нафас олсангиз бўлади.",
+      myTasksMore: 'Яна {count} та',
+      goToRegulations: 'Барча регламентлар',
     },
     settings: {
       title: 'Созламалар',
@@ -1547,6 +1567,7 @@ export const dictionaries = {
       addMemberBtn: 'Қўшиш',
       roleMember: 'Иштирокчи',
       roleOwner: 'Масъул',
+      roleAssistant: 'Ёрдамчи',
       removeMemberBtn: 'Олиб ташлаш',
       memberAdded: 'Иштирокчи қўшилди',
       memberRemoved: 'Иштирокчи олиб ташланди',

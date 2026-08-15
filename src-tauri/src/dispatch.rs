@@ -78,6 +78,10 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db) -> Result<Value, String> {
             let p: crate::SelfUpdateEmployeePayload = from_payload(payload)?;
             db.self_update_employee(&p.employee_id, &p.full_name, p.phone.as_deref()).map(crate::to_employee).map(to_json)
         }
+        "update_own_avatar" => {
+            let p: crate::UpdateOwnAvatarPayload = from_payload(payload)?;
+            db.update_own_avatar(&p.employee_id, p.avatar_data.as_deref()).map(crate::to_employee).map(to_json)
+        }
         "set_employee_status" => {
             let p: crate::SetEmployeeStatusPayload = from_payload(payload)?;
             db.set_employee_status(&p.employee_id, p.status.as_deref()).map(crate::to_employee).map(to_json)
@@ -303,6 +307,10 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db) -> Result<Value, String> {
             let regulation_id = field(&payload, "regulationId")?;
             Ok(to_json(db.list_regulation_entries(&regulation_id).into_iter().map(crate::to_reg_entry).collect::<Vec<_>>()))
         }
+        "list_my_open_tasks" => {
+            let employee_id = field(&payload, "employeeId")?;
+            Ok(to_json(db.list_my_open_tasks(&employee_id).into_iter().map(crate::to_my_task).collect::<Vec<_>>()))
+        }
         "add_regulation_entry" => {
             let p: crate::AddRegulationEntryPayload = from_payload(payload)?;
             db.add_regulation_entry(&p.actor_id, &p.regulation_id, &p.target_employee_id, &p.content, p.attachment_data.as_deref(), p.attachment_name.as_deref(), p.deadline.as_deref())
@@ -354,7 +362,7 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db) -> Result<Value, String> {
         }
         "delete_blog_topic" => {
             let p: crate::DeleteBlogTopicPayload = from_payload(payload)?;
-            db.delete_blog_topic(&p.admin_id, &p.id).map(to_json)
+            db.delete_blog_topic(&p.actor_id, &p.id).map(to_json)
         }
         "list_blog_comments" => {
             let topic_id = field(&payload, "topicId")?;

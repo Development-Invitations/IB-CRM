@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.2.1';
+export const APP_VERSION = '0.2.2';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,13 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.2.2',
+      items: [
+        'В Настройках появилась возможность подключить уже работающее приложение к серверу — раньше это было доступно только при самой первой установке',
+        'Свои локальные данные при подключении к серверу никуда не пропадают, просто перестают использоваться, пока подключение активно',
+      ],
+    },
     {
       version: '0.2.1',
       items: [
@@ -258,6 +265,13 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.2.2',
+      items: [
+        "Sozlamalarda allaqachon ishlayotgan ilovani serverga ulash imkoniyati paydo bo'ldi — avval bu faqat birinchi o'rnatishda mavjud edi",
+        "Serverga ulanganda o'zingizning lokal ma'lumotlaringiz yo'qolmaydi, ulanish faol bo'lgan vaqtda shunchaki ishlatilmay turadi",
+      ],
+    },
+    {
       version: '0.2.1',
       items: [
         "Barcha modal oynalar endi krestik, tashqariga bosish va Esc tugmasi orqali yopiladi",
@@ -499,6 +513,13 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.2.2',
+      items: [
+        "Созламаларда аллақачон ишлаётган иловани серверга улаш имконияти пайдо бўлди — аввал бу фақат биринчи ўрнатишда мавжуд эди",
+        "Серверга уланганда ўзингизнинг локал маълумотларингиз йўқолмайди, уланиш фаол бўлган вақтда шунчаки ишлатилмай туради",
+      ],
+    },
     {
       version: '0.2.1',
       items: [

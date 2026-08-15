@@ -98,6 +98,8 @@ export const dictionaries = {
       server: {
         title: 'Сервер',
         hint: 'Разрешите другим устройствам в локальной сети подключаться к базе этого компьютера.',
+        connectSectionTitle: 'Подключиться к серверу',
+        connectSectionHint: 'Если в сети уже есть сервер (например, на компьютере администратора), это устройство может использовать его базу вместо своей. Адрес узнайте у администратора сервера — Настройки → Сервер.',
         connectedTo: 'Вы подключены к серверу',
         disconnectBtn: 'Отключиться от сервера',
         enableLabel: 'Приём подключений по сети',
@@ -674,6 +676,8 @@ export const dictionaries = {
       server: {
         title: 'Server',
         hint: "Lokal tarmoqdagi boshqa qurilmalarga ushbu kompyuter bazasiga ulanishga ruxsat bering.",
+        connectSectionTitle: 'Serverga ulanish',
+        connectSectionHint: "Agar tarmoqda allaqachon server bo'lsa (masalan, administrator kompyuterida), bu qurilma o'z bazasi o'rniga uning bazasidan foydalanishi mumkin. Manzilni server administratoridan so'rang — Sozlamalar → Server.",
         connectedTo: 'Siz serverga ulangansiz',
         disconnectBtn: 'Serverdan uzilish',
         enableLabel: "Tarmoq orqali ulanishlarni qabul qilish",
@@ -1251,6 +1255,8 @@ export const dictionaries = {
       server: {
         title: 'Сервер',
         hint: 'Локал тармоқдаги бошқа қурилмаларга ушбу компьютер базасига уланишга рухсат беринг.',
+        connectSectionTitle: 'Серверга улаш',
+        connectSectionHint: 'Агар тармоқда аллақачон сервер бўлса (масалан, администратор компьютерида), бу қурилма ўз базаси ўрнига унинг базасидан фойдаланиши мумкин. Манзилни сервер администраторидан сўранг — Созламалар → Сервер.',
         connectedTo: 'Сиз серверга улангансиз',
         disconnectBtn: 'Сервердан узилиш',
         enableLabel: 'Тармоқ орқали уланишларни қабул қилиш',

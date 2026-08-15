@@ -5,6 +5,7 @@ import { useLocale, LOCALE_LABELS, type Locale } from '../lib/i18n';
 import { useTheme, THEME_NAMES } from '../lib/theme';
 import { useToast } from '../lib/toast';
 import { connection } from '../lib/connection';
+import { session } from '../lib/session';
 import Select from '../components/Select';
 
 export default function Settings({ employee }: { employee: Employee }) {
@@ -78,6 +79,33 @@ export default function Settings({ employee }: { employee: Employee }) {
   const handleDisconnect = () => {
     connection.useLocal();
     window.location.reload();
+  };
+
+  const [connectUrl, setConnectUrl] = useState('');
+  const [connectBusy, setConnectBusy] = useState(false);
+
+  const handleConnectToServer = async () => {
+    const trimmed = connectUrl.trim();
+    if (!trimmed) {
+      showToast('error', t('firstRun.serverUrlRequired'));
+      return;
+    }
+    setConnectBusy(true);
+    const normalized = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
+    connection.connectToServer(normalized);
+    try {
+      await api.hasAdmin();
+      // Локальная сессия этого устройства относится к локальной базе — она
+      // невалидна для сервера (другой набор сотрудников/токенов), поэтому
+      // сбрасываем её, чтобы после перезагрузки честно спросился логин уже
+      // от учётной записи на сервере.
+      session.clear();
+      window.location.reload();
+    } catch {
+      connection.useLocal();
+      showToast('error', t('firstRun.serverUnreachable'));
+      setConnectBusy(false);
+    }
   };
 
   const handleChangePassword = async (e: FormEvent) => {
@@ -179,6 +207,25 @@ export default function Settings({ employee }: { employee: Employee }) {
           </div>
           <button className="modal-btn danger" onClick={handleDisconnect} style={{ marginTop: 10 }}>
             {t('settings.server.disconnectBtn')}
+          </button>
+        </section>
+      )}
+
+      {!isClient && (
+        <section className="settings-section">
+          <h2>{t('settings.server.connectSectionTitle')}</h2>
+          <p className="settings-hint">{t('settings.server.connectSectionHint')}</p>
+          <div className="field" style={{ maxWidth: 320, marginTop: 8 }}>
+            <label>{t('firstRun.serverUrlLabel')}</label>
+            <input
+              value={connectUrl}
+              onChange={(e) => setConnectUrl(e.target.value)}
+              placeholder="192.168.1.10:8778"
+              disabled={connectBusy}
+            />
+          </div>
+          <button className="modal-btn danger" onClick={handleConnectToServer} disabled={connectBusy} style={{ marginTop: 10 }}>
+            {connectBusy ? t('firstRun.connectBusy') : t('firstRun.connectSubmit')}
           </button>
         </section>
       )}

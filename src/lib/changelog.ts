@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.2.5';
+export const APP_VERSION = '0.2.6';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.2.6',
+      items: [
+        '"Проверить обновления" в режиме клиента теперь честно сравнивает вашу версию с версией на сервере, а не пытается достучаться до интернета',
+        'Если на сервере версия новее — при входе покажется понятное предупреждение',
+        '"Последние входы" в кабинете сотрудника теперь сгруппированы по дням в аккордеон — сегодняшний день открыт, остальные свёрнуты, заголовок — сама дата',
+      ],
+    },
     {
       version: '0.2.5',
       items: [
@@ -294,6 +302,14 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.2.6',
+      items: [
+        "Klient rejimida \"Yangilanishlarni tekshirish\" endi internetga ulanishga urinish o'rniga versiyangizni server versiyasi bilan solishtiradi",
+        "Agar serverda yangiroq versiya bo'lsa — kirishda tushunarli ogohlantirish ko'rsatiladi",
+        "Xodim kabinetidagi \"Oxirgi kirishlar\" endi kunlar bo'yicha akkordeonga guruhlangan — bugungi kun ochiq, qolganlari yig'ilgan, sarlavha — sananing o'zi",
+      ],
+    },
+    {
       version: '0.2.5',
       items: [
         "Bildirishnomalar endi Windows'ning tabiiy oynachasida ham ko'rsatiladi — qo'ng'iroqchani doim tekshirib turish shart emas",
@@ -571,6 +587,14 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.2.6',
+      items: [
+        'Клиент режимида "Янгиланишларни текшириш" энди интернетга уланишга уриниш ўрнига версиянгизни сервер версияси билан солиштиради',
+        "Агар серверда янгироқ версия бўлса — киришда тушунарли огоҳлантириш кўрсатилади",
+        "Ходим кабинетидаги \"Охирги киришлар\" энди кунлар бўйича аккордеонга гуруҳланган — бугунги кун очиқ, қолганлари йиғилган, сарлавҳа — сананинг ўзи",
+      ],
+    },
     {
       version: '0.2.5',
       items: [

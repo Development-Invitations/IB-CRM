@@ -17,11 +17,28 @@ export default function UpdateNotifier() {
     // игнорируем — не дёргаем сотрудника, если обновлений нет или сервер
     // обновлений ещё не настроен (см. src/lib/updater.ts).
     checkForAppUpdate().then((res) => {
-      if (res.status === 'available') setResult(res);
+      if (res.status === 'available' || res.status === 'server-newer') setResult(res);
     });
   }, []);
 
-  if (!result || result.status !== 'available' || dismissed) return null;
+  if (!result || (result.status !== 'available' && result.status !== 'server-newer') || dismissed) return null;
+
+  if (result.status === 'server-newer') {
+    return (
+      <Modal
+        open
+        title={t('updates.serverNewerTitle', { version: result.version })}
+        onClose={() => setDismissed(true)}
+        actions={
+          <button className="modal-btn danger" onClick={() => setDismissed(true)}>
+            {t('common.close')}
+          </button>
+        }
+      >
+        {t('updates.serverNewerBody')}
+      </Modal>
+    );
+  }
 
   const handleInstall = async () => {
     setInstalling(true);

@@ -1862,6 +1862,17 @@ fn get_lan_address() -> Option<String> {
     socket.local_addr().ok().map(|addr| addr.ip().to_string())
 }
 
+// Версия того процесса, который реально отвечает на вызов — не завязана на
+// то, локальный ли это режим или сервер. В режиме клиента invoke() уходит
+// на сервер, так что этот вызов вернёт версию СЕРВЕРА — ровно то, что нужно
+// для практичной проверки "клиент отстал от сервера", раз настоящий
+// автообновитель (см. src/lib/updater.ts) требует ключ подписи и публикацию
+// релизов, которых пока нет.
+#[tauri::command]
+fn get_app_version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -1968,6 +1979,7 @@ fn main() {
             get_server_settings,
             set_server_settings,
             get_lan_address,
+            get_app_version,
             record_login,
             record_logout,
             list_recent_sessions

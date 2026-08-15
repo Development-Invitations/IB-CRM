@@ -614,4 +614,5 @@ export const api = {
   setServerSettings: (payload: { adminId: string; enabled: boolean; port: number }) =>
     invoke<ServerSettings>('set_server_settings', { payload }),
   getLanAddress: () => invoke<string | null>('get_lan_address'),
+  getAppVersion: () => invoke<string>('get_app_version'),
 };

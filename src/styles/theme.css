@@ -1396,6 +1396,44 @@ button.employees-add-btn {
 
 .sessions-list li span:first-child { color: var(--color-text-muted); }
 
+.sessions-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sessions-day-group {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.sessions-day-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--color-surface-2);
+  border: none;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.sessions-day-header:hover { background: var(--color-border); }
+.sessions-day-header span:first-child { flex: 1; }
+
+.sessions-day-chevron { transition: transform 0.15s; flex-shrink: 0; }
+.sessions-day-chevron.open { transform: rotate(180deg); }
+
+.sessions-day-group .sessions-list {
+  padding: 8px;
+  margin: 0;
+  max-height: none;
+}
+
 /* ---- Ручной статус сотрудника (Отошёл/Обед/Отпуск/Отгул) ---- */
 
 .manual-status-badge {

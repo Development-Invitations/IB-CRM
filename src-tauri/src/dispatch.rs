@@ -377,6 +377,7 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db) -> Result<Value, String> {
         // самой серверной машине, но диспетчеру всё равно, откуда вызов) ----
         "get_server_settings" => Ok(to_json(crate::to_server_settings(db.get_server_settings()))),
         "get_lan_address" => Ok(to_json(crate::get_lan_address())),
+        "get_app_version" => Ok(to_json(crate::get_app_version())),
         "set_server_settings" => {
             let p: crate::SetServerSettingsPayload = from_payload(payload)?;
             db.set_server_settings(&p.admin_id, p.enabled, p.port).map(crate::to_server_settings).map(to_json)

@@ -1,5 +1,8 @@
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
+import { connection } from './connection';
+import { api } from './api';
+import { APP_VERSION } from './changelog';
 
 // ============================================================================
 // ВАЖНО — прочитать перед тем как полагаться на автообновление:
@@ -33,7 +36,22 @@ export type UpdateProgress = { downloaded: number; total: number | null };
 export type UpdateCheckResult =
   | { status: 'up-to-date' }
   | { status: 'available'; version: string; notes?: string; install: (onProgress?: (p: UpdateProgress) => void) => Promise<void> }
+  // Режим клиента: настоящий автообновитель не настроен (см. комментарий
+  // выше), но сервер знает свою версию — если она новее, чем у клиента,
+  // сообщаем об этом честно, без притворного автоустановщика (реального
+  // подписанного инсталлятора через этот канал не доставить).
+  | { status: 'server-newer'; version: string }
   | { status: 'error'; message: string };
+
+function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map((n) => parseInt(n, 10) || 0);
+  const pb = b.split('.').map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
 
 // Перезапуск вынесен отдельной функцией и НЕ вызывается автоматически внутри
 // install() — раньше приложение перезапускалось мгновенно сразу после
@@ -45,6 +63,18 @@ export async function restartApp() {
 }
 
 export async function checkForAppUpdate(): Promise<UpdateCheckResult> {
+  if (connection.isClient()) {
+    try {
+      const serverVersion = await api.getAppVersion();
+      if (compareVersions(serverVersion, APP_VERSION) > 0) {
+        return { status: 'server-newer', version: serverVersion };
+      }
+      return { status: 'up-to-date' };
+    } catch (err: any) {
+      return { status: 'error', message: typeof err === 'string' ? err : (err?.message ?? String(err)) };
+    }
+  }
+
   try {
     const update = await check();
     if (update?.available) {

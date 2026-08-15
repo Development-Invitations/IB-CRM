@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, ChangeEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Phone, Briefcase, Building2, UserCog, Users, Clock, Send, Calendar, History, CalendarPlus, Cake, Camera, X } from 'lucide-react';
+import { ArrowLeft, Phone, Briefcase, Building2, UserCog, Users, Clock, Send, Calendar, History, CalendarPlus, Cake, Camera, X, ChevronDown } from 'lucide-react';
 import { api, type Employee, type Session, type AbsenceRequest } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
@@ -86,6 +86,22 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
       setAvatarBusy(false);
     }
   };
+
+  // ---- "Последние входы" — аккордеон по дням: сегодняшний день открыт по
+  // умолчанию, прошлые дни свёрнуты, заголовок каждой группы — сама дата.
+  const [dayOverrides, setDayOverrides] = useState<Record<string, boolean>>({});
+  const localDateKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const todayKey = localDateKey(new Date());
+  const sessionGroups = useMemo(() => {
+    const map = new Map<string, { date: Date; items: Session[] }>();
+    for (const s of sessions) {
+      const d = parseSqliteUtc(s.loginAt);
+      const key = localDateKey(d);
+      if (!map.has(key)) map.set(key, { date: d, items: [] });
+      map.get(key)!.items.push(s);
+    }
+    return Array.from(map.entries());
+  }, [sessions]);
 
   // ---- Режим "временный доступ выдан" — редактирование прямо тут ----
   const [editFullName, setEditFullName] = useState('');
@@ -336,20 +352,39 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
             {sessions.length === 0 ? (
               <p className="settings-hint">{t('employees.sessionsEmpty')}</p>
             ) : (
-              <ul className="sessions-list">
-                {sessions.map((s) => (
-                  <li key={s.id}>
-                    <span>{parseSqliteUtc(s.loginAt).toLocaleDateString()}</span>
-                    <span>
-                      {parseSqliteUtc(s.loginAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      {' – '}
-                      {s.logoutAt
-                        ? parseSqliteUtc(s.logoutAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        : t('employees.sessionOnlineNow')}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <div className="sessions-accordion">
+                {sessionGroups.map(([dateKey, group]) => {
+                  const isExpanded = dayOverrides[dateKey] ?? dateKey === todayKey;
+                  return (
+                    <div className="sessions-day-group" key={dateKey}>
+                      <button
+                        type="button"
+                        className="sessions-day-header"
+                        onClick={() => setDayOverrides((prev) => ({ ...prev, [dateKey]: !isExpanded }))}
+                      >
+                        <span>{group.date.toLocaleDateString()}</span>
+                        <span className="settings-hint">{group.items.length}</span>
+                        <ChevronDown size={14} className={`sessions-day-chevron${isExpanded ? ' open' : ''}`} />
+                      </button>
+                      {isExpanded && (
+                        <ul className="sessions-list">
+                          {group.items.map((s) => (
+                            <li key={s.id}>
+                              <span>
+                                {parseSqliteUtc(s.loginAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {' – '}
+                                {s.logoutAt
+                                  ? parseSqliteUtc(s.logoutAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                  : t('employees.sessionOnlineNow')}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
 

@@ -95,6 +95,7 @@ export default function UpdatesButton() {
                   <p className="settings-hint updates-online-status">
                     {onlineCheck.status === 'up-to-date' && t('updates.upToDate')}
                     {onlineCheck.status === 'available' && t('updates.availableTitle', { version: onlineCheck.version })}
+                    {onlineCheck.status === 'server-newer' && t('updates.serverNewer', { version: onlineCheck.version })}
                     {onlineCheck.status === 'error' && t('updates.checkError')}
                   </p>
                   {onlineCheck.status === 'available' && (

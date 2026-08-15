@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.1.22';
+export const APP_VERSION = '0.2.1';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,25 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.2.1',
+      items: [
+        'Все модальные окна теперь закрываются по крестику, клику вне окна и клавише Esc',
+        'Окно создания и редактирования темы блога стало заметно шире, редактору больше не тесно',
+        'Уведомления о задачах в регламентах и проектах теперь открывают сам регламент/проект, а не просто кабинет сотрудника',
+        'Уведомление о дне рождения коллеги теперь ведёт в календарь дней рождений',
+      ],
+    },
+    {
+      version: '0.2.0',
+      items: [
+        'Настоящее подключение к серверу — теперь несколько сотрудников могут работать с одной общей базой',
+        'Любой компьютер с приложением может стать сервером — включается в Настройках, отдельная установка не нужна',
+        'При первом запуске — выбор: работать локально или подключиться к серверу в сети по адресу',
+        'Подключение защищено токеном сессии, вход по-прежнему по логину и паролю',
+        'Если связь с сервером потеряна, приложение честно сообщает об этом, а не работает вслепую с устаревшими данными',
+      ],
+    },
     {
       version: '0.1.22',
       items: [
@@ -239,6 +258,25 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.2.1',
+      items: [
+        "Barcha modal oynalar endi krestik, tashqariga bosish va Esc tugmasi orqali yopiladi",
+        "Blog mavzusini yaratish va tahrirlash oynasi ancha kengaydi, muharrirga endi tor emas",
+        "Reglament va loyihalardagi vazifalar haqidagi bildirishnomalar endi xodim kabineti o'rniga reglament/loyihaning o'zini ochadi",
+        "Hamkasbning tug'ilgan kuni haqidagi bildirishnoma endi tug'ilgan kunlar taqvimiga olib boradi",
+      ],
+    },
+    {
+      version: '0.2.0',
+      items: [
+        "Serverga haqiqiy ulanish — endi bir nechta xodim bitta umumiy baza bilan ishlashi mumkin",
+        "Ilova o'rnatilgan istalgan kompyuter serverga aylanishi mumkin — Sozlamalarda yoqiladi, alohida o'rnatish shart emas",
+        "Birinchi ishga tushirishda — avtonom ishlash yoki tarmoqdagi serverga manzil bo'yicha ulanishni tanlash",
+        "Ulanish sessiya tokeni bilan himoyalangan, kirish avvalgidek login va parol orqali",
+        "Server bilan aloqa uzilsa, ilova buni ochiq aytadi, eskirgan ma'lumotlar bilan ko'r-ko'rona ishlamaydi",
+      ],
+    },
+    {
       version: '0.1.22',
       items: [
         "Tuzatildi: formatlash muharriri endi mavzu yaratish formasida ham, faqat tahrirlashda emas",
@@ -461,6 +499,25 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.2.1',
+      items: [
+        'Барча модал ойналар энди крестик, ташқарига босиш ва Esc тугмаси орқали ёпилади',
+        'Блог мавзусини яратиш ва таҳрирлаш ойнаси анча кенгайди, муҳаррирга энди тор эмас',
+        "Регламент ва лойиҳалардаги вазифалар ҳақидаги билдиришномалар энди ходим кабинети ўрнига регламент/лойиҳанинг ўзини очади",
+        "Ҳамкасбнинг туғилган куни ҳақидаги билдиришнома энди туғилган кунлар тақвимига олиб боради",
+      ],
+    },
+    {
+      version: '0.2.0',
+      items: [
+        'Серверга ҳақиқий уланиш — энди бир нечта ходим битта умумий база билан ишлаши мумкин',
+        "Илова ўрнатилган исталган компьютер серверга айланиши мумкин — Созламаларда ёқилади, алоҳида ўрнатиш шарт эмас",
+        "Биринчи ишга туширишда — автоном ишлаш ёки тармоқдаги серверга манзил бўйича уланишни танлаш",
+        'Уланиш сессия токени билан ҳимояланган, кириш аввалгидек логин ва парол орқали',
+        "Сервер билан алоқа узилса, илова буни очиқ айтади, эскирган маълумотлар билан кўр-кўрона ишламайди",
+      ],
+    },
     {
       version: '0.1.22',
       items: [

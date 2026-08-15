@@ -1,4 +1,56 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke as tauriInvoke } from '@tauri-apps/api/core';
+import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+import { connection, sessionToken } from './connection';
+
+// Единственная точка входа для всех вызовов бэкенда (все ~90 обёрток ниже
+// зовут именно её) — поэтому именно здесь, и только здесь, решаем, идти ли
+// в локальный Tauri-процесс (как раньше) или по сети на чужой сервер
+// (режим "клиент", см. connection.ts и src-tauri/src/server.rs). Ни одну из
+// обёрток api.xxx() ниже менять не пришлось.
+async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  if (!connection.isClient()) {
+    return tauriInvoke<T>(cmd, args);
+  }
+
+  const serverUrl = connection.getServerUrl();
+  if (!serverUrl) {
+    throw new Error('Не задан адрес сервера');
+  }
+
+  // Tauri сам решает, как разложить args по параметрам Rust-команды: если
+  // команда принимает один параметр payload — JS передаёт { payload: {...} },
+  // если несколько отдельных (id, employeeId...) — передаёт их плоско. HTTP
+  // на стороне сервера (dispatch.rs) ожидает всегда плоский объект под
+  // "payload" в теле запроса — тут просто разворачиваем args так же, как
+  // это неявно делает сам Tauri IPC.
+  const body = args && 'payload' in args ? (args as { payload: unknown }).payload : (args ?? {});
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = sessionToken.get();
+  if (token) headers['X-Session-Token'] = token;
+
+  let response: Awaited<ReturnType<typeof tauriFetch>>;
+  try {
+    response = await tauriFetch(`${serverUrl}/api/invoke`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ command: cmd, payload: body }),
+    });
+  } catch {
+    throw new Error('Нет соединения с сервером');
+  }
+
+  let result: { ok: boolean; data?: T; error?: string; token?: string };
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error(`Сервер вернул некорректный ответ (HTTP ${response.status})`);
+  }
+
+  if (result.token) sessionToken.set(result.token);
+  if (!result.ok) throw new Error(result.error || 'Ошибка сервера');
+  return result.data as T;
+}
 
 export type EmployeeStatus = 'away15' | 'lunch' | 'vacation' | 'dayoff';
 
@@ -230,6 +282,11 @@ export type Session = {
   id: string;
   loginAt: string;
   logoutAt: string | null;
+};
+
+export type ServerSettings = {
+  enabled: boolean;
+  port: number;
 };
 
 export type Position = { id: string; title: string };
@@ -520,4 +577,9 @@ export const api = {
   recordLogout: (employeeId: string) => invoke<void>('record_logout', { employeeId }),
 
   listRecentSessions: (employeeId: string) => invoke<Session[]>('list_recent_sessions', { employeeId }),
+
+  getServerSettings: () => invoke<ServerSettings>('get_server_settings'),
+  setServerSettings: (payload: { adminId: string; enabled: boolean; port: number }) =>
+    invoke<ServerSettings>('set_server_settings', { payload }),
+  getLanAddress: () => invoke<string | null>('get_lan_address'),
 };

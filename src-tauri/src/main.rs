@@ -1,9 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod db;
+mod dispatch;
+mod server;
 
 use db::Db;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
 #[derive(Clone, serde::Serialize)]
@@ -386,6 +388,12 @@ struct RegulationReminder {
 struct Position {
     id: String,
     title: String,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct ServerSettings {
+    enabled: bool,
+    port: u16,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -899,6 +907,14 @@ struct AddBlogCommentPayload {
 }
 
 #[derive(serde::Deserialize)]
+struct SetServerSettingsPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    enabled: bool,
+    port: u16,
+}
+
+#[derive(serde::Deserialize)]
 struct SetEmployeeSchedulePayload {
     #[serde(rename = "adminId")]
     admin_id: String,
@@ -936,7 +952,11 @@ struct LoginResult {
     message: Option<String>,
 }
 
-struct AppState(Mutex<Db>);
+// Arc — чтобы то же состояние можно было отдать и Tauri (app.manage), и
+// фоновому axum-серверу (см. server.rs) без второго соединения к SQLite.
+// Все существующие команды продолжают работать без изменений: state.0.lock()
+// у Arc<Mutex<Db>> работает так же, как у Mutex<Db> (Deref).
+pub struct AppState(pub Arc<Mutex<Db>>);
 
 fn to_employee(e: db::EmployeeRecord) -> Employee {
     Employee {
@@ -1109,6 +1129,22 @@ fn to_reg_reply(r: db::RegulationReplyRecord) -> RegulationReply {
     RegulationReply { id: r.id, entry_id: r.entry_id, author_id: r.author_id, author_name: r.author_name, content: r.content, created_at: r.created_at }
 }
 
+fn to_reg_reminder(r: db::RegulationReminderRecord) -> RegulationReminder {
+    RegulationReminder {
+        id: r.id,
+        regulation_id: r.regulation_id,
+        entry_id: r.entry_id,
+        created_by: r.created_by,
+        created_by_name: r.created_by_name,
+        target_employee_id: r.target_employee_id,
+        target_name: r.target_name,
+        remind_at: r.remind_at,
+        note: r.note,
+        fired: r.fired,
+        created_at: r.created_at,
+    }
+}
+
 fn to_position(p: db::PositionRecord) -> Position {
     Position { id: p.id, title: p.title }
 }
@@ -1126,6 +1162,10 @@ fn to_blog_comment(c: db::BlogCommentRecord) -> BlogComment {
         id: c.id, topic_id: c.topic_id, author_id: c.author_id, author_name: c.author_name,
         content: c.content, reply_to_id: c.reply_to_id, created_at: c.created_at,
     }
+}
+
+fn to_server_settings(s: db::ServerSettingsRecord) -> ServerSettings {
+    ServerSettings { enabled: s.enabled, port: s.port }
 }
 
 fn to_department(d: db::DepartmentRecord) -> Department {
@@ -1670,19 +1710,7 @@ fn add_regulation_reminder(payload: AddRegulationReminderPayload, state: tauri::
         &payload.remind_at,
         &payload.note,
     )
-    .map(|r| RegulationReminder {
-        id: r.id,
-        regulation_id: r.regulation_id,
-        entry_id: r.entry_id,
-        created_by: r.created_by,
-        created_by_name: r.created_by_name,
-        target_employee_id: r.target_employee_id,
-        target_name: r.target_name,
-        remind_at: r.remind_at,
-        note: r.note,
-        fired: r.fired,
-        created_at: r.created_at,
-    })
+    .map(to_reg_reminder)
 }
 
 #[tauri::command]
@@ -1690,19 +1718,7 @@ fn list_regulation_reminders(payload: ListRegulationRemindersPayload, state: tau
     let db = state.0.lock().unwrap();
     db.list_regulation_reminders(&payload.regulation_id, &payload.employee_id)
         .into_iter()
-        .map(|r| RegulationReminder {
-            id: r.id,
-            regulation_id: r.regulation_id,
-            entry_id: r.entry_id,
-            created_by: r.created_by,
-            created_by_name: r.created_by_name,
-            target_employee_id: r.target_employee_id,
-            target_name: r.target_name,
-            remind_at: r.remind_at,
-            note: r.note,
-            fired: r.fired,
-            created_at: r.created_at,
-        })
+        .map(to_reg_reminder)
         .collect()
 }
 
@@ -1758,6 +1774,19 @@ fn add_blog_comment(payload: AddBlogCommentPayload, state: tauri::State<AppState
 }
 
 #[tauri::command]
+fn get_server_settings(state: tauri::State<AppState>) -> ServerSettings {
+    let db = state.0.lock().unwrap();
+    to_server_settings(db.get_server_settings())
+}
+
+#[tauri::command]
+fn set_server_settings(payload: SetServerSettingsPayload, state: tauri::State<AppState>) -> Result<ServerSettings, String> {
+    let db = state.0.lock().unwrap();
+    db.set_server_settings(&payload.admin_id, payload.enabled, payload.port)
+        .map(to_server_settings)
+}
+
+#[tauri::command]
 fn record_login(employee_id: String, state: tauri::State<AppState>) -> Result<(), String> {
     let db = state.0.lock().unwrap();
     db.record_login(&employee_id)
@@ -1775,15 +1804,42 @@ fn list_recent_sessions(employee_id: String, state: tauri::State<AppState>) -> V
     db.list_recent_sessions(&employee_id, 20).into_iter().map(to_session).collect()
 }
 
+// Локальный LAN-адрес этого ПК — только чтобы показать админу, что давать
+// коллегам при включении режима сервера (Настройки → Сервер). Классический
+// трюк без внешних зависимостей: UDP "connect" не отправляет пакетов, только
+// выбирает исходящий интерфейс/маршрут по таблице маршрутизации ОС, после
+// чего local_addr() отдаёт реальный IP этого интерфейса.
+#[tauri::command]
+fn get_lan_address() -> Option<String> {
+    use std::net::UdpSocket;
+    let socket = UdpSocket::bind("0.0.0.0:0").ok()?;
+    socket.connect("8.8.8.8:80").ok()?;
+    socket.local_addr().ok().map(|addr| addr.ip().to_string())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_http::init())
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir().expect("нет app data dir");
             std::fs::create_dir_all(&app_data_dir).ok();
-            let db = Db::init(&app_data_dir.join("ib-crm.db"));
-            app.manage(AppState(Mutex::new(db)));
+            let db = Arc::new(Mutex::new(Db::init(&app_data_dir.join("ib-crm.db"))));
+
+            // Если включён режим сервера (настройка в app_meta, см. Settings →
+            // "Сервер") — поднимаем фоновый HTTP-сервер на том же Db, без
+            // второго соединения к SQLite. Требует перезапуск приложения
+            // после включения тумблера — динамический горячий старт/стоп
+            // сознательно не делали в v0.2.0, чтобы не городить graceful
+            // shutdown ради второстепенного UX-удобства.
+            let settings = db.lock().unwrap().get_server_settings();
+            if settings.enabled {
+                let server_db = db.clone();
+                tauri::async_runtime::spawn(server::run(server_db, settings.port));
+            }
+
+            app.manage(AppState(db));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1861,6 +1917,9 @@ fn main() {
             delete_blog_topic,
             list_blog_comments,
             add_blog_comment,
+            get_server_settings,
+            set_server_settings,
+            get_lan_address,
             record_login,
             record_logout,
             list_recent_sessions

@@ -282,7 +282,7 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
           </div>
         </div>
 
-        <Modal open={formOpen} title={editingTopic ? t('blog.editTitle') : t('blog.addTitle')} onClose={() => setFormOpen(false)}
+        <Modal open={formOpen} title={editingTopic ? t('blog.editTitle') : t('blog.addTitle')} onClose={() => setFormOpen(false)} size="lg"
           actions={<>
             <button className="modal-btn" onClick={() => setFormOpen(false)}>{t('common.cancel')}</button>
             <button className="modal-btn danger" onClick={handleFormSubmit} disabled={formBusy}>{formBusy ? t('employees.savingBusy') : editingTopic ? t('employees.saveConfirm') : t('employees.addConfirm')}</button>
@@ -350,7 +350,7 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
         </table>
       )}
 
-      <Modal open={formOpen} title={t('blog.addTitle')} onClose={() => setFormOpen(false)}
+      <Modal open={formOpen} title={t('blog.addTitle')} onClose={() => setFormOpen(false)} size="lg"
         actions={<>
           <button className="modal-btn" onClick={() => setFormOpen(false)}>{t('common.cancel')}</button>
           <button className="modal-btn danger" onClick={handleFormSubmit} disabled={formBusy}>{formBusy ? t('employees.savingBusy') : t('employees.addConfirm')}</button>

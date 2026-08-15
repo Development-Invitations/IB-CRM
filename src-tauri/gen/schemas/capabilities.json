@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"Права по умолчанию для главного окна IB CRM","local":true,"windows":["main"],"permissions":["core:default","updater:default","process:default"]}}
+{"default":{"identifier":"default","description":"Права по умолчанию для главного окна IB CRM","local":true,"windows":["main"],"permissions":["core:default","updater:default","process:default",{"identifier":"http:default","allow":[{"url":"http://*/*"},{"url":"http://*:*/*"}]}]}}

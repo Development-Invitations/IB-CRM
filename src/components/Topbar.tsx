@@ -55,6 +55,16 @@ export default function Topbar({ employee }: { employee: Employee }) {
       // Заявка на отсутствие — приходит либо руководителю сотрудника, либо всем
       // админам, если руководитель не назначен (см. create_absence_request в db.rs).
       setReviewAbsenceId(n.relatedEntityId);
+    } else if (n.relatedEntityType === 'regulation' && n.relatedEntityId) {
+      // Задача/напоминание/добавление в регламент — открываем сам регламент,
+      // а не просто кабинет сотрудника (см. openRegId в Regulations.tsx).
+      navigate('/dashboard/regulations', { state: { openRegId: n.relatedEntityId } });
+    } else if (n.relatedEntityType === 'project' && n.relatedEntityId) {
+      // Назначение сообщения/передача владения проектом — открываем сам проект.
+      navigate('/dashboard/projects', { state: { openProjectId: n.relatedEntityId } });
+    } else if (n.type === 'birthday') {
+      // День рождения коллеги — ведём в календарь дней рождений, а не в свой кабинет.
+      navigate('/dashboard/birthdays');
     } else {
       // Остальные типы (например, результат рассмотрения своей же заявки) — ведём в кабинет.
       navigate(`/dashboard/employees/${employee.id}`);

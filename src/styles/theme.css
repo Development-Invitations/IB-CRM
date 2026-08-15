@@ -146,6 +146,28 @@ html, body, #root {
   margin: 0 0 20px;
 }
 
+.firstrun-mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px;
+  margin-bottom: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+.firstrun-mode-btn:hover { background: var(--color-border); }
+.firstrun-mode-btn.primary {
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface-2));
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+}
+.firstrun-mode-btn span { display: flex; flex-direction: column; gap: 2px; }
+.firstrun-mode-btn strong { font-size: 14px; }
+
 .field {
   margin-bottom: 14px;
 }
@@ -648,6 +670,7 @@ button.primary:hover { filter: brightness(0.95); }
 }
 
 .modal-card {
+  position: relative;
   width: 460px;
   max-width: calc(100vw - 40px);
   max-height: calc(100vh - 64px);
@@ -660,12 +683,38 @@ button.primary:hover { filter: brightness(0.95); }
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
 }
 
+.modal-card-lg {
+  width: 860px;
+}
+
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.modal-close:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+
 .modal-title {
   font-size: 16px;
   font-weight: 700;
   margin-bottom: 10px;
   flex-shrink: 0;
-  padding-right: 26px;
+  padding-right: 40px;
 }
 
 .modal-body {
@@ -2550,6 +2599,10 @@ button.employees-add-btn {
   font-size: 13px;
   line-height: 1.6;
   color: var(--color-text);
+}
+.modal-card-lg .rich-editor-content {
+  min-height: 320px;
+  max-height: 55vh;
 }
 .rich-editor-content:focus { outline: none; }
 .rich-editor-content:empty::before {

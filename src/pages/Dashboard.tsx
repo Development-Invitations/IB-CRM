@@ -15,7 +15,6 @@ import {
   FileText,
   MessageSquare,
   Cake,
-  Server,
   LogOut,
   ClipboardList,
 } from 'lucide-react';
@@ -79,13 +78,6 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
             <ClipboardList size={16} className="nav-icon" />
             {t('sidebar.absenceRequests')}
           </NavLink>
-          {employee.isAdmin && (
-            <span className="nav-disabled">
-              <Server size={16} className="nav-icon" />
-              {t('sidebar.serverConnect')}
-              <span className="badge-soon">v0.2.0</span>
-            </span>
-          )}
         </nav>
         <div className="footer">
           <div>{employee.fullName || employee.login}</div>

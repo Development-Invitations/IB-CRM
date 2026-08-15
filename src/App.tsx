@@ -102,6 +102,9 @@ export default function App() {
                 setAdminExists(true);
                 setCurrentEmployee(emp);
               }}
+              onConnected={(hasAdminAlready) => {
+                if (hasAdminAlready) setAdminExists(true);
+              }}
             />
           )
         }

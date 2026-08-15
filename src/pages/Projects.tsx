@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useContext } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Plus, Search, Pencil, Trash2, Send, UserPlus, X, Repeat, CheckSquare, XSquare, RotateCcw, ChevronDown, ChevronRight, ArrowLeft, Link2, Check, Paperclip, Forward, CalendarClock } from 'lucide-react';
 import { api, type Employee, type Project, type ProjectMember, type ProjectChatMessage, type ProjectChatReply, type Client, type ProjectMemberRole, type RegulationEntryStatus } from '../lib/api';
 import { FullscreenContext } from './Dashboard';
@@ -229,6 +230,7 @@ const STATUS_LABEL_KEYS: Record<Project['status'], string> = {
 export default function Projects({ currentEmployee }: { currentEmployee: Employee }) {
   const { t } = useLocale();
   const { showToast } = useToast();
+  const location = useLocation();
   const { enter: enterFullscreen, exit: exitFullscreen } = useContext(FullscreenContext);
 
   const [projects, setProjects] = useState<Project[]>([]);
@@ -294,6 +296,13 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
     }
     return () => { exitFullscreen(); };
   }, [!!selected]); // eslint-disable-line
+
+  useEffect(() => {
+    const openProjectId = (location.state as any)?.openProjectId;
+    if (!openProjectId || projects.length === 0) return;
+    const proj = projects.find((p) => p.id === openProjectId);
+    if (proj) setSelected(proj);
+  }, [projects, location.state]);
 
   const loadDetail = () => {
     if (!selected) return;

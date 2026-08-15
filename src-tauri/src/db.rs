@@ -3043,5 +3043,48 @@ impl Db {
             created_at: String::new(),
         })
     }
+
+    // ---- Режим сервера (v0.2.0) ----
+    // Настройки хранятся в уже существующей app_meta (key/value) — тем же
+    // паттерном, что last_birthday_notify_date: по умолчанию выключено,
+    // порт 8778, если ключей ещё нет.
+
+    pub fn get_server_settings(&self) -> ServerSettingsRecord {
+        let enabled: Option<String> = self.conn
+            .query_row("SELECT value FROM app_meta WHERE key = 'server_enabled'", [], |row| row.get(0))
+            .ok();
+        let port: Option<String> = self.conn
+            .query_row("SELECT value FROM app_meta WHERE key = 'server_port'", [], |row| row.get(0))
+            .ok();
+        ServerSettingsRecord {
+            enabled: enabled.as_deref() == Some("1"),
+            port: port.and_then(|p| p.parse().ok()).unwrap_or(8778),
+        }
+    }
+
+    pub fn set_server_settings(&self, admin_id: &str, enabled: bool, port: u16) -> Result<ServerSettingsRecord, String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        if port < 1024 {
+            return Err("Порт должен быть не меньше 1024".into());
+        }
+        self.conn.execute(
+            "INSERT INTO app_meta (key, value) VALUES ('server_enabled', ?1)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![if enabled { "1" } else { "0" }],
+        ).map_err(|e| e.to_string())?;
+        self.conn.execute(
+            "INSERT INTO app_meta (key, value) VALUES ('server_port', ?1)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![port.to_string()],
+        ).map_err(|e| e.to_string())?;
+        Ok(self.get_server_settings())
+    }
+}
+
+pub struct ServerSettingsRecord {
+    pub enabled: bool,
+    pub port: u16,
 }
 

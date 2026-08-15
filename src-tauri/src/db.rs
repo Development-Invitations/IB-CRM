@@ -39,6 +39,18 @@ pub struct EmployeeRecord {
     pub head_of_department_name: Option<String>,
     pub deputy_of_department_name: Option<String>,
     pub birth_date: Option<String>,
+    pub is_partner: bool,
+    pub partner_id: Option<String>,
+    pub partner_name: Option<String>,
+}
+
+pub struct PartnerRecord {
+    pub id: String,
+    pub name: String,
+    pub created_by: Option<String>,
+    pub created_by_name: Option<String>,
+    pub created_at: String,
+    pub account_count: i64,
 }
 
 pub struct SessionRecord {
@@ -588,6 +600,23 @@ impl Db {
             [],
         );
 
+        // Партнёры — организации-партнёры компании. Отдельная лёгкая таблица
+        // (просто название + кто создал), по аналогии с department/position, а
+        // не полноценная сущность с собственными полями — тех пока не требуется.
+        // Аккаунты партнёров — это ОБЫЧНЫЕ записи employees с флагом is_partner
+        // и ссылкой на partner_id, а не отдельная таблица: так переиспользуется
+        // весь существующий механизм логина/пароля/сессий без дублирования.
+        let _ = conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS partners (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                created_by TEXT REFERENCES employees(id),
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );",
+        );
+        add_column_if_missing(&conn, "employees", "is_partner INTEGER NOT NULL DEFAULT 0");
+        add_column_if_missing(&conn, "employees", "partner_id TEXT REFERENCES partners(id)");
+
         let db = Db { conn };
         db.notify_todays_birthdays();
         db
@@ -703,12 +732,14 @@ impl Db {
             e.work_days, e.work_start, e.work_end,
             (SELECT hd.name FROM departments hd WHERE hd.head_employee_id = e.id LIMIT 1),
             (SELECT dd.name FROM departments dd WHERE dd.deputy_employee_id = e.id LIMIT 1),
-            e.birth_date
+            e.birth_date,
+            e.is_partner, e.partner_id, pr.name
         FROM employees e
         LEFT JOIN positions p ON p.id = e.position_id
         LEFT JOIN employees m ON m.id = e.manager_id
         LEFT JOIN employees d ON d.id = e.deputy_id
-        LEFT JOIN departments dep ON dep.id = e.department_id";
+        LEFT JOIN departments dep ON dep.id = e.department_id
+        LEFT JOIN partners pr ON pr.id = e.partner_id";
 
     fn map_employee_row(row: &rusqlite::Row) -> rusqlite::Result<EmployeeRecord> {
         Ok(EmployeeRecord {
@@ -740,6 +771,9 @@ impl Db {
             head_of_department_name: row.get(25)?,
             deputy_of_department_name: row.get(26)?,
             birth_date: row.get(27)?,
+            is_partner: row.get::<_, i64>(28)? != 0,
+            partner_id: row.get(29)?,
+            partner_name: row.get(30)?,
         })
     }
 
@@ -861,12 +895,17 @@ impl Db {
         department_id: Option<&str>,
         avatar_data: Option<&str>,
         birth_date: Option<&str>,
+        is_partner: bool,
+        partner_id: Option<&str>,
     ) -> Result<EmployeeRecord, String> {
         if !self.is_admin(admin_id) {
             return Err("Недостаточно прав для добавления сотрудников".into());
         }
         if password.len() < 6 {
             return Err("Пароль должен быть не короче 6 символов".into());
+        }
+        if is_partner && partner_id.is_none() {
+            return Err("Выберите партнёра для этого аккаунта".into());
         }
 
         let resolved_manager_id = self.resolve_manager(manager_id, department_id)?;
@@ -877,9 +916,9 @@ impl Db {
 
         self.conn
             .execute(
-                "INSERT INTO employees (id, employee_number, login, password_hash, full_name, is_admin, phone, position_id, manager_id, deputy_id, department_id, avatar_data, birth_date)
-                 VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
-                params![id, employee_number, login, password_hash, full_name, phone, position_id, resolved_manager_id, deputy_id, department_id, avatar_data, birth_date],
+                "INSERT INTO employees (id, employee_number, login, password_hash, full_name, is_admin, phone, position_id, manager_id, deputy_id, department_id, avatar_data, birth_date, is_partner, partner_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                params![id, employee_number, login, password_hash, full_name, phone, position_id, resolved_manager_id, deputy_id, department_id, avatar_data, birth_date, is_partner, partner_id],
             )
             .map_err(|e| {
                 if e.to_string().contains("UNIQUE") {
@@ -978,6 +1017,68 @@ impl Db {
                 }
             })?;
         Ok(PositionRecord { id, title: title.to_string() })
+    }
+
+    // ---- Партнёры (см. §"Партнёры" — организации-партнёры компании) ----
+    pub fn list_partners(&self) -> Vec<PartnerRecord> {
+        let mut stmt = match self.conn.prepare(
+            "SELECT pr.id, pr.name, pr.created_by, e.full_name, pr.created_at,
+                    (SELECT COUNT(*) FROM employees acc WHERE acc.partner_id = pr.id)
+             FROM partners pr
+             LEFT JOIN employees e ON e.id = pr.created_by
+             ORDER BY pr.name ASC",
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map([], |row| {
+            Ok(PartnerRecord {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                created_by: row.get(2)?,
+                created_by_name: row.get(3)?,
+                created_at: row.get(4)?,
+                account_count: row.get(5)?,
+            })
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default()
+    }
+
+    pub fn create_partner(&self, admin_id: &str, name: &str) -> Result<PartnerRecord, String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        let name = name.trim();
+        if name.is_empty() {
+            return Err("Укажите название партнёра".into());
+        }
+        let id = Uuid::new_v4().to_string();
+        self.conn
+            .execute(
+                "INSERT INTO partners (id, name, created_by) VALUES (?1, ?2, ?3)",
+                params![id, name, admin_id],
+            )
+            .map_err(|e| e.to_string())?;
+        self.list_partners()
+            .into_iter()
+            .find(|p| p.id == id)
+            .ok_or_else(|| "Не удалось создать партнёра".to_string())
+    }
+
+    pub fn delete_partner(&self, admin_id: &str, id: &str) -> Result<(), String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        let in_use: i64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM employees WHERE partner_id = ?1", params![id], |row| row.get(0))
+            .unwrap_or(0);
+        if in_use > 0 {
+            return Err("У этого партнёра ещё есть аккаунты — сначала удалите или перепривяжите их".into());
+        }
+        self.conn.execute("DELETE FROM partners WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
+        Ok(())
     }
 
     // ---- Подразделения ----

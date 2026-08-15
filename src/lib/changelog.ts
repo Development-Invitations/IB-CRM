@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.2.6';
+export const APP_VERSION = '0.2.8';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,22 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.2.8',
+      items: [
+        'Новый раздел для админа — "Партнёры": можно завести партнёра-организацию и создавать для него аккаунты (логин/пароль) прямо на странице "Сотрудники"',
+        'Аккаунты партнёров больше не показываются в общем списке сотрудников — только на вкладке "Партнёры"',
+        'Исправлено оформление блока "Заявка на изменение данных" в кабинете сотрудника — поля больше не растягивались на всю ширину карточки',
+      ],
+    },
+    {
+      version: '0.2.7',
+      items: [
+        'Уведомления теперь показываются собственным окном-баннером в цветах приложения — висит, пока не закроешь или не откроешь, а не системным тостом Windows',
+        'В сайдбаре появилась кнопка "Главная" — быстрый возврат на дашборд',
+        'На синей теме поправлена читаемость нескольких бейджей/статусов, которые сливались с фоном ("Заместитель", "Завершён", "Открыта", "Обсуждение")',
+      ],
+    },
     {
       version: '0.2.6',
       items: [
@@ -302,6 +318,22 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.2.8',
+      items: [
+        "Administrator uchun yangi bo'lim — \"Hamkorlar\": hamkor-tashkilot yaratish va u uchun akkaunt (login/parol) ochish endi to'g'ridan-to'g'ri \"Xodimlar\" sahifasida mumkin",
+        "Hamkor akkauntlari endi umumiy xodimlar ro'yxatida ko'rsatilmaydi — faqat \"Hamkorlar\" bo'limida",
+        "Xodim kabinetidagi \"Ma'lumotlarni o'zgartirish so'rovi\" blokining ko'rinishi tuzatildi — maydonlar endi kartaning butun kengligiga cho'zilmaydi",
+      ],
+    },
+    {
+      version: '0.2.7',
+      items: [
+        "Bildirishnomalar endi ilova ranglarida o'zining banner-oynasida ko'rsatiladi — yopmaguningizcha yoki ochmaguningizcha turadi, Windows tizim tosti o'rniga",
+        "Yon panelda \"Bosh sahifa\" tugmasi paydo bo'ldi — dashboardga tezkor qaytish",
+        "Ko'k mavzuda fonga qorishib ketayotgan bir nechta belgi/status o'qilishi tuzatildi (\"Yordamchi\", \"Yakunlangan\", \"Ochiq\", \"Muhokama\")",
+      ],
+    },
+    {
       version: '0.2.6',
       items: [
         "Klient rejimida \"Yangilanishlarni tekshirish\" endi internetga ulanishga urinish o'rniga versiyangizni server versiyasi bilan solishtiradi",
@@ -587,6 +619,22 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.2.8',
+      items: [
+        "Администратор учун янги бўлим — \"Ҳамкорлар\": ҳамкор-ташкилот яратиш ва у учун аккаунт (логин/парол) очиш энди тўғридан-тўғри \"Ходимлар\" саҳифасида мумкин",
+        "Ҳамкор аккаунтлари энди умумий ходимлар рўйхатида кўрсатилмайди — фақат \"Ҳамкорлар\" бўлимида",
+        "Ходим кабинетидаги \"Маълумотларни ўзгартириш сўрови\" блокининг кўриниши тузатилди — майдонлар энди картанинг бутун кенглигига чўзилмайди",
+      ],
+    },
+    {
+      version: '0.2.7',
+      items: [
+        "Билдиришномалар энди илова рангларида ўзининг баннер-ойнасида кўрсатилади — ёпмагунингизча ёки очмагунингизча туради, Windows тизим тости ўрнига",
+        "Ён панелда \"Бош саҳифа\" тугмаси пайдо бўлди — дашбордга тезкор қайтиш",
+        "Кўк мавзуда фонга қоришиб кетаётган бир нечта белги/статус ўқилиши тузатилди (\"Ёрдамчи\", \"Якунланган\", \"Очиқ\", \"Муҳокама\")",
+      ],
+    },
     {
       version: '0.2.6',
       items: [

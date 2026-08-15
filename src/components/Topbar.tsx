@@ -1,11 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, Settings as SettingsIcon, User } from 'lucide-react';
-import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { primaryMonitor } from '@tauri-apps/api/window';
+import { emit, listen } from '@tauri-apps/api/event';
 import { api, type Employee, type Notification } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import EditRequestReviewModal from './EditRequestReviewModal';
 import AbsenceRequestReviewModal from './AbsenceRequestReviewModal';
+import type { ToastPayload } from '../pages/ToastWindow';
+
+// Куда ведёт клик по уведомлению — вычисляется один раз и используется как
+// для клика в выпадающей панели (в этом же окне), так и для клика по
+// собственному окну-баннеру (см. ToastWindow.tsx) — там результат приходит
+// назад событием toast-navigate, потому что показывающее баннер окно другое.
+type NotificationTarget =
+  | { kind: 'modal-edit-request'; id: string }
+  | { kind: 'modal-absence'; id: string }
+  | { kind: 'navigate'; path: string; state?: Record<string, unknown> };
+
+const TOAST_WIDTH = 340;
+const TOAST_HEIGHT = 110;
 
 export default function Topbar({ employee }: { employee: Employee }) {
   const { t } = useLocale();
@@ -16,49 +31,129 @@ export default function Topbar({ employee }: { employee: Employee }) {
   const [reviewRequestId, setReviewRequestId] = useState<string | null>(null);
   const [reviewAbsenceId, setReviewAbsenceId] = useState<string | null>(null);
 
-  // Разрешение на нативные уведомления Windows запрашиваем один раз при
-  // монтировании, не на каждый опрос. `null` — ещё не знаем, `true`/`false` —
-  // результат (или тихий отказ, если плагин недоступен вне Tauri-контекста).
-  const osPermissionRef = useRef<boolean | null>(null);
-  // id уведомлений, уже показанных как нативный тост — чтобы не дублировать
-  // при каждом опросе, и чтобы НЕ засыпать пользователя пачкой старых
+  // id уведомлений, уже показанных баннером — чтобы не дублировать при
+  // каждом опросе, и чтобы НЕ засыпать пользователя пачкой старых
   // уведомлений при первом запуске (уведомляем только про новые после старта).
   const seenIdsRef = useRef<Set<string> | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        let granted = await isPermissionGranted();
-        if (!granted) {
-          const perm = await requestPermission();
-          granted = perm === 'granted';
-        }
-        osPermissionRef.current = granted;
-      } catch {
-        osPermissionRef.current = false;
-      }
-    })();
-  }, []);
+  const resolveNotificationTarget = (n: Notification): NotificationTarget => {
+    if (n.type === 'edit_request' && n.relatedEntityId) {
+      // Заявка на изменение данных — открываем модалку рассмотрения (только для админа,
+      // но такие уведомления и приходят только админам, см. notify_all_admins в db.rs).
+      return { kind: 'modal-edit-request', id: n.relatedEntityId };
+    }
+    if (n.type === 'absence_request' && n.relatedEntityId) {
+      // Заявка на отсутствие — приходит либо руководителю сотрудника, либо всем
+      // админам, если руководитель не назначен (см. create_absence_request в db.rs).
+      return { kind: 'modal-absence', id: n.relatedEntityId };
+    }
+    if (n.relatedEntityType === 'regulation' && n.relatedEntityId) {
+      // Задача/напоминание/добавление в регламент — открываем сам регламент,
+      // а не просто кабинет сотрудника (см. openRegId в Regulations.tsx).
+      return { kind: 'navigate', path: '/dashboard/regulations', state: { openRegId: n.relatedEntityId } };
+    }
+    if (n.relatedEntityType === 'project' && n.relatedEntityId) {
+      // Назначение сообщения/передача владения проектом — открываем сам проект.
+      return { kind: 'navigate', path: '/dashboard/projects', state: { openProjectId: n.relatedEntityId } };
+    }
+    if (n.type === 'birthday') {
+      // День рождения коллеги — ведём в календарь дней рождений, а не в свой кабинет.
+      return { kind: 'navigate', path: '/dashboard/birthdays' };
+    }
+    // Остальные типы (например, результат рассмотрения своей же заявки) — ведём в кабинет.
+    return { kind: 'navigate', path: `/dashboard/employees/${employee.id}` };
+  };
+
+  const applyNotificationTarget = (target: NotificationTarget) => {
+    if (target.kind === 'modal-edit-request') setReviewRequestId(target.id);
+    else if (target.kind === 'modal-absence') setReviewAbsenceId(target.id);
+    else navigate(target.path, target.state ? { state: target.state } : undefined);
+  };
 
   const loadNotifications = () => {
     api.listNotifications(employee.id)
       .then((list) => {
         setNotifications(list);
-        const unreadIds = list.filter((n) => !n.isRead);
+        const unread = list.filter((n) => !n.isRead);
         if (seenIdsRef.current === null) {
-          seenIdsRef.current = new Set(unreadIds.map((n) => n.id));
+          seenIdsRef.current = new Set(unread.map((n) => n.id));
         } else {
-          const newOnes = unreadIds.filter((n) => !seenIdsRef.current!.has(n.id));
-          if (newOnes.length > 0 && osPermissionRef.current) {
-            for (const n of newOnes) {
-              sendNotification({ title: n.title, body: n.body ?? undefined });
-            }
-          }
-          seenIdsRef.current = new Set(unreadIds.map((n) => n.id));
+          const newOnes = unread.filter((n) => !seenIdsRef.current!.has(n.id));
+          newOnes.forEach(showToast);
+          seenIdsRef.current = new Set(unread.map((n) => n.id));
         }
       })
       .catch(() => {});
   };
+
+  // Собственное окно-баннер (вместо системного тоста Windows — тот нельзя ни
+  // стилизовать под темы приложения, ни заставить висеть до явного закрытия,
+  // см. журнал v0.2.6/v0.2.7 в docs/TZ.md). Окно создаётся один раз и
+  // переиспользуется — на новое уведомление просто обновляем его содержимое.
+  const showToast = async (n: Notification) => {
+    try {
+      const target = resolveNotificationTarget(n);
+      const payload: ToastPayload = {
+        notificationId: n.id,
+        title: n.title,
+        body: n.body,
+        path: target.kind === 'navigate' ? target.path : `/dashboard/employees/${employee.id}`,
+        navState: target.kind === 'navigate' ? target.state : { reviewKind: target.kind, reviewId: target.id },
+      };
+
+      let win = await WebviewWindow.getByLabel('toast');
+      if (!win) {
+        const monitor = await primaryMonitor();
+        const scale = monitor?.scaleFactor ?? 1;
+        const logicalW = monitor ? monitor.size.width / scale : 1920;
+        const logicalH = monitor ? monitor.size.height / scale : 1080;
+        win = new WebviewWindow('toast', {
+          url: 'index.html#/toast',
+          width: TOAST_WIDTH,
+          height: TOAST_HEIGHT,
+          x: Math.max(0, Math.round(logicalW - TOAST_WIDTH - 20)),
+          y: Math.max(0, Math.round(logicalH - TOAST_HEIGHT - 60)),
+          decorations: false,
+          alwaysOnTop: true,
+          skipTaskbar: true,
+          resizable: false,
+          shadow: true,
+          transparent: true,
+          focus: false,
+          visible: false,
+        });
+        await new Promise<void>((resolve) => {
+          win!.once('tauri://created', () => resolve());
+          win!.once('tauri://error', () => resolve());
+        });
+      }
+      await win.show();
+      await emit('toast-show', payload);
+    } catch {
+      // Тихо игнорируем — например, вне Tauri-контекста или окно не удалось создать.
+    }
+  };
+
+  // Клик по баннеру (отдельное окно) сообщает сюда, что открыть — этот же
+  // код уже умеет и открывать модалку рассмотрения, и переходить по маршруту.
+  useEffect(() => {
+    const unlisten = listen<{ notificationId: string; path: string; state?: Record<string, unknown> }>('toast-navigate', (event) => {
+      api.markNotificationRead(event.payload.notificationId).catch(() => {});
+      setNotifications((prev) => prev.map((x) => (x.id === event.payload.notificationId ? { ...x, isRead: true } : x)));
+      const st = event.payload.state as { reviewKind?: 'modal-edit-request' | 'modal-absence'; reviewId?: string } | undefined;
+      if (st?.reviewKind === 'modal-edit-request' && st.reviewId) {
+        setReviewRequestId(st.reviewId);
+      } else if (st?.reviewKind === 'modal-absence' && st.reviewId) {
+        setReviewAbsenceId(st.reviewId);
+      } else {
+        navigate(event.payload.path, event.payload.state ? { state: event.payload.state } : undefined);
+      }
+    });
+    return () => {
+      unlisten.then((f) => f());
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     loadNotifications();
@@ -87,29 +182,7 @@ export default function Topbar({ employee }: { employee: Employee }) {
     await api.markNotificationRead(n.id);
     setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)));
     setOpen(false);
-
-    if (n.type === 'edit_request' && n.relatedEntityId) {
-      // Заявка на изменение данных — открываем модалку рассмотрения (только для админа,
-      // но такие уведомления и приходят только админам, см. notify_all_admins в db.rs).
-      setReviewRequestId(n.relatedEntityId);
-    } else if (n.type === 'absence_request' && n.relatedEntityId) {
-      // Заявка на отсутствие — приходит либо руководителю сотрудника, либо всем
-      // админам, если руководитель не назначен (см. create_absence_request в db.rs).
-      setReviewAbsenceId(n.relatedEntityId);
-    } else if (n.relatedEntityType === 'regulation' && n.relatedEntityId) {
-      // Задача/напоминание/добавление в регламент — открываем сам регламент,
-      // а не просто кабинет сотрудника (см. openRegId в Regulations.tsx).
-      navigate('/dashboard/regulations', { state: { openRegId: n.relatedEntityId } });
-    } else if (n.relatedEntityType === 'project' && n.relatedEntityId) {
-      // Назначение сообщения/передача владения проектом — открываем сам проект.
-      navigate('/dashboard/projects', { state: { openProjectId: n.relatedEntityId } });
-    } else if (n.type === 'birthday') {
-      // День рождения коллеги — ведём в календарь дней рождений, а не в свой кабинет.
-      navigate('/dashboard/birthdays');
-    } else {
-      // Остальные типы (например, результат рассмотрения своей же заявки) — ведём в кабинет.
-      navigate(`/dashboard/employees/${employee.id}`);
-    }
+    applyNotificationTarget(resolveNotificationTarget(n));
   };
 
   return (

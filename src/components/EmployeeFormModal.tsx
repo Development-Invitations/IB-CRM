@@ -1,6 +1,7 @@
 import { useEffect, useState, FormEvent, ChangeEvent, useRef } from 'react';
 import { Plus, Camera, X } from 'lucide-react';
-import { api, type Employee, type Position, type Department } from '../lib/api';
+import { api, type Employee, type Position, type Department, type Partner } from '../lib/api';
+import Checkbox from './Checkbox';
 import { formatUzPhone } from '../lib/phone';
 import { compressImageFile } from '../lib/photo';
 import { WEEK_DAYS, WEEK_DAY_KEYS } from '../lib/schedule';
@@ -22,6 +23,9 @@ type Props = {
   onPositionCreated: (position: Position) => void;
   currentEmployeeId: string;
   onSaved: () => void;
+  // Открыть сразу с отмеченным чекбоксом "Партнёр" и выбранной организацией —
+  // используется кнопкой "Добавить аккаунт" на вкладке "Партнёры".
+  initialPartner?: Partner;
 };
 
 export default function EmployeeFormModal({
@@ -35,6 +39,7 @@ export default function EmployeeFormModal({
   onPositionCreated,
   currentEmployeeId,
   onSaved,
+  initialPartner,
 }: Props) {
   const { t } = useLocale();
   const { showToast } = useToast();
@@ -55,6 +60,19 @@ export default function EmployeeFormModal({
   const [workDays, setWorkDays] = useState<number[]>([]);
   const [workStart, setWorkStart] = useState('');
   const [workEnd, setWorkEnd] = useState('');
+
+  // Аккаунт партнёра — только при создании (см. db.rs::create_employee).
+  // Партнёр — организация, аккаунт привязывается к уже созданной (список тут
+  // же, "+ создать" не нужен — заводится в отдельной вкладке "Партнёры").
+  const [isPartner, setIsPartner] = useState(false);
+  const [partnerId, setPartnerId] = useState('');
+  const [partners, setPartners] = useState<Partner[]>([]);
+
+  useEffect(() => {
+    if (open && mode === 'create') {
+      api.listPartners().then(setPartners).catch(() => {});
+    }
+  }, [open, mode]);
 
   const toggleWorkDay = (day: number) => {
     setWorkDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort((a, b) => a - b)));
@@ -96,11 +114,13 @@ export default function EmployeeFormModal({
       setWorkDays([]);
       setWorkStart('');
       setWorkEnd('');
+      setIsPartner(!!initialPartner);
+      setPartnerId(initialPartner?.id ?? '');
     }
     setAddingPosition(false);
     setNewPositionTitle('');
     setError('');
-  }, [open, mode, employee]);
+  }, [open, mode, employee, initialPartner]);
 
   const handleAvatarChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -145,6 +165,10 @@ export default function EmployeeFormModal({
       setError(t('firstRun.errorShortPassword'));
       return;
     }
+    if (mode === 'create' && isPartner && !partnerId) {
+      setError(t('employees.partnerRequired'));
+      return;
+    }
 
     const shared = {
       fullName: fullName.trim(),
@@ -161,7 +185,14 @@ export default function EmployeeFormModal({
     try {
       let savedEmployee: Employee;
       if (mode === 'create') {
-        savedEmployee = await api.createEmployee({ adminId: currentEmployeeId, login: login.trim(), password, ...shared });
+        savedEmployee = await api.createEmployee({
+          adminId: currentEmployeeId,
+          login: login.trim(),
+          password,
+          isPartner,
+          partnerId: isPartner ? partnerId : null,
+          ...shared,
+        });
         showToast('success', t('employees.added'));
       } else if (employee) {
         savedEmployee = await api.updateEmployee({ adminId: currentEmployeeId, employeeId: employee.id, ...shared });
@@ -270,6 +301,23 @@ export default function EmployeeFormModal({
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
             <p className="settings-hint">{t('employees.tempPasswordHint')}</p>
+
+            <div className="field">
+              <Checkbox checked={isPartner} onChange={setIsPartner} label={t('employees.partnerCheckboxLabel')} />
+              {isPartner && (
+                <>
+                  <Select
+                    value={partnerId}
+                    options={[
+                      { value: '', label: t('employees.notSelected') },
+                      ...partners.map((p) => ({ value: p.id, label: p.name })),
+                    ]}
+                    onChange={setPartnerId}
+                  />
+                  {partners.length === 0 && <p className="settings-hint">{t('employees.partnerListEmptyHint')}</p>}
+                </>
+              )}
+            </div>
           </>
         )}
 

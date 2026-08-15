@@ -63,6 +63,26 @@ struct Employee {
     deputy_of_department_name: Option<String>,
     #[serde(rename = "birthDate")]
     birth_date: Option<String>,
+    #[serde(rename = "isPartner")]
+    is_partner: bool,
+    #[serde(rename = "partnerId")]
+    partner_id: Option<String>,
+    #[serde(rename = "partnerName")]
+    partner_name: Option<String>,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct Partner {
+    id: String,
+    name: String,
+    #[serde(rename = "createdBy")]
+    created_by: Option<String>,
+    #[serde(rename = "createdByName")]
+    created_by_name: Option<String>,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+    #[serde(rename = "accountCount")]
+    account_count: i64,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -491,6 +511,24 @@ struct CreateEmployeePayload {
     avatar_data: Option<String>,
     #[serde(rename = "birthDate")]
     birth_date: Option<String>,
+    #[serde(rename = "isPartner", default)]
+    is_partner: bool,
+    #[serde(rename = "partnerId")]
+    partner_id: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct CreatePartnerPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    name: String,
+}
+
+#[derive(serde::Deserialize)]
+struct DeletePartnerPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    id: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -1013,6 +1051,20 @@ fn to_employee(e: db::EmployeeRecord) -> Employee {
         head_of_department_name: e.head_of_department_name,
         deputy_of_department_name: e.deputy_of_department_name,
         birth_date: e.birth_date,
+        is_partner: e.is_partner,
+        partner_id: e.partner_id,
+        partner_name: e.partner_name,
+    }
+}
+
+fn to_partner(p: db::PartnerRecord) -> Partner {
+    Partner {
+        id: p.id,
+        name: p.name,
+        created_by: p.created_by,
+        created_by_name: p.created_by_name,
+        created_at: p.created_at,
+        account_count: p.account_count,
     }
 }
 
@@ -1295,8 +1347,28 @@ fn create_employee(payload: CreateEmployeePayload, state: tauri::State<AppState>
         payload.department_id.as_deref(),
         payload.avatar_data.as_deref(),
         payload.birth_date.as_deref(),
+        payload.is_partner,
+        payload.partner_id.as_deref(),
     )
     .map(to_employee)
+}
+
+#[tauri::command]
+fn list_partners(state: tauri::State<AppState>) -> Vec<Partner> {
+    let db = state.0.lock().unwrap();
+    db.list_partners().into_iter().map(to_partner).collect()
+}
+
+#[tauri::command]
+fn create_partner(payload: CreatePartnerPayload, state: tauri::State<AppState>) -> Result<Partner, String> {
+    let db = state.0.lock().unwrap();
+    db.create_partner(&payload.admin_id, &payload.name).map(to_partner)
+}
+
+#[tauri::command]
+fn delete_partner(payload: DeletePartnerPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.delete_partner(&payload.admin_id, &payload.id)
 }
 
 #[tauri::command]
@@ -1878,7 +1950,6 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_http::init())
-        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir().expect("нет app data dir");
             std::fs::create_dir_all(&app_data_dir).ok();
@@ -1907,6 +1978,9 @@ fn main() {
             list_employees,
             get_employee,
             create_employee,
+            list_partners,
+            create_partner,
+            delete_partner,
             update_employee,
             list_positions,
             create_position,

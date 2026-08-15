@@ -8,6 +8,7 @@ export const FullscreenContext = createContext<{
   exit: () => void;
 }>({ isFullscreen: false, enter: () => {}, exit: () => {} });
 import {
+  LayoutDashboard,
   Users,
   Building2,
   Contact,
@@ -60,6 +61,10 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
       <aside className="sidebar">
         <div className="brand">IB CRM</div>
         <nav>
+          <NavLink to="." end className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            <LayoutDashboard size={16} className="nav-icon" />
+            {t('sidebar.home')}
+          </NavLink>
           {modules.map((m) =>
             m.path ? (
               <NavLink key={m.label} to={m.path} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>

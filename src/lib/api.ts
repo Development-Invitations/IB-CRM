@@ -304,6 +304,18 @@ export type Employee = {
   headOfDepartmentName: string | null;
   deputyOfDepartmentName: string | null;
   birthDate: string | null;
+  isPartner: boolean;
+  partnerId: string | null;
+  partnerName: string | null;
+};
+
+export type Partner = {
+  id: string;
+  name: string;
+  createdBy: string | null;
+  createdByName: string | null;
+  createdAt: string;
+  accountCount: number;
 };
 
 export type Session = {
@@ -383,11 +395,19 @@ export const api = {
 
   getEmployee: (id: string) => invoke<Employee | null>('get_employee', { id }),
 
-  createEmployee: (payload: EmployeeFormPayload & { adminId: string; login: string; password: string }) =>
+  createEmployee: (payload: EmployeeFormPayload & { adminId: string; login: string; password: string; isPartner?: boolean; partnerId?: string | null }) =>
     invoke<Employee>('create_employee', { payload }),
 
   updateEmployee: (payload: EmployeeFormPayload & { adminId: string; employeeId: string }) =>
     invoke<Employee>('update_employee', { payload }),
+
+  listPartners: () => invoke<Partner[]>('list_partners'),
+
+  createPartner: (payload: { adminId: string; name: string }) =>
+    invoke<Partner>('create_partner', { payload }),
+
+  deletePartner: (payload: { adminId: string; id: string }) =>
+    invoke<void>('delete_partner', { payload }),
 
   listPositions: () => invoke<Position[]>('list_positions'),
 

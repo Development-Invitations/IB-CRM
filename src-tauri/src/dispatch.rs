@@ -62,8 +62,17 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db) -> Result<Value, String> {
                 &p.admin_id, &p.login, &p.password, &p.full_name,
                 p.phone.as_deref(), p.position_id.as_deref(), p.manager_id.as_deref(),
                 p.deputy_id.as_deref(), p.department_id.as_deref(), p.avatar_data.as_deref(),
-                p.birth_date.as_deref(),
+                p.birth_date.as_deref(), p.is_partner, p.partner_id.as_deref(),
             ).map(crate::to_employee).map(to_json)
+        }
+        "list_partners" => Ok(to_json(db.list_partners().into_iter().map(crate::to_partner).collect::<Vec<_>>())),
+        "create_partner" => {
+            let p: crate::CreatePartnerPayload = from_payload(payload)?;
+            db.create_partner(&p.admin_id, &p.name).map(crate::to_partner).map(to_json)
+        }
+        "delete_partner" => {
+            let p: crate::DeletePartnerPayload = from_payload(payload)?;
+            db.delete_partner(&p.admin_id, &p.id).map(to_json)
         }
         "update_employee" => {
             let p: crate::UpdateEmployeePayload = from_payload(payload)?;

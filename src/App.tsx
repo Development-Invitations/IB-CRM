@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { exit } from '@tauri-apps/plugin-process';
 import FirstRunSetup from './pages/FirstRunSetup';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import PartnerPanel from './pages/PartnerPanel';
+import ToastWindow from './pages/ToastWindow';
 import LoadingScreen from './components/LoadingScreen';
 import { api, type Employee } from './lib/api';
 import { session } from './lib/session';
@@ -12,6 +14,7 @@ import { useLocale } from './lib/i18n';
 
 export default function App() {
   const { t } = useLocale();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [adminExists, setAdminExists] = useState(false);
   // Сессия читается из sessionStorage (не localStorage!) — переживает reload
@@ -41,12 +44,23 @@ export default function App() {
     setCurrentEmployee(null);
   };
 
+  // Окно уведомления (см. src/pages/ToastWindow.tsx) — отдельное лёгкое OS-окно
+  // без авторизации и без обращений к БД, поэтому весь блок ниже (проверка
+  // администратора, слежение за закрытием окна и т.д.) ему не нужен и даже
+  // вреден (лишний сетевой запрос при каждом показе уведомления).
+  const isToastWindow = location.pathname === '/toast';
+
   useEffect(() => {
+    if (isToastWindow) {
+      setLoading(false);
+      return;
+    }
     api.hasAdmin().then((res) => {
       setAdminExists(res);
       setLoading(false);
     });
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isToastWindow]);
 
   // Лучшая попытка зафиксировать выход и при закрытии окна приложения (крестик),
   // а не только по кнопке "Выйти" — иначе статус "в сети" завис бы навсегда,
@@ -87,6 +101,7 @@ export default function App() {
     };
   }, [currentEmployee?.id]);
 
+  if (isToastWindow) return <ToastWindow />;
   if (loading) return <LoadingScreen />;
 
   return (
@@ -125,7 +140,11 @@ export default function App() {
         path="/dashboard/*"
         element={
           currentEmployee ? (
-            <Dashboard employee={currentEmployee} onLogout={handleLogout} />
+            currentEmployee.isPartner ? (
+              <PartnerPanel employee={currentEmployee} onLogout={handleLogout} />
+            ) : (
+              <Dashboard employee={currentEmployee} onLogout={handleLogout} />
+            )
           ) : (
             <Navigate to="/login" />
           )

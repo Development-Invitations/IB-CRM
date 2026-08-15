@@ -57,6 +57,14 @@
   --color-border: #2A4BA0;
   --color-danger: #FF6B6B;
   --color-success: #4ADE80;
+  /* --color-primary (#1E3A8A) нигде больше не переопределяется — но именно
+     на этой теме фон и поверхности сами тёмно-синие, того же оттенка, так
+     что бейджи/статусы на var(--color-primary) сливались с карточками
+     (бейдж "Заместитель", статус "Завершён" у проектов, "Открыта" у записей
+     регламента, категория "Обсуждение" в блоге — везде текст/бейдж был почти
+     не виден). Светлее и чуть более насыщенный оттенок синего держит тот же
+     смысл цвета, но реально виден на тёмно-синих поверхностях этой темы. */
+  --color-primary: #5B8DEF;
 }
 
 * { box-sizing: border-box; }
@@ -85,6 +93,75 @@ html, body, #root {
   font-family: var(--font);
   background: var(--color-bg);
   color: var(--color-text);
+}
+
+html.toast-window-root, html.toast-window-root body, html.toast-window-root #root {
+  background: transparent;
+}
+
+/* ---- Собственное окно-уведомление (вместо системного тоста Windows) ---- */
+.toast-window {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 100%;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  overflow: hidden;
+  user-select: none;
+}
+
+.toast-window-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toast-window-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.toast-window-close {
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  border-radius: 4px;
+}
+.toast-window-close:hover { background: var(--color-surface-2); color: var(--color-text); }
+
+.toast-window-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.toast-window-body {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .loading-screen {
@@ -868,6 +945,46 @@ button.primary:hover { filter: brightness(0.95); }
 
 .employees-header h1 { margin: 0; }
 
+.employees-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.employees-tab-btn {
+  padding: 8px 4px;
+  margin-bottom: -1px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.employees-tab-btn:hover { color: var(--color-text); }
+.employees-tab-btn.active { color: var(--color-accent); border-bottom-color: var(--color-accent); }
+
+/* ---- Панель партнёра (заглушка) ---- */
+.partner-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  padding: 24px;
+}
+.partner-panel-card {
+  max-width: 420px;
+  text-align: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 32px;
+}
+.partner-panel-card h1 { font-size: 18px; margin: 0 0 10px; }
+.partner-panel-card p { margin-bottom: 20px; }
+
 button.employees-add-btn {
   width: auto;
   display: inline-flex;
@@ -1524,8 +1641,13 @@ button.employees-add-btn {
 
 .profile-edit-request-block {
   margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid var(--color-border);
+  padding: 20px 24px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  /* Без ограничения ширины поля растягивались на всю карту профиля
+     (та сейчас до 1400px) — на широком экране это выглядело сломанным. */
+  max-width: 520px;
 }
 
 .profile-edit-request-title {
@@ -1535,16 +1657,18 @@ button.employees-add-btn {
   font-size: 13px;
   font-weight: 600;
   color: var(--color-accent);
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
-.edit-request-form { display: flex; flex-direction: column; }
+.edit-request-form { display: flex; flex-direction: column; gap: 4px; }
+.edit-request-form .checkbox-row { margin-bottom: 2px; }
+.edit-request-form .field { margin-top: 6px; }
 
 .edit-request-form-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 12px;
+  margin-top: 14px;
 }
 
 /* ---- Модалка рассмотрения заявки (админ) ---- */

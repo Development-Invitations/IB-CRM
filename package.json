@@ -1,6 +1,6 @@
 {
   "name": "ib-crm",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "IB OOO \"ISHONCHLI BOSH BUXGALTER\" — корпоративная CRM",
   "author": "IB - Команда",
   "private": true,
@@ -15,8 +15,10 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.1",
+    "@tauri-apps/plugin-fs": "^2.5.1",
     "@tauri-apps/plugin-http": "^2.5.9",
     "@tauri-apps/plugin-process": "^2.0.0",
+    "@tauri-apps/plugin-shell": "^2.3.5",
     "@tauri-apps/plugin-updater": "^2.0.0",
     "lucide-react": "^0.383.0",
     "react": "^18.3.1",

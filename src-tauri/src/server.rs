@@ -7,14 +7,17 @@
 
 use crate::db::Db;
 use axum::{
+    body::Bytes,
     extract::State,
-    http::{HeaderMap, StatusCode},
-    routing::post,
+    http::{header, HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
+    routing::{get, post},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};
 use tower_http::cors::CorsLayer;
 
@@ -24,6 +27,10 @@ pub struct ServerState {
     // token -> employeeId. Живёт в памяти — перезапуск сервера разлогинивает
     // всех клиентов, это ожидаемо и безвредно (просто заново логинятся).
     pub sessions: Arc<RwLock<HashMap<String, String>>>,
+    // Для раздачи файла установщика клиентам (см. download_installer_handler)
+    // — практичная замена настоящему подписанному автообновителю, см. журнал
+    // v0.2.9 в docs/TZ.md.
+    pub app_data_dir: PathBuf,
 }
 
 #[derive(Deserialize)]
@@ -114,7 +121,7 @@ async fn invoke_handler(
 
     let dispatch_result = {
         let db = state.db.lock().unwrap();
-        crate::dispatch::dispatch(&req.command, req.payload, &db)
+        crate::dispatch::dispatch(&req.command, req.payload, &db, &state.app_data_dir)
     };
 
     match dispatch_result {
@@ -151,10 +158,39 @@ async fn invoke_handler(
     }
 }
 
-pub async fn run(db: Arc<Mutex<Db>>, port: u16) {
-    let state = ServerState { db, sessions: Arc::new(RwLock::new(HashMap::new())) };
+// Раздаёт сырые байты установщика клиенту — не через /api/invoke (JSON),
+// т.к. установщик весит несколько мегабайт и base64-в-JSON для такого объёма
+// не имеет смысла. Тот же токен сессии, что и у обычных команд — просто
+// проверяется вручную, а не через общую ветку invoke_handler.
+async fn download_installer_handler(State(state): State<ServerState>, headers: HeaderMap) -> Response {
+    let header_token = headers.get("x-session-token").and_then(|v| v.to_str().ok());
+    let authed = header_token
+        .map(|t| state.sessions.read().unwrap().contains_key(t))
+        .unwrap_or(false);
+    if !authed {
+        return unauthorized("Не авторизован — войдите заново").into_response();
+    }
+
+    let path = crate::update_installer_path(&state.app_data_dir);
+    match tokio::fs::read(&path).await {
+        Ok(bytes) => (
+            StatusCode::OK,
+            [
+                (header::CONTENT_TYPE, "application/octet-stream".to_string()),
+                (header::CONTENT_DISPOSITION, "attachment; filename=\"IB-CRM-Setup.exe\"".to_string()),
+            ],
+            Bytes::from(bytes),
+        )
+            .into_response(),
+        Err(_) => (StatusCode::NOT_FOUND, "Файл обновления не найден на сервере").into_response(),
+    }
+}
+
+pub async fn run(db: Arc<Mutex<Db>>, port: u16, app_data_dir: PathBuf) {
+    let state = ServerState { db, sessions: Arc::new(RwLock::new(HashMap::new())), app_data_dir };
     let app = Router::new()
         .route("/api/invoke", post(invoke_handler))
+        .route("/api/update-installer", get(download_installer_handler))
         // Доверенная локальная сеть (офис) — разрешаем любой origin, чтобы не
         // гадать, как именно вебвью Tauri представляется на разных платформах.
         .layer(CorsLayer::permissive())

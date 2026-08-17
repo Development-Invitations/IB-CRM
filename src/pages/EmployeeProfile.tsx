@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, ChangeEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Phone, Briefcase, Building2, UserCog, Users, Clock, Send, Calendar, History, CalendarPlus, Cake, Camera, X, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Phone, Briefcase, Building2, UserCog, Users, Clock, Send, Calendar, History, CalendarPlus, Cake, Camera, X, ChevronDown, KeyRound, Handshake } from 'lucide-react';
 import { api, type Employee, type Session, type AbsenceRequest } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
@@ -102,6 +102,26 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
     }
     return Array.from(map.entries());
   }, [sessions]);
+
+  // ---- Админ меняет пароль аккаунта партнёра — у партнёров нет
+  // самостоятельного "Сменить пароль" (см. change_password), а
+  // admin_reset_password не требует знать старый пароль ----
+  const [resetPasswordValue, setResetPasswordValue] = useState('');
+  const [resetPasswordBusy, setResetPasswordBusy] = useState(false);
+
+  const handleResetPassword = async () => {
+    if (!employee || resetPasswordValue.length < 6) return;
+    setResetPasswordBusy(true);
+    try {
+      await api.adminResetPassword({ adminId: currentEmployee.id, employeeId: employee.id, newPassword: resetPasswordValue });
+      showToast('success', t('employees.resetPasswordSuccess'));
+      setResetPasswordValue('');
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('employees.errorGeneric'));
+    } finally {
+      setResetPasswordBusy(false);
+    }
+  };
 
   // ---- Режим "временный доступ выдан" — редактирование прямо тут ----
   const [editFullName, setEditFullName] = useState('');
@@ -228,10 +248,16 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
             <div>
               <h1>{employee.fullName || employee.login}</h1>
               <p className="settings-hint">
-                {employee.employeeNumber} · {employee.isAdmin ? t('sidebar.admin') : t('employees.roleEmployee')}
+                {employee.employeeNumber} ·{' '}
+                {employee.isAdmin ? t('sidebar.admin') : employee.isPartner ? t('employees.rolePartner') : t('employees.roleEmployee')}
               </p>
-              {(employee.headOfDepartmentName || employee.deputyOfDepartmentName) && (
+              {(employee.isPartner || employee.headOfDepartmentName || employee.deputyOfDepartmentName) && (
                 <div className="role-badges">
+                  {employee.isPartner && (
+                    <span className="role-badge role-badge-partner">
+                      <Handshake size={12} /> {employee.partnerName}
+                    </span>
+                  )}
                   {employee.headOfDepartmentName && (
                     <span className="role-badge role-badge-head">
                       {t('employees.headOfDepartmentLabel')}: {employee.headOfDepartmentName}
@@ -248,42 +274,50 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
           </div>
 
           <div className="profile-grid">
-            <div className="profile-field">
-              <span className="settings-hint">
-                <Cake size={13} /> {t('employees.birthDateLabel')}
-              </span>
-              <span>{employee.birthDate ? formatLocalDate(employee.birthDate) : '—'}</span>
-            </div>
-            <div className="profile-field">
-              <span className="settings-hint">
-                <Phone size={13} /> {t('employees.phoneLabel')}
-              </span>
-              <span>{employee.phone || '—'}</span>
-            </div>
+            {!employee.isPartner && (
+              <div className="profile-field">
+                <span className="settings-hint">
+                  <Cake size={13} /> {t('employees.birthDateLabel')}
+                </span>
+                <span>{employee.birthDate ? formatLocalDate(employee.birthDate) : '—'}</span>
+              </div>
+            )}
+            {!employee.isPartner && (
+              <div className="profile-field">
+                <span className="settings-hint">
+                  <Phone size={13} /> {t('employees.phoneLabel')}
+                </span>
+                <span>{employee.phone || '—'}</span>
+              </div>
+            )}
             <div className="profile-field">
               <span className="settings-hint">
                 <Briefcase size={13} /> {t('employees.positionLabel')}
               </span>
               <span>{employee.positionTitle || '—'}</span>
             </div>
-            <div className="profile-field">
-              <span className="settings-hint">
-                <Building2 size={13} /> {t('employees.departmentLabel')}
-              </span>
-              <span>{employee.departmentName || '—'}</span>
-            </div>
-            <div className="profile-field">
-              <span className="settings-hint">
-                <UserCog size={13} /> {t('employees.managerLabel')}
-              </span>
-              <span>{employee.managerName || '—'}</span>
-            </div>
-            <div className="profile-field">
-              <span className="settings-hint">
-                <Users size={13} /> {t('employees.deputyLabel')}
-              </span>
-              <span>{employee.deputyName || '—'}</span>
-            </div>
+            {!employee.isPartner && (
+              <>
+                <div className="profile-field">
+                  <span className="settings-hint">
+                    <Building2 size={13} /> {t('employees.departmentLabel')}
+                  </span>
+                  <span>{employee.departmentName || '—'}</span>
+                </div>
+                <div className="profile-field">
+                  <span className="settings-hint">
+                    <UserCog size={13} /> {t('employees.managerLabel')}
+                  </span>
+                  <span>{employee.managerName || '—'}</span>
+                </div>
+                <div className="profile-field">
+                  <span className="settings-hint">
+                    <Users size={13} /> {t('employees.deputyLabel')}
+                  </span>
+                  <span>{employee.deputyName || '—'}</span>
+                </div>
+              </>
+            )}
             <div className="profile-field">
               <span className="settings-hint">
                 <Calendar size={13} /> {t('employees.createdAtLabel')}
@@ -316,6 +350,30 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
 
           {isOwnProfile && <StatusPicker employee={employee} onChanged={setEmployee} />}
 
+          {currentEmployee.isAdmin && employee.isPartner && (
+            <div className="profile-sessions-block">
+              <div className="profile-edit-request-title">
+                <KeyRound size={14} /> {t('employees.resetPasswordTitle')}
+              </div>
+              <div className="field" style={{ maxWidth: 320 }}>
+                <input
+                  type="password"
+                  value={resetPasswordValue}
+                  onChange={(e) => setResetPasswordValue(e.target.value)}
+                  placeholder={t('employees.resetPasswordLabel')}
+                />
+              </div>
+              <button
+                className="modal-btn danger"
+                onClick={handleResetPassword}
+                disabled={resetPasswordBusy || resetPasswordValue.length < 6}
+              >
+                {resetPasswordBusy ? t('employees.resetPasswordSaving') : t('employees.resetPasswordBtn')}
+              </button>
+            </div>
+          )}
+
+          {!employee.isPartner && (
           <div className="profile-sessions-block">
             <div className="profile-edit-request-title">
               <CalendarPlus size={14} /> {t('absence.myTitle')}
@@ -344,6 +402,7 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
               </ul>
             )}
           </div>
+          )}
 
           <div className="profile-sessions-block">
             <div className="profile-edit-request-title">

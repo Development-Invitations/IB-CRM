@@ -11,6 +11,8 @@ import LoadingScreen from './components/LoadingScreen';
 import { api, type Employee } from './lib/api';
 import { session } from './lib/session';
 import { useLocale } from './lib/i18n';
+import { onSessionExpired } from './lib/sessionExpiry';
+import { saveReturnPath, consumeReturnPath } from './lib/returnPath';
 
 export default function App() {
   const { t } = useLocale();
@@ -22,11 +24,18 @@ export default function App() {
   // пароль всё равно спросится заново при следующем реальном запуске.
   // См. подробный комментарий в src/lib/session.ts.
   const [currentEmployee, setCurrentEmployeeState] = useState<Employee | null>(() => session.get<Employee>());
+  // true — пользователя выкинуло принудительно (сервер перезапустили, токен
+  // сессии стал недействителен), а не он сам вышел — Login.tsx показывает
+  // отдельное объяснение вместо обычного экрана входа.
+  const [sessionExpiredNotice, setSessionExpiredNotice] = useState(false);
+  const [returnPath, setReturnPath] = useState<string | null>(null);
 
   const setCurrentEmployee = (emp: Employee | null) => {
     setCurrentEmployeeState(emp);
     if (emp) {
       session.set(emp);
+      setSessionExpiredNotice(false);
+      setReturnPath(consumeReturnPath());
       // Фиксируем реальный новый вход (не срабатывает при восстановлении
       // сессии из sessionStorage при обычном reload страницы — там employee
       // читается напрямую из session.get() в инициализаторе useState выше,
@@ -36,6 +45,24 @@ export default function App() {
       session.clear();
     }
   };
+
+  // Сервер перезапустили (токены сессий живут только в памяти сервера) —
+  // клиент узнаёт об этом не сразу, а только на первом сетевом вызове после
+  // рестарта (см. sessionExpiry.ts/api.ts). Запоминаем, где именно был
+  // пользователь, чтобы после повторного входа вернуть его туда же, а не на
+  // дашборд с нуля.
+  useEffect(() => {
+    return onSessionExpired(() => {
+      setCurrentEmployeeState((prev) => {
+        if (!prev) return prev;
+        saveReturnPath(location.pathname);
+        session.clear();
+        setSessionExpiredNotice(true);
+        return null;
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   const handleLogout = () => {
     if (currentEmployee) {
@@ -128,11 +155,11 @@ export default function App() {
         path="/login"
         element={
           currentEmployee ? (
-            <Navigate to="/dashboard" />
+            <Navigate to={returnPath ?? '/dashboard'} replace />
           ) : !adminExists ? (
             <Navigate to="/setup" />
           ) : (
-            <Login onLogin={setCurrentEmployee} />
+            <Login onLogin={setCurrentEmployee} sessionExpired={sessionExpiredNotice} />
           )
         }
       />

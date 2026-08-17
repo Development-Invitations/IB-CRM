@@ -31,7 +31,7 @@ fn field(payload: &Value, key: &str) -> Result<String, String> {
         .ok_or_else(|| format!("Отсутствует поле '{key}'"))
 }
 
-pub fn dispatch(cmd: &str, payload: Value, db: &Db) -> Result<Value, String> {
+pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Path) -> Result<Value, String> {
     match cmd {
         // ---- Авторизация / сотрудники ----
         "has_admin" => Ok(to_json(db.has_admin())),
@@ -73,6 +73,14 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db) -> Result<Value, String> {
         "delete_partner" => {
             let p: crate::DeletePartnerPayload = from_payload(payload)?;
             db.delete_partner(&p.admin_id, &p.id).map(to_json)
+        }
+        "rename_partner" => {
+            let p: crate::RenamePartnerPayload = from_payload(payload)?;
+            db.rename_partner(&p.admin_id, &p.id, &p.name).map(crate::to_partner).map(to_json)
+        }
+        "admin_reset_password" => {
+            let p: crate::AdminResetPasswordPayload = from_payload(payload)?;
+            db.admin_reset_password(&p.admin_id, &p.employee_id, &p.new_password).map(to_json)
         }
         "update_employee" => {
             let p: crate::UpdateEmployeePayload = from_payload(payload)?;
@@ -387,6 +395,8 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db) -> Result<Value, String> {
         "get_server_settings" => Ok(to_json(crate::to_server_settings(db.get_server_settings()))),
         "get_lan_address" => Ok(to_json(crate::get_lan_address())),
         "get_app_version" => Ok(to_json(crate::get_app_version())),
+        "get_update_installer_info" => Ok(to_json(crate::get_update_installer_info_impl(app_data_dir))),
+        "get_update_installer_path" => Ok(to_json(crate::update_installer_path(app_data_dir).display().to_string())),
         "set_server_settings" => {
             let p: crate::SetServerSettingsPayload = from_payload(payload)?;
             db.set_server_settings(&p.admin_id, p.enabled, p.port).map(crate::to_server_settings).map(to_json)

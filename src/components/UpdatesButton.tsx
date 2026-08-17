@@ -4,7 +4,7 @@ import Modal from './Modal';
 import LoadingScreen from './LoadingScreen';
 import { changelog } from '../lib/changelog';
 import { useLocale } from '../lib/i18n';
-import { checkForAppUpdate, restartApp, type UpdateCheckResult, type UpdateProgress } from '../lib/updater';
+import { checkForAppUpdate, restartApp, quitApp, type UpdateCheckResult, type UpdateProgress } from '../lib/updater';
 
 export default function UpdatesButton() {
   const { t, locale } = useLocale();
@@ -15,6 +15,7 @@ export default function UpdatesButton() {
   const [installing, setInstalling] = useState(false);
   const [progress, setProgress] = useState<UpdateProgress | null>(null);
   const [done, setDone] = useState(false);
+  const [finishKind, setFinishKind] = useState<'restart' | 'quit'>('restart');
 
   const handleCheckOnline = async () => {
     setOnlineCheck('checking');
@@ -23,14 +24,23 @@ export default function UpdatesButton() {
   };
 
   const handleInstall = async () => {
-    if (onlineCheck === 'idle' || onlineCheck === 'checking' || onlineCheck.status !== 'available') return;
+    if (onlineCheck === 'idle' || onlineCheck === 'checking') return;
+    if (onlineCheck.status !== 'available' && !(onlineCheck.status === 'server-newer' && onlineCheck.install)) return;
+    const install = onlineCheck.install;
+    if (!install) return;
+    // Официальный подписанный автообновитель перезапускает тот же бинарник
+    // (relaunch), скачанный с сервера установщик — полностью новый .exe,
+    // текущий процесс должен сначала выйти (quitApp), а не перезапуститься.
+    const isRestart = onlineCheck.status === 'available';
+    const finish = isRestart ? restartApp : quitApp;
+    setFinishKind(isRestart ? 'restart' : 'quit');
     setInstalling(true);
     setProgress({ downloaded: 0, total: null });
     try {
-      await onlineCheck.install((p) => setProgress(p));
+      await install((p) => setProgress(p));
       setDone(true);
       setTimeout(() => {
-        restartApp().catch(() => {
+        finish().catch(() => {
           setInstalling(false);
           setDone(false);
         });
@@ -65,7 +75,9 @@ export default function UpdatesButton() {
           done ? (
             <div className="update-progress update-progress-done">
               <CheckCircle2 size={32} className="update-done-icon" />
-              <div className="update-progress-label">{t('updates.installedRestarting')}</div>
+              <div className="update-progress-label">
+                {finishKind === 'restart' ? t('updates.installedRestarting') : t('updates.installedQuitting')}
+              </div>
             </div>
           ) : (
             <div className="update-progress">
@@ -98,7 +110,7 @@ export default function UpdatesButton() {
                     {onlineCheck.status === 'server-newer' && t('updates.serverNewer', { version: onlineCheck.version })}
                     {onlineCheck.status === 'error' && t('updates.checkError')}
                   </p>
-                  {onlineCheck.status === 'available' && (
+                  {(onlineCheck.status === 'available' || (onlineCheck.status === 'server-newer' && onlineCheck.install)) && (
                     <button className="modal-btn danger" style={{ width: '100%', marginTop: 8 }} onClick={handleInstall}>
                       {t('updates.installNow')}
                     </button>

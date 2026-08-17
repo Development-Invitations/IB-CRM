@@ -1,6 +1,15 @@
 import { invoke as tauriInvoke } from '@tauri-apps/api/core';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { connection, sessionToken } from './connection';
+import { notifySessionExpired } from './sessionExpiry';
+
+// Ровно та же строка, что server.rs::unauthorized() отдаёт при отсутствующем
+// или невалидном токене сессии (см. dispatch выше в invoke_handler) —
+// единственный источник этой ошибки, поэтому safe матчить по тексту: если
+// клиент был залогинен и вдруг получил именно её — значит сервер перезапустили
+// (см. sessionExpiry.ts) и локальную сессию нужно сбросить, а не просто
+// показать общую ошибку загрузки на текущей странице.
+const SESSION_INVALID_MESSAGE = 'Не авторизован — войдите заново';
 
 // Единственная точка входа для всех вызовов бэкенда (все ~90 обёрток ниже
 // зовут именно её) — поэтому именно здесь, и только здесь, решаем, идти ли
@@ -65,7 +74,10 @@ async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
   }
 
   if (result.token) sessionToken.set(result.token);
-  if (!result.ok) throw result.error || 'Ошибка сервера';
+  if (!result.ok) {
+    if (result.error === SESSION_INVALID_MESSAGE && cmd !== 'login') notifySessionExpired();
+    throw result.error || 'Ошибка сервера';
+  }
   return result.data as T;
 }
 
@@ -329,6 +341,11 @@ export type ServerSettings = {
   port: number;
 };
 
+export type UpdateInstallerInfo = {
+  available: boolean;
+  sizeBytes: number;
+};
+
 export type Position = { id: string; title: string };
 
 export type Department = {
@@ -408,6 +425,12 @@ export const api = {
 
   deletePartner: (payload: { adminId: string; id: string }) =>
     invoke<void>('delete_partner', { payload }),
+
+  renamePartner: (payload: { adminId: string; id: string; name: string }) =>
+    invoke<Partner>('rename_partner', { payload }),
+
+  adminResetPassword: (payload: { adminId: string; employeeId: string; newPassword: string }) =>
+    invoke<void>('admin_reset_password', { payload }),
 
   listPositions: () => invoke<Position[]>('list_positions'),
 
@@ -635,4 +658,6 @@ export const api = {
     invoke<ServerSettings>('set_server_settings', { payload }),
   getLanAddress: () => invoke<string | null>('get_lan_address'),
   getAppVersion: () => invoke<string>('get_app_version'),
+  getUpdateInstallerInfo: () => invoke<UpdateInstallerInfo>('get_update_installer_info'),
+  getUpdateInstallerPath: () => invoke<string>('get_update_installer_path'),
 };

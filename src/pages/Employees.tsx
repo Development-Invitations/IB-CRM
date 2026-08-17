@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Pencil, ArrowRight, Trash2, UserPlus, ChevronDown } from 'lucide-react';
+import { Plus, Search, Pencil, ArrowRight, Trash2, UserPlus, ChevronDown, Check, X } from 'lucide-react';
 import { api, type Employee, type Position, type Department, type AbsenceRequest, type Regulation, type Partner } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
@@ -39,6 +39,8 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
   const [newPartnerName, setNewPartnerName] = useState('');
   const [partnerBusy, setPartnerBusy] = useState(false);
   const [deletePartnerTarget, setDeletePartnerTarget] = useState<Partner | null>(null);
+  const [renamingPartnerId, setRenamingPartnerId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
 
   const loadPartners = () => {
     api.listPartners().then(setPartners).catch(() => showToast('error', t('common.loadError')));
@@ -70,6 +72,29 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
       await api.deletePartner({ adminId: currentEmployee.id, id: deletePartnerTarget.id });
       showToast('success', t('partners.deleted'));
       setDeletePartnerTarget(null);
+      loadPartners();
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('partners.errorGeneric'));
+    } finally {
+      setPartnerBusy(false);
+    }
+  };
+
+  const startRenamePartner = (partner: Partner) => {
+    setRenamingPartnerId(partner.id);
+    setRenameValue(partner.name);
+  };
+
+  const handleSaveRename = async (partner: Partner) => {
+    if (!renameValue.trim() || renameValue.trim() === partner.name) {
+      setRenamingPartnerId(null);
+      return;
+    }
+    setPartnerBusy(true);
+    try {
+      await api.renamePartner({ adminId: currentEmployee.id, id: partner.id, name: renameValue.trim() });
+      showToast('success', t('partners.renamed'));
+      setRenamingPartnerId(null);
       loadPartners();
     } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('partners.errorGeneric'));
@@ -202,22 +227,54 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
                 const isExpanded = expandedPartnerIds.has(partner.id);
                 return (
                   <div className="sessions-day-group" key={partner.id}>
-                    <button type="button" className="sessions-day-header" onClick={() => togglePartnerExpanded(partner.id)}>
-                      <span>{partner.name}</span>
-                      <span className="settings-hint">{t('partners.accountsCount', { count: partner.accountCount })}</span>
-                      <ChevronDown size={14} className={`sessions-day-chevron${isExpanded ? ' open' : ''}`} />
-                    </button>
+                    <div className="sessions-day-header partners-tab-header">
+                      <button
+                        type="button"
+                        className="partners-tab-toggle"
+                        onClick={() => togglePartnerExpanded(partner.id)}
+                      >
+                        {renamingPartnerId === partner.id ? (
+                          <input
+                            className="partner-rename-input"
+                            value={renameValue}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            autoFocus
+                          />
+                        ) : (
+                          <span>{partner.name}</span>
+                        )}
+                        <span className="settings-hint">{t('partners.accountsCount', { count: partner.accountCount })}</span>
+                        <ChevronDown size={14} className={`sessions-day-chevron${isExpanded ? ' open' : ''}`} />
+                      </button>
+                      <div className="partners-tab-header-actions">
+                        {renamingPartnerId === partner.id ? (
+                          <>
+                            <button type="button" disabled={partnerBusy} title={t('common.save')} onClick={(e) => { e.stopPropagation(); handleSaveRename(partner); }}>
+                              <Check size={14} />
+                            </button>
+                            <button type="button" title={t('common.cancel')} onClick={(e) => { e.stopPropagation(); setRenamingPartnerId(null); }}>
+                              <X size={14} />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button type="button" title={t('partners.renameBtn')} onClick={(e) => { e.stopPropagation(); startRenamePartner(partner); }}>
+                              <Pencil size={13} />
+                            </button>
+                            <button type="button" className="danger" title={t('partners.deleteBtn')} onClick={(e) => { e.stopPropagation(); setDeletePartnerTarget(partner); }}>
+                              <Trash2 size={13} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
                     {isExpanded && (
                       <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button className="modal-btn" onClick={() => openAddPartnerAccount(partner)}>
                             <UserPlus size={13} /> {t('partners.addAccountBtn')}
                           </button>
-                          {partner.accountCount === 0 && (
-                            <button className="modal-btn danger" onClick={() => setDeletePartnerTarget(partner)}>
-                              <Trash2 size={13} /> {t('partners.deleteBtn')}
-                            </button>
-                          )}
                         </div>
                         {accounts.length === 0 ? (
                           <p className="settings-hint">{t('partners.noAccounts')}</p>

@@ -6,6 +6,7 @@ import { useTheme, THEME_NAMES } from '../lib/theme';
 import { useToast } from '../lib/toast';
 import { connection } from '../lib/connection';
 import { session } from '../lib/session';
+import { ZOOM_LEVELS, getStoredZoom, applyZoom } from '../lib/zoom';
 import Select from '../components/Select';
 
 export default function Settings({ employee }: { employee: Employee }) {
@@ -18,12 +19,21 @@ export default function Settings({ employee }: { employee: Employee }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const [zoom, setZoomState] = useState(getStoredZoom());
+  const handleZoomChange = (v: string) => {
+    const percent = Number(v);
+    setZoomState(percent);
+    applyZoom(percent).catch(() => showToast('error', t('settings.errorGeneric')));
+  };
+
   const isClient = connection.isClient();
   const [serverSettings, setServerSettingsState] = useState<ServerSettings | null>(null);
   const [lanAddress, setLanAddress] = useState<string | null>(null);
   const [portInput, setPortInput] = useState('8778');
   const [serverBusy, setServerBusy] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const [installerPath, setInstallerPath] = useState<string | null>(null);
+  const [copiedInstallerPath, setCopiedInstallerPath] = useState(false);
 
   useEffect(() => {
     if (!employee.isAdmin || isClient) return;
@@ -32,7 +42,16 @@ export default function Settings({ employee }: { employee: Employee }) {
       setPortInput(String(s.port));
     });
     api.getLanAddress().then(setLanAddress);
+    api.getUpdateInstallerPath().then(setInstallerPath).catch(() => {});
   }, [employee.isAdmin, isClient]);
+
+  const handleCopyInstallerPath = () => {
+    if (!installerPath) return;
+    navigator.clipboard.writeText(installerPath).then(() => {
+      setCopiedInstallerPath(true);
+      setTimeout(() => setCopiedInstallerPath(false), 2000);
+    });
+  };
 
   const handleToggleServer = async () => {
     if (!serverSettings) return;
@@ -156,6 +175,16 @@ export default function Settings({ employee }: { employee: Employee }) {
       </section>
 
       <section className="settings-section">
+        <h2>{t('settings.display')}</h2>
+        <Select
+          value={String(zoom)}
+          options={ZOOM_LEVELS.map((z) => ({ value: String(z), label: `${z}%` }))}
+          onChange={handleZoomChange}
+        />
+        <p className="settings-hint">{t('settings.displayHint')}</p>
+      </section>
+
+      <section className="settings-section">
         <h2>{t('settings.language')}</h2>
         <Select value={locale} options={languageOptions} onChange={(v) => setLocale(v as Locale)} />
         <p className="settings-hint">{t('settings.languageHint')}</p>
@@ -263,6 +292,18 @@ export default function Settings({ employee }: { employee: Employee }) {
               </span>
             </div>
           )}
+
+          <div className="account-row" style={{ marginTop: 12, alignItems: 'flex-start' }}>
+            <span className="settings-hint">{t('updates.serverInstallerHint')}</span>
+            <span style={{ wordBreak: 'break-all' }}>
+              {installerPath ?? '—'}
+              {installerPath && (
+                <button className="reg-action-btn" style={{ marginLeft: 8 }} onClick={handleCopyInstallerPath} title={t('settings.server.copyAddress')}>
+                  {copiedInstallerPath ? <Check size={13} /> : <Copy size={13} />}
+                </button>
+              )}
+            </span>
+          </div>
         </section>
       )}
     </div>

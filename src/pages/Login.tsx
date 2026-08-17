@@ -4,7 +4,7 @@ import { rememberedLogin } from '../lib/session';
 import { useLocale } from '../lib/i18n';
 import Checkbox from '../components/Checkbox';
 
-export default function Login({ onLogin }: { onLogin: (emp: Employee) => void }) {
+export default function Login({ onLogin, sessionExpired }: { onLogin: (emp: Employee) => void; sessionExpired?: boolean }) {
   const { t } = useLocale();
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
@@ -46,6 +46,7 @@ export default function Login({ onLogin }: { onLogin: (emp: Employee) => void })
         <h1>{t('login.title')}</h1>
         <p className="subtitle">{t('login.subtitle')}</p>
 
+        {sessionExpired && <div className="session-expired-notice">{t('login.sessionExpiredExplain')}</div>}
         {error && <div className="error-text">{error}</div>}
 
         <div className="field">

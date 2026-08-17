@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.2.8';
+export const APP_VERSION = '0.2.9';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,22 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.2.9',
+      items: [
+        'В режиме клиента "Проверить обновления" теперь может не только сообщить о новой версии на сервере, но и скачать установщик с сервера и запустить его одной кнопкой (админ заранее кладёт файл установщика на сервер — путь виден в Настройках → Сервер)',
+        'Установщик приложения (.exe) теперь оформлен в фирменном стиле — с логотипом и описанием компании',
+        'В разделе "Партнёры" теперь можно переименовать партнёра и удалить его прямо из заголовка карточки (не открывая её)',
+        'В карточке партнёра при создании аккаунта чекбокс "Это аккаунт партнёра" и выбор организации теперь в одну строку; поле "Название партнёра" приведено к общему дизайну',
+        'В кабинете аккаунта партнёра теперь видно, что это партнёр (с названием организации), лишние поля (дата рождения, подразделение, руководитель, заместитель, телефон) скрыты — показываются только ФИО, должность, график и статус',
+        'Админ может назначить новый пароль аккаунту партнёра прямо из его кабинета, не зная старый',
+        'В своей панели партнёр теперь может сам сменить пароль, который выдал админ',
+        'Новый раздел в Настройках — "Экран": масштаб окна приложения, доступен всем сотрудникам',
+        'В собранном приложении отключены перезагрузка страницы (F5/Ctrl+R) и инструменты разработчика — как у обычной десктоп-программы',
+        'Исправлена читаемость цифр в плитках статистики и текста задач на Главной, которые были плохо видны на тёмных темах',
+        'В режиме клиента: если сервер перезапустили и сессия закончилась — теперь показывается понятное объяснение при входе, а после повторного входа вы возвращаетесь ровно на ту страницу, где были',
+      ],
+    },
     {
       version: '0.2.8',
       items: [
@@ -318,6 +334,22 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.2.9',
+      items: [
+        "Mijoz rejimida \"Yangilanishlarni tekshirish\" endi serverda yangi versiya borligini aytibgina qolmay, o'rnatuvchini serverdan yuklab, bitta tugma bilan ishga tushirishi ham mumkin (administrator o'rnatuvchi faylni oldindan serverga joylashtiradi — yo'li Sozlamalar → Server bo'limida ko'rinadi)",
+        "Ilova o'rnatuvchisi (.exe) endi kompaniya uslubida — logotip va tavsif bilan",
+        "\"Hamkorlar\" bo'limida endi hamkorni nomini o'zgartirish va o'chirish kartani ochmasdan, sarlavhadan mumkin",
+        "Akkaunt qo'shishda \"Bu hamkor akkaunti\" katakchasi va tashkilot tanlovi endi bitta qatorda; \"Hamkor nomi\" maydoni umumiy dizaynga moslashtirildi",
+        "Hamkor akkaunti kabinetida endi bu hamkor ekani (tashkilot nomi bilan) ko'rinadi, keraksiz maydonlar (tug'ilgan sana, bo'lim, rahbar, o'rinbosar, telefon) yashirilgan — faqat F.I.Sh., lavozim, grafik va status ko'rsatiladi",
+        "Administrator hamkor akkauntiga eski parolni bilmasdan yangi parol tayinlashi mumkin",
+        "O'z panelida hamkor endi administrator bergan parolni o'zi almashtirishi mumkin",
+        "Sozlamalarda yangi bo'lim — \"Ekran\": ilova oynasining masshtabi, barcha xodimlar uchun mavjud",
+        "Yig'ilgan ilovada sahifani qayta yuklash (F5/Ctrl+R) va dasturchi asboblari o'chirilgan — oddiy desktop dastur kabi",
+        "Bosh sahifadagi statistika raqamlari va vazifalar matni qorong'i mavzularda yaxshi ko'rinmasligi tuzatildi",
+        "Mijoz rejimida: server qayta ishga tushirilib sessiya tugagan bo'lsa — kirishda tushunarli izoh ko'rsatiladi, qayta kirgandan so'ng aynan o'sha sahifaga qaytasiz",
+      ],
+    },
+    {
       version: '0.2.8',
       items: [
         "Administrator uchun yangi bo'lim — \"Hamkorlar\": hamkor-tashkilot yaratish va u uchun akkaunt (login/parol) ochish endi to'g'ridan-to'g'ri \"Xodimlar\" sahifasida mumkin",
@@ -619,6 +651,22 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.2.9',
+      items: [
+        "Мижоз режимида \"Янгиланишларни текшириш\" энди серверда янги версия борлигини айтибгина қолмай, ўрнатувчини сервердан юклаб, битта тугма билан ишга туширишни ҳам мумкин (администратор ўрнатувчи файлни олдиндан серверга жойлаштиради — йўли Созламалар → Сервер бўлимида кўринади)",
+        "Илова ўрнатувчиси (.exe) энди компания услубида — логотип ва тавсиф билан",
+        "\"Ҳамкорлар\" бўлимида энди ҳамкорни номини ўзгартириш ва ўчириш картани очмасдан, сарлавҳадан мумкин",
+        "Аккаунт қўшишда \"Бу ҳамкор аккаунти\" катакчаси ва ташкилот танлови энди битта қаторда; \"Ҳамкор номи\" майдони умумий дизайнга мослаштирилди",
+        "Ҳамкор аккаунти кабинетида энди бу ҳамкор экани (ташкилот номи билан) кўринади, кераксиз майдонлар (туғилган сана, бўлим, раҳбар, ўринбосар, телефон) яширилган — фақат Ф.И.Ш., лавозим, график ва статус кўрсатилади",
+        "Администратор ҳамкор аккаунтига эски паролни билмасдан янги парол тайинлаши мумкин",
+        "Ўз панелида ҳамкор энди администратор берган паролни ўзи алмаштириши мумкин",
+        "Созламаларда янги бўлим — \"Экран\": илова ойнасининг масштаби, барча ходимлар учун мавжуд",
+        "Йиғилган иловада саҳифани қайта юклаш (F5/Ctrl+R) ва дастурчи асбоблари ўчирилган — оддий десктоп дастур каби",
+        "Бош саҳифадаги статистика рақамлари ва вазифалар матни қоронғи мавзуларда яхши кўринмаслиги тузатилди",
+        "Мижоз режимида: сервер қайта ишга туширилиб сессия тугаган бўлса — киришда тушунарли изоҳ кўрсатилади, қайта киргандан сўнг худди шу саҳифага қайтасиз",
+      ],
+    },
     {
       version: '0.2.8',
       items: [

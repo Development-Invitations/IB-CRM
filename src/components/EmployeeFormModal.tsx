@@ -303,9 +303,9 @@ export default function EmployeeFormModal({
             <p className="settings-hint">{t('employees.tempPasswordHint')}</p>
 
             <div className="field">
-              <Checkbox checked={isPartner} onChange={setIsPartner} label={t('employees.partnerCheckboxLabel')} />
-              {isPartner && (
-                <>
+              <div className="partner-checkbox-row">
+                <Checkbox checked={isPartner} onChange={setIsPartner} label={t('employees.partnerCheckboxLabel')} />
+                {isPartner && (
                   <Select
                     value={partnerId}
                     options={[
@@ -314,9 +314,9 @@ export default function EmployeeFormModal({
                     ]}
                     onChange={setPartnerId}
                   />
-                  {partners.length === 0 && <p className="settings-hint">{t('employees.partnerListEmptyHint')}</p>}
-                </>
-              )}
+                )}
+              </div>
+              {isPartner && partners.length === 0 && <p className="settings-hint">{t('employees.partnerListEmptyHint')}</p>}
             </div>
           </>
         )}

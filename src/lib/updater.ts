@@ -1,6 +1,10 @@
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
-import { connection } from './connection';
+import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+import { writeFile, mkdir, BaseDirectory } from '@tauri-apps/plugin-fs';
+import { open as shellOpen } from '@tauri-apps/plugin-shell';
+import { exit } from '@tauri-apps/plugin-process';
+import { connection, sessionToken } from './connection';
 import { api } from './api';
 import { APP_VERSION } from './changelog';
 
@@ -36,11 +40,17 @@ export type UpdateProgress = { downloaded: number; total: number | null };
 export type UpdateCheckResult =
   | { status: 'up-to-date' }
   | { status: 'available'; version: string; notes?: string; install: (onProgress?: (p: UpdateProgress) => void) => Promise<void> }
-  // Режим клиента: настоящий автообновитель не настроен (см. комментарий
-  // выше), но сервер знает свою версию — если она новее, чем у клиента,
-  // сообщаем об этом честно, без притворного автоустановщика (реального
-  // подписанного инсталлятора через этот канал не доставить).
-  | { status: 'server-newer'; version: string }
+  // Режим клиента: настоящий подписанный автообновитель не настроен (см.
+  // комментарий выше), сервер знает свою версию — если она новее, чем у
+  // клиента, сообщаем об этом. Если админ положил на сервер файл установщика
+  // (см. Настройки → Сервер), install заполнен — тогда можно скачать и
+  // запустить его прямо отсюда (см. server.rs::download_installer_handler);
+  // если файла нет — install отсутствует, просто показываем текст.
+  | {
+      status: 'server-newer';
+      version: string;
+      install?: (onProgress?: (p: UpdateProgress) => void) => Promise<void>;
+    }
   | { status: 'error'; message: string };
 
 function compareVersions(a: string, b: string): number {
@@ -62,12 +72,57 @@ export async function restartApp() {
   await relaunch();
 }
 
+// Для скачанного с сервера установщика — не перезапуск того же бинарника
+// (relaunch), а полный выход: установщик сейчас же попробует перезаписать
+// текущий .exe, что невозможно, пока он ещё запущен.
+export async function quitApp() {
+  await exit(0);
+}
+
+// Скачивает установщик с сервера (см. server.rs::download_installer_handler),
+// сохраняет в $APPDATA/updates/downloaded-installer.exe (тот же путь, что
+// вычисляет update_installer_path() в main.rs) и запускает его — тот же
+// файл, что раньше только "лежал на сервере", теперь реально доставляется
+// клиенту одной кнопкой. Подписи/проверки нет (см. комментарий в начале
+// файла) — осознанный компромисс для доверенной офисной LAN, не интернета.
+async function downloadAndLaunchServerInstaller(onProgress?: (p: UpdateProgress) => void): Promise<void> {
+  const serverUrl = connection.getServerUrl();
+  const token = sessionToken.get();
+  const headers: Record<string, string> = {};
+  if (token) headers['X-Session-Token'] = token;
+
+  const response = await tauriFetch(`${serverUrl}/api/update-installer`, { method: 'GET', headers });
+  if (!response.ok) throw new Error('Не удалось скачать установщик с сервера');
+
+  const contentLength = response.headers.get('content-length');
+  const total = contentLength ? parseInt(contentLength, 10) : null;
+  onProgress?.({ downloaded: 0, total });
+
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  onProgress?.({ downloaded: bytes.length, total: total ?? bytes.length });
+
+  await mkdir('updates', { baseDir: BaseDirectory.AppData, recursive: true });
+  await writeFile('updates/downloaded-installer.exe', bytes, { baseDir: BaseDirectory.AppData });
+
+  const installerPath = await api.getUpdateInstallerPath();
+  await shellOpen(installerPath);
+}
+
 export async function checkForAppUpdate(): Promise<UpdateCheckResult> {
   if (connection.isClient()) {
     try {
       const serverVersion = await api.getAppVersion();
       if (compareVersions(serverVersion, APP_VERSION) > 0) {
-        return { status: 'server-newer', version: serverVersion };
+        let install: ((onProgress?: (p: UpdateProgress) => void) => Promise<void>) | undefined;
+        try {
+          const installerInfo = await api.getUpdateInstallerInfo();
+          if (installerInfo.available) {
+            install = downloadAndLaunchServerInstaller;
+          }
+        } catch {
+          // Нет установщика на сервере — просто сообщаем о новой версии без кнопки.
+        }
+        return { status: 'server-newer', version: serverVersion, install };
       }
       return { status: 'up-to-date' };
     } catch (err: any) {

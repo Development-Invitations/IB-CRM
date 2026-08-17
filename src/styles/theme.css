@@ -69,6 +69,14 @@
 
 * { box-sizing: border-box; }
 
+/* Браузерный дефолт для <button>/<select> — системный цвет текста (обычно
+   тёмный), а НЕ currentColor от родителя, из-за чего любая кнопка, где явно
+   не задан свой color, оставалась тёмной на тёмных темах (например, цифры
+   в плитках статистики на Главной — .home-stat-value внутри <button>).
+   Классы с собственным color (.primary, .modal-btn.danger и т.д.) выше по
+   специфичности и продолжают работать как раньше — это только safety-net. */
+button, select { color: inherit; font-family: inherit; }
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -420,6 +428,15 @@ button.primary:hover { filter: brightness(0.95); }
   color: var(--color-danger);
   font-size: 13px;
   margin-bottom: 12px;
+}
+
+.session-expired-notice {
+  background: color-mix(in srgb, var(--color-accent) 16%, var(--color-surface-2));
+  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 14px;
 }
 
 .app-shell {
@@ -965,6 +982,80 @@ button.primary:hover { filter: brightness(0.95); }
 }
 .employees-tab-btn:hover { color: var(--color-text); }
 .employees-tab-btn.active { color: var(--color-accent); border-bottom-color: var(--color-accent); }
+
+.partner-checkbox-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.partner-checkbox-row .checkbox-row {
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+.partner-checkbox-row .custom-select {
+  min-width: 200px;
+}
+
+.partners-tab-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-right: 4px;
+}
+.partners-tab-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.partners-tab-toggle span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.partners-tab-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.partners-tab-header-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.partners-tab-header-actions button:hover {
+  color: var(--color-text);
+  background: var(--color-border);
+}
+.partners-tab-header-actions button.danger:hover {
+  color: #E5484D;
+}
+
+.partner-rename-input {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+}
 
 /* ---- Панель партнёра (заглушка) ---- */
 .partner-panel {
@@ -1772,6 +1863,16 @@ button.employees-add-btn {
   border-top: 1px solid var(--color-border);
 }
 
+.department-add-member-row input {
+  flex: 1 1 220px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: 14px;
+}
+
 .department-add-member-row > .custom-select:first-child {
   flex: 1 1 100%;
 }
@@ -1992,6 +2093,12 @@ button.employees-add-btn {
 .role-badge-deputy {
   background: var(--color-primary);
   color: #FFFFFF;
+}
+
+.role-badge-partner {
+  gap: 4px;
+  background: var(--color-accent);
+  color: #14213D;
 }
 
 /* ---- История клиента (лента заметок в карточке) ---- */

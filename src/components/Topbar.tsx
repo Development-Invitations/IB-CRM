@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Settings as SettingsIcon, User } from 'lucide-react';
+import { Bell, Settings as SettingsIcon, User, Home } from 'lucide-react';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { primaryMonitor } from '@tauri-apps/api/window';
 import { emit, listen } from '@tauri-apps/api/event';
@@ -190,6 +190,10 @@ export default function Topbar({ employee }: { employee: Employee }) {
       <div className="topbar-title">{t('topbar.welcome', { name: employee.fullName || employee.login })}</div>
 
       <div className="topbar-actions">
+        <button className="icon-btn" onClick={() => navigate('/dashboard')} aria-label={t('sidebar.home')}>
+          <Home size={20} />
+        </button>
+
         <button
           className="icon-btn"
           onClick={() => navigate(`/dashboard/employees/${employee.id}`)}

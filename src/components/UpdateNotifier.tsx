@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import Modal from './Modal';
-import { checkForAppUpdate, restartApp, type UpdateCheckResult, type UpdateProgress } from '../lib/updater';
+import { checkForAppUpdate, restartApp, quitApp, type UpdateCheckResult, type UpdateProgress } from '../lib/updater';
 import { useLocale } from '../lib/i18n';
 
 export default function UpdateNotifier() {
@@ -23,7 +23,10 @@ export default function UpdateNotifier() {
 
   if (!result || (result.status !== 'available' && result.status !== 'server-newer') || dismissed) return null;
 
-  if (result.status === 'server-newer') {
+  const install = result.install;
+  const isRestart = result.status === 'available';
+
+  if (result.status === 'server-newer' && !install) {
     return (
       <Modal
         open
@@ -41,16 +44,17 @@ export default function UpdateNotifier() {
   }
 
   const handleInstall = async () => {
+    if (!install) return;
     setInstalling(true);
     setProgress({ downloaded: 0, total: null });
     try {
-      await result.install((p) => setProgress(p));
+      await install((p) => setProgress(p));
       // Загрузка и установка завершены — показываем короткое "Готово!" перед
-      // перезапуском, чтобы это не выглядело как будто приложение просто
-      // вылетело, а ощущалось как осознанное, аккуратное завершение.
+      // перезапуском/выходом, чтобы это не выглядело как будто приложение
+      // просто вылетело, а ощущалось как осознанное, аккуратное завершение.
       setDone(true);
       setTimeout(() => {
-        restartApp().catch(() => {
+        (isRestart ? restartApp() : quitApp()).catch(() => {
           setInstalling(false);
           setDone(false);
         });
@@ -67,7 +71,7 @@ export default function UpdateNotifier() {
   return (
     <Modal
       open
-      title={t('updates.availableTitle', { version: result.version })}
+      title={t(isRestart ? 'updates.availableTitle' : 'updates.serverNewerTitle', { version: result.version })}
       onClose={() => !installing && setDismissed(true)}
       actions={
         !installing ? (
@@ -83,11 +87,13 @@ export default function UpdateNotifier() {
       }
     >
       {!installing ? (
-        result.notes || t('updates.availableBody')
+        (result.status === 'available' ? result.notes : undefined) || t(isRestart ? 'updates.availableBody' : 'updates.serverNewerBody')
       ) : done ? (
         <div className="update-progress update-progress-done">
           <CheckCircle2 size={32} className="update-done-icon" />
-          <div className="update-progress-label">{t('updates.installedRestarting')}</div>
+          <div className="update-progress-label">
+            {isRestart ? t('updates.installedRestarting') : t('updates.installedQuitting')}
+          </div>
         </div>
       ) : (
         <div className="update-progress">

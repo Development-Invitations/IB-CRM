@@ -1066,6 +1066,44 @@ impl Db {
             .ok_or_else(|| "Не удалось создать партнёра".to_string())
     }
 
+    pub fn rename_partner(&self, admin_id: &str, id: &str, name: &str) -> Result<PartnerRecord, String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        let name = name.trim();
+        if name.is_empty() {
+            return Err("Укажите название партнёра".into());
+        }
+        self.conn
+            .execute("UPDATE partners SET name = ?1 WHERE id = ?2", params![name, id])
+            .map_err(|e| e.to_string())?;
+        self.list_partners()
+            .into_iter()
+            .find(|p| p.id == id)
+            .ok_or_else(|| "Партнёр не найден".to_string())
+    }
+
+    // Для аккаунтов партнёров — у них нет самостоятельного доступа к
+    // "Сменить пароль" (обычно логинятся редко, забывают пароль чаще), поэтому
+    // админ может назначить новый пароль напрямую, без знания текущего (в
+    // отличие от change_password выше, которое требует ввести старый пароль).
+    pub fn admin_reset_password(&self, admin_id: &str, employee_id: &str, new_password: &str) -> Result<(), String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        if new_password.len() < 6 {
+            return Err("Новый пароль должен быть не короче 6 символов".into());
+        }
+        let new_hash = bcrypt::hash(new_password, bcrypt::DEFAULT_COST).map_err(|e| e.to_string())?;
+        self.conn
+            .execute(
+                "UPDATE employees SET password_hash = ?1, password_changed_at = datetime('now') WHERE id = ?2",
+                params![new_hash, employee_id],
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
     pub fn delete_partner(&self, admin_id: &str, id: &str) -> Result<(), String> {
         if !self.is_admin(admin_id) {
             return Err("Недостаточно прав".into());

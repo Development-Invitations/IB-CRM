@@ -532,6 +532,24 @@ struct DeletePartnerPayload {
 }
 
 #[derive(serde::Deserialize)]
+struct RenamePartnerPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    id: String,
+    name: String,
+}
+
+#[derive(serde::Deserialize)]
+struct AdminResetPasswordPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+    #[serde(rename = "newPassword")]
+    new_password: String,
+}
+
+#[derive(serde::Deserialize)]
 struct UpdateEmployeePayload {
     #[serde(rename = "adminId")]
     admin_id: String,
@@ -1021,6 +1039,35 @@ struct LoginResult {
 // у Arc<Mutex<Db>> работает так же, как у Mutex<Db> (Deref).
 pub struct AppState(pub Arc<Mutex<Db>>);
 
+// Отдельное managed-состояние (не поле AppState — иначе пришлось бы менять
+// все ~90 существующих команд с `state.0.lock()` на `state.db.lock()`) —
+// нужен для загрузки обновлений (см. update_installer_path ниже): и
+// локальным Tauri-командам, и HTTP-серверу (через ServerState в server.rs)
+// нужно знать, где на диске лежит файл установщика.
+pub struct AppDataDir(pub std::path::PathBuf);
+
+// Путь к файлу установщика, который сервер раздаёт клиентам для практичного
+// (без ключа подписи) обновления — см. журнал v0.2.9 в docs/TZ.md. Админ
+// сам кладёт туда новый установщик после пересборки; имя файла фиксировано,
+// чтобы не парсить версии из имени файла.
+pub fn update_installer_path(app_data_dir: &std::path::Path) -> std::path::PathBuf {
+    app_data_dir.join("updates").join("downloaded-installer.exe")
+}
+
+#[derive(Clone, serde::Serialize)]
+pub struct UpdateInstallerInfo {
+    available: bool,
+    #[serde(rename = "sizeBytes")]
+    size_bytes: u64,
+}
+
+pub fn get_update_installer_info_impl(app_data_dir: &std::path::Path) -> UpdateInstallerInfo {
+    match std::fs::metadata(update_installer_path(app_data_dir)) {
+        Ok(meta) if meta.is_file() => UpdateInstallerInfo { available: true, size_bytes: meta.len() },
+        _ => UpdateInstallerInfo { available: false, size_bytes: 0 },
+    }
+}
+
 fn to_employee(e: db::EmployeeRecord) -> Employee {
     Employee {
         id: e.id,
@@ -1369,6 +1416,18 @@ fn create_partner(payload: CreatePartnerPayload, state: tauri::State<AppState>) 
 fn delete_partner(payload: DeletePartnerPayload, state: tauri::State<AppState>) -> Result<(), String> {
     let db = state.0.lock().unwrap();
     db.delete_partner(&payload.admin_id, &payload.id)
+}
+
+#[tauri::command]
+fn rename_partner(payload: RenamePartnerPayload, state: tauri::State<AppState>) -> Result<Partner, String> {
+    let db = state.0.lock().unwrap();
+    db.rename_partner(&payload.admin_id, &payload.id, &payload.name).map(to_partner)
+}
+
+#[tauri::command]
+fn admin_reset_password(payload: AdminResetPasswordPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.admin_reset_password(&payload.admin_id, &payload.employee_id, &payload.new_password)
 }
 
 #[tauri::command]
@@ -1945,11 +2004,23 @@ fn get_app_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
+#[tauri::command]
+fn get_update_installer_info(app_data_dir: tauri::State<AppDataDir>) -> UpdateInstallerInfo {
+    get_update_installer_info_impl(&app_data_dir.0)
+}
+
+#[tauri::command]
+fn get_update_installer_path(app_data_dir: tauri::State<AppDataDir>) -> String {
+    update_installer_path(&app_data_dir.0).display().to_string()
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir().expect("нет app data dir");
             std::fs::create_dir_all(&app_data_dir).ok();
@@ -1964,10 +2035,12 @@ fn main() {
             let settings = db.lock().unwrap().get_server_settings();
             if settings.enabled {
                 let server_db = db.clone();
-                tauri::async_runtime::spawn(server::run(server_db, settings.port));
+                let server_dir = app_data_dir.clone();
+                tauri::async_runtime::spawn(server::run(server_db, settings.port, server_dir));
             }
 
             app.manage(AppState(db));
+            app.manage(AppDataDir(app_data_dir));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1981,6 +2054,8 @@ fn main() {
             list_partners,
             create_partner,
             delete_partner,
+            rename_partner,
+            admin_reset_password,
             update_employee,
             list_positions,
             create_position,
@@ -2054,6 +2129,8 @@ fn main() {
             set_server_settings,
             get_lan_address,
             get_app_version,
+            get_update_installer_info,
+            get_update_installer_path,
             record_login,
             record_logout,
             list_recent_sessions

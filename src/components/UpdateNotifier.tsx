@@ -3,9 +3,11 @@ import { CheckCircle2 } from 'lucide-react';
 import Modal from './Modal';
 import { checkForAppUpdate, restartApp, quitApp, type UpdateCheckResult, type UpdateProgress } from '../lib/updater';
 import { useLocale } from '../lib/i18n';
+import { useToast } from '../lib/toast';
 
 export default function UpdateNotifier() {
   const { t } = useLocale();
+  const { showToast } = useToast();
   const [result, setResult] = useState<UpdateCheckResult | null>(null);
   const [installing, setInstalling] = useState(false);
   const [progress, setProgress] = useState<UpdateProgress | null>(null);
@@ -59,9 +61,10 @@ export default function UpdateNotifier() {
           setDone(false);
         });
       }, 1800);
-    } catch {
+    } catch (err: any) {
       setInstalling(false);
       setProgress(null);
+      showToast('error', `${t('updates.installError')} ${typeof err === 'string' ? err : (err?.message ?? '')}`.trim());
     }
   };
 

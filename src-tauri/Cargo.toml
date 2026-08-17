@@ -1,6 +1,6 @@
 [package]
 name = "ib-crm"
-version = "0.2.15"
+version = "0.2.16"
 description = "IB CRM — desktop приложение"
 authors = ["IB - Команда"]
 edition = "2021"

@@ -93,6 +93,17 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
     [selected?.id, selected?.content]
   );
 
+  // Ссылки на скачивание (`<a download>`) — data:-URI, браузер сохраняет их
+  // молча, без единого визуального отклика внутри встроенного WebView2 (нет
+  // системной панели загрузок, как в обычном браузере) — пользователю
+  // непонятно, сработало ли скачивание вообще. Показываем тост сразу по
+  // клику: сам файл к этому моменту уже гарантированно готов (это не сетевой
+  // запрос, а мгновенная запись уже загруженных в память base64-данных).
+  const handleContentClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const link = (e.target as HTMLElement).closest('a[download]');
+    if (link) showToast('success', t('blog.downloadStarted'));
+  };
+
   const filtered = search.trim()
     ? topics.filter((tp) => {
         const q = search.trim().toLowerCase();
@@ -227,7 +238,7 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
             )}
 
             {selected.content && (
-              <div className="blog-topic-content" dangerouslySetInnerHTML={{ __html: renderedContent }} />
+              <div className="blog-topic-content" onClick={handleContentClick} dangerouslySetInnerHTML={{ __html: renderedContent }} />
             )}
           </div>
 
@@ -262,7 +273,7 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
                         {parent && (
                           <div className="blog-reply-to">↪ {t('blog.replyingTo', { name: parent.authorName })}</div>
                         )}
-                        <div className="reg-entry-content blog-comment-content" dangerouslySetInnerHTML={{ __html: sanitizeBlogHtml(c.content) }} />
+                        <div className="reg-entry-content blog-comment-content" onClick={handleContentClick} dangerouslySetInnerHTML={{ __html: sanitizeBlogHtml(c.content) }} />
                       </div>
                     </div>
                   );

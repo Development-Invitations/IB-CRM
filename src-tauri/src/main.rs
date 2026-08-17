@@ -501,6 +501,18 @@ struct DmChannelSummary {
 }
 
 #[derive(Clone, serde::Serialize)]
+struct PartnerChatSummary {
+    #[serde(rename = "partnerId")]
+    partner_id: String,
+    #[serde(rename = "partnerName")]
+    partner_name: String,
+    #[serde(rename = "lastMessage")]
+    last_message: Option<String>,
+    #[serde(rename = "lastMessageAt")]
+    last_message_at: Option<String>,
+}
+
+#[derive(Clone, serde::Serialize)]
 struct ChatGroup {
     id: String,
     name: String,
@@ -1461,6 +1473,15 @@ fn to_dm_channel_summary(s: db::DmChannelSummary) -> DmChannelSummary {
     }
 }
 
+fn to_partner_chat_summary(s: db::PartnerChatSummary) -> PartnerChatSummary {
+    PartnerChatSummary {
+        partner_id: s.partner_id,
+        partner_name: s.partner_name,
+        last_message: s.last_message,
+        last_message_at: s.last_message_at,
+    }
+}
+
 fn to_chat_group(g: db::ChatGroupRecord) -> ChatGroup {
     ChatGroup {
         id: g.id,
@@ -2152,6 +2173,15 @@ fn list_my_dm_channels(employee_id: String, state: tauri::State<AppState>) -> Ve
 }
 
 #[tauri::command]
+fn list_my_partner_chats(actor_id: String, state: tauri::State<AppState>) -> Vec<PartnerChatSummary> {
+    let db = state.0.lock().unwrap();
+    if !db.is_admin(&actor_id) {
+        return Vec::new();
+    }
+    db.list_my_partner_chats().into_iter().map(to_partner_chat_summary).collect()
+}
+
+#[tauri::command]
 fn create_chat_group(payload: CreateChatGroupPayload, state: tauri::State<AppState>) -> Result<ChatGroup, String> {
     let db = state.0.lock().unwrap();
     db.create_chat_group(
@@ -2439,6 +2469,7 @@ fn main() {
             add_blog_comment,
             list_chat_messages,
             list_my_dm_channels,
+            list_my_partner_chats,
             create_chat_group,
             list_my_chat_groups,
             get_chat_group,

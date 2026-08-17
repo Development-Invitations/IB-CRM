@@ -399,6 +399,11 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
             let employee_id = field(&payload, "employeeId")?;
             Ok(to_json(db.list_my_dm_channels(&employee_id).into_iter().map(crate::to_dm_channel_summary).collect::<Vec<_>>()))
         }
+        "list_my_partner_chats" => {
+            let actor_id = field(&payload, "actorId")?;
+            let list = if db.is_admin(&actor_id) { db.list_my_partner_chats() } else { Vec::new() };
+            Ok(to_json(list.into_iter().map(crate::to_partner_chat_summary).collect::<Vec<_>>()))
+        }
         "create_chat_group" => {
             let p: crate::CreateChatGroupPayload = from_payload(payload)?;
             db.create_chat_group(

@@ -5,9 +5,11 @@ import LoadingScreen from './LoadingScreen';
 import { changelog } from '../lib/changelog';
 import { useLocale } from '../lib/i18n';
 import { checkForAppUpdate, restartApp, quitApp, type UpdateCheckResult, type UpdateProgress } from '../lib/updater';
+import { useToast } from '../lib/toast';
 
 export default function UpdatesButton() {
   const { t, locale } = useLocale();
+  const { showToast } = useToast();
   const entries = changelog[locale];
   const [open, setOpen] = useState(false);
   const [expandedVersion, setExpandedVersion] = useState<string | null>(entries[0]?.version ?? null);
@@ -45,9 +47,10 @@ export default function UpdatesButton() {
           setDone(false);
         });
       }, 1800);
-    } catch {
+    } catch (err: any) {
       setInstalling(false);
       setProgress(null);
+      showToast('error', `${t('updates.installError')} ${typeof err === 'string' ? err : (err?.message ?? '')}`.trim());
     }
   };
 

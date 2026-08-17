@@ -74,6 +74,13 @@ pub struct DmChannelSummary {
     pub last_message_at: Option<String>,
 }
 
+pub struct PartnerChatSummary {
+    pub partner_id: String,
+    pub partner_name: String,
+    pub last_message: Option<String>,
+    pub last_message_at: Option<String>,
+}
+
 pub struct ChatGroupRecord {
     pub id: String,
     pub name: String,
@@ -1470,6 +1477,53 @@ impl Db {
                     other_employee_id: other_id,
                     other_employee_name: other_name,
                     other_employee_avatar: other_avatar,
+                    last_message: last.as_ref().map(|(c, _)| c.clone()),
+                    last_message_at: last.map(|(_, t)| t),
+                })
+            })
+            .collect();
+
+        summaries.sort_by(|a, b| b.last_message_at.cmp(&a.last_message_at));
+        summaries
+    }
+
+    // Список уже начатых переписок с партнёрами (channel = id партнёра
+    // напрямую, без префикса) — только каналы, где реально есть хотя бы одно
+    // сообщение. Раньше админ видел в сайдбаре ВСЕХ партнёров компании сразу,
+    // даже с кем ни разу не переписывались — по просьбе показываем только
+    // реально начатые, тем же принципом, что list_my_dm_channels. Новый
+    // партнёр для первого сообщения ищется отдельно (полный список партнёров
+    // уже загружен через list_partners для admin).
+    pub fn list_my_partner_chats(&self) -> Vec<PartnerChatSummary> {
+        let mut stmt = match self.conn.prepare(
+            "SELECT DISTINCT cm.channel FROM chat_messages cm INNER JOIN partners p ON p.id = cm.channel",
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        let channels: Vec<String> = match stmt.query_map([], |row| row.get(0)) {
+            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+            Err(_) => return Vec::new(),
+        };
+
+        let mut summaries: Vec<PartnerChatSummary> = channels
+            .into_iter()
+            .filter_map(|channel| {
+                let partner_name: String = self
+                    .conn
+                    .query_row("SELECT name FROM partners WHERE id = ?1", params![channel], |row| row.get(0))
+                    .ok()?;
+                let last: Option<(String, String)> = self
+                    .conn
+                    .query_row(
+                        "SELECT content, created_at FROM chat_messages WHERE channel = ?1 ORDER BY created_at DESC LIMIT 1",
+                        params![channel],
+                        |row| Ok((row.get(0)?, row.get(1)?)),
+                    )
+                    .ok();
+                Some(PartnerChatSummary {
+                    partner_id: channel,
+                    partner_name,
                     last_message: last.as_ref().map(|(c, _)| c.clone()),
                     last_message_at: last.map(|(_, t)| t),
                 })

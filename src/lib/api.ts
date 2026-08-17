@@ -308,6 +308,13 @@ export type DmChannelSummary = {
   lastMessageAt: string | null;
 };
 
+export type PartnerChatSummary = {
+  partnerId: string;
+  partnerName: string;
+  lastMessage: string | null;
+  lastMessageAt: string | null;
+};
+
 export type ChatGroup = {
   id: string;
   name: string;
@@ -702,6 +709,7 @@ export const api = {
   markChatChannelRead: (payload: { employeeId: string; channel: string }) =>
     invoke<void>('mark_chat_channel_read', { payload }),
   listMyDmChannels: (employeeId: string) => invoke<DmChannelSummary[]>('list_my_dm_channels', { employeeId }),
+  listMyPartnerChats: (actorId: string) => invoke<PartnerChatSummary[]>('list_my_partner_chats', { actorId }),
 
   createChatGroup: (payload: {
     actorId: string;

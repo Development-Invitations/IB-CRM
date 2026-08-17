@@ -225,7 +225,22 @@ export default function Topbar({ employee }: { employee: Employee }) {
     // (например, заявка от подчинённого) появлялись только после перезахода
     // на страницу/перезапуска, что слишком медленно для рабочего процесса.
     const interval = setInterval(loadNotifications, 10000);
-    return () => clearInterval(interval);
+
+    // Пока окно свёрнуто/неактивно, Chromium (на котором работает WebView2)
+    // сильно замедляет фоновые таймеры — 10-секундный интервал выше может
+    // реально сработать раз в минуту и реже, из-за чего уведомления "то
+    // приходят, то нет". Довосстанавливаем актуальность сразу же, как только
+    // окно снова стало видимым/в фокусе — событие focus/visibilitychange не
+    // подвержено этому троттлингу, оно происходит по факту действия ОС.
+    const onWake = () => loadNotifications();
+    window.addEventListener('focus', onWake);
+    document.addEventListener('visibilitychange', onWake);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onWake);
+      document.removeEventListener('visibilitychange', onWake);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employee.id]);
 

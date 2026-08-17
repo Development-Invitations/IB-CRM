@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.2.15';
+export const APP_VERSION = '0.2.16';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,17 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.2.16',
+      items: [
+        'Исправлена реальная причина ошибки при нажатии "Открыть папку" в Настройках → Сервер и зависания загрузки обновления на 0% — Windows блокировала открытие обычных папок/файлов, теперь разрешено',
+        'Если установка обновления всё же не удалась — теперь показывается понятная причина, а не молчаливый откат к началу',
+        'В блоге при скачивании фото/видео/файла теперь появляется подтверждение "Файл сохранён в папку Загрузки" — раньше было непонятно, сработало ли скачивание',
+        'Админ в IB Чате теперь видит только общий канал и уже начатые переписки с партнёрами — не весь список партнёров компании; новую переписку можно начать через поиск партнёра',
+        'В IB Чате появилась кнопка-шестерёнка с настройками чата (уведомления, положение баннера, фон) — перенесены туда из общих Настроек',
+        'Уведомления теперь досчитываются сразу же при возврате в приложение (например, после сворачивания) — раньше могли задерживаться из-за того, что Windows замедляет фоновые таймеры свёрнутого окна',
+      ],
+    },
     {
       version: '0.2.15',
       items: [
@@ -386,6 +397,17 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.2.16',
+      items: [
+        "Sozlamalar → Server bo'limida \"Papkani ochish\" tugmasidagi xato va yangilanish yuklanishining 0%da to'xtab qolishining haqiqiy sababi tuzatildi — Windows oddiy papka/faylni ochishni bloklayotgan edi, endi ruxsat berilgan",
+        "Agar yangilanishni o'rnatish baribir muvaffaqiyatsiz bo'lsa — endi tushunarli sabab ko'rsatiladi, sukut bilan boshiga qaytish o'rniga",
+        "Blogda foto/video/fayl yuklab olinganda endi \"Fayl Yuklab olinganlar papkasiga saqlandi\" tasdig'i chiqadi — avval yuklab olish ishlaganini bilib bo'lmasdi",
+        "IB Chatda administrator endi faqat umumiy kanal va allaqachon boshlangan hamkorlar bilan yozishmalarni ko'radi — kompaniyaning barcha hamkorlari ro'yxatini emas; yangi yozishmani hamkor qidiruvi orqali boshlash mumkin",
+        "IB Chatda sozlamalar (bildirishnomalar, banner joyi, fon) uchun tishli g'ildirakcha tugmasi paydo bo'ldi — umumiy Sozlamalardan shu yerga ko'chirildi",
+        "Bildirishnomalar endi ilovaga qaytilganda (masalan, kichraytirilgandan keyin) darhol yangilanadi — avval Windows kichraytirilgan oyna taymerlarini sekinlashtirgani uchun kechikishi mumkin edi",
+      ],
+    },
+    {
       version: '0.2.15',
       items: [
         "IB Chatda guruhlar paydo bo'ldi: bo'lim rahbari bitta bosish bilan bo'limning barcha xodimlaridan guruh yaratishi mumkin, istalgan xodim esa hamkasblardan qo'lda o'z guruhini yig'ishi mumkin — nomi, tavsifi va rasmi bilan",
@@ -755,6 +777,17 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.2.16',
+      items: [
+        "Созламалар → Сервер бўлимида \"Папкани очиш\" тугмасидаги хато ва янгиланиш юкланишининг 0%да тўхтаб қолишининг ҳақиқий сабаби тузатилди — Windows оддий папка/файлни очишни блоклаётган эди, энди рухсат берилган",
+        "Агар янгиланишни ўрнатиш барибир муваффақиятсиз бўлса — энди тушунарли сабаб кўрсатилади, сукут билан бошига қайтиш ўрнига",
+        "Блогда фото/видео/файл юклаб олинганда энди \"Файл Юкламалар папкасига сақланди\" тасдиғи чиқади — аввал юклаб олиш ишлаганини билиб бўлмасди",
+        "IB Чатда администратор энди фақат умумий канал ва аллақачон бошланган ҳамкорлар билан ёзишмаларни кўради — компаниянинг барча ҳамкорлари рўйхатини эмас; янги ёзишмани ҳамкор қидируви орқали бошлаш мумкин",
+        "IB Чатда созламалар (билдиришномалар, баннер жойи, фон) учун тишли ғилдиракча тугмаси пайдо бўлди — умумий Созламалардан шу ерга кўчирилди",
+        "Билдиришномалар энди иловага қайтилганда (масалан, кичрайтирилгандан кейин) дарҳол янгиланади — аввал Windows кичрайтирилган ойна таймерларини секинлаштиргани учун кечикиши мумкин эди",
+      ],
+    },
     {
       version: '0.2.15',
       items: [

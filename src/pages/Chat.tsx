@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useContext } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Paperclip, X, Reply, Download, Search, Plus, Users, LogOut, Copy, Check, UserPlus } from 'lucide-react';
-import { api, type Employee, type Partner, type Department, type ChatMessage, type DmChannelSummary, type ChatGroupSummary } from '../lib/api';
+import { ArrowLeft, Send, Paperclip, X, Reply, Download, Search, Plus, Users, LogOut, Copy, Check, UserPlus, Settings as SettingsIcon } from 'lucide-react';
+import { api, type Employee, type Partner, type Department, type ChatMessage, type DmChannelSummary, type PartnerChatSummary, type ChatGroupSummary } from '../lib/api';
 import { dmChannelId, dmOtherParticipant } from '../lib/chat';
 import { FullscreenContext } from './Dashboard';
 import { useLocale } from '../lib/i18n';
@@ -12,6 +12,7 @@ import Avatar from '../components/Avatar';
 import LoadingScreen from '../components/LoadingScreen';
 import Modal from '../components/Modal';
 import ChatGroupFormModal from '../components/ChatGroupFormModal';
+import ChatSettingsModal from '../components/ChatSettingsModal';
 import { getStoredChatWallpaper, CHAT_WALLPAPER_CSS } from '../lib/chatWallpaper';
 
 const POLL_INTERVAL_MS = 4000;
@@ -72,6 +73,9 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
   const [dmSummaries, setDmSummaries] = useState<DmChannelSummary[]>([]);
   const [search, setSearch] = useState('');
 
+  const [partnerChatSummaries, setPartnerChatSummaries] = useState<PartnerChatSummary[]>([]);
+  const [partnerSearch, setPartnerSearch] = useState('');
+
   const [departments, setDepartments] = useState<Department[]>([]);
   const [groups, setGroups] = useState<ChatGroupSummary[]>([]);
   const [activeGroup, setActiveGroup] = useState<ChatGroupSummary | null>(null);
@@ -82,6 +86,7 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
   const [groupMembers, setGroupMembers] = useState<Employee[]>([]);
   const [membersBusy, setMembersBusy] = useState(false);
   const [copiedInviteCode, setCopiedInviteCode] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
@@ -97,10 +102,24 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Полный список партнёров нужен только как справочник для поиска "начать
+  // переписку с партнёром" — сам сайдбар показывает только уже начатые чаты
+  // (см. loadPartnerChats ниже), а не всех партнёров компании сразу.
   useEffect(() => {
     if (currentEmployee.isAdmin) {
       api.listPartners().then(setPartners).catch(() => {});
     }
+  }, [currentEmployee.isAdmin]);
+
+  useEffect(() => {
+    if (!currentEmployee.isAdmin) return;
+    const loadPartnerChats = () => {
+      api.listMyPartnerChats(currentEmployee.id).then(setPartnerChatSummaries).catch(() => {});
+    };
+    loadPartnerChats();
+    const interval = setInterval(loadPartnerChats, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEmployee.isAdmin]);
 
   // Личка недоступна партнёрам (см. can_access_chat_channel в db.rs) — ни
@@ -150,10 +169,7 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
 
   const channels: Channel[] = currentEmployee.isPartner
     ? [{ id: currentEmployee.partnerId ?? '', label: currentEmployee.partnerName ?? t('chat.partnerChannelLabel') }]
-    : [
-        { id: 'general', label: t('chat.generalChannelLabel') },
-        ...partners.map((p) => ({ id: p.id, label: p.name })),
-      ];
+    : [{ id: 'general', label: t('chat.generalChannelLabel') }];
 
   useEffect(() => {
     if (channel !== null) return;
@@ -390,7 +406,13 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
   const wallpaperCss = CHAT_WALLPAPER_CSS[getStoredChatWallpaper()];
 
   const isDmChannel = !!channel && channel.startsWith('dm:');
-  const activeChannelLabel = channels.find((c) => c.id === channel)?.label ?? '';
+  const activePartnerName =
+    partners.find((p) => p.id === channel)?.name ?? partnerChatSummaries.find((s) => s.partnerId === channel)?.partnerName;
+  const activeChannelLabel = channels.find((c) => c.id === channel)?.label ?? activePartnerName ?? '';
+
+  const partnerSearchResults = partnerSearch.trim()
+    ? partners.filter((p) => p.name.toLowerCase().includes(partnerSearch.trim().toLowerCase()))
+    : [];
 
   return (
     <div className="reg-fullscreen">
@@ -401,6 +423,9 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
         <div className="reg-fullscreen-title">
           <h2>{t('chat.pageTitle')}</h2>
         </div>
+        <button className="icon-btn" style={{ marginLeft: 'auto' }} onClick={() => setSettingsOpen(true)} title={t('chat.settingsTitle')}>
+          <SettingsIcon size={18} />
+        </button>
       </div>
 
       <div className="reg-fullscreen-body">
@@ -456,6 +481,56 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
                 </ul>
               )}
             </div>
+
+            {currentEmployee.isAdmin && (
+              <div className="reg-sidebar-section">
+                <div className="department-members-title">{t('chat.partnersTitle')}</div>
+                <div className="employees-search-row" style={{ marginBottom: 10, maxWidth: 'none' }}>
+                  <Search size={14} className="employees-search-icon" />
+                  <input
+                    className="employees-search-input"
+                    value={partnerSearch}
+                    onChange={(e) => setPartnerSearch(e.target.value)}
+                    placeholder={t('chat.partnerSearchPlaceholder')}
+                  />
+                </div>
+                {partnerSearch.trim() && (
+                  <ul className="chat-dm-list" style={{ marginBottom: 10 }}>
+                    {partnerSearchResults.length === 0 ? (
+                      <p className="settings-hint">{t('chat.searchEmpty')}</p>
+                    ) : (
+                      partnerSearchResults.map((p) => (
+                        <li key={p.id} className="chat-dm-item" onClick={() => { openChannel(p.id); setPartnerSearch(''); }}>
+                          <Avatar name={p.name} size={28} />
+                          <div className="chat-dm-item-text">
+                            <span className="chat-dm-item-name">{p.name}</span>
+                          </div>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                )}
+                {partnerChatSummaries.length === 0 ? (
+                  <p className="settings-hint">{t('chat.partnersEmpty')}</p>
+                ) : (
+                  <ul className="chat-dm-list">
+                    {partnerChatSummaries.map((s) => (
+                      <li
+                        key={s.partnerId}
+                        className={`chat-dm-item${channel === s.partnerId ? ' active' : ''}`}
+                        onClick={() => openChannel(s.partnerId)}
+                      >
+                        <Avatar name={s.partnerName} size={28} />
+                        <div className="chat-dm-item-text">
+                          <span className="chat-dm-item-name">{s.partnerName}</span>
+                          {s.lastMessage && <span className="chat-dm-item-preview">{s.lastMessage}</span>}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
 
             <div className="reg-sidebar-section">
               <div className="chat-groups-title-row">
@@ -627,6 +702,8 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
           </button>
         </div>
       )}
+
+      <ChatSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       {!currentEmployee.isPartner && (
         <ChatGroupFormModal

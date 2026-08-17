@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Pencil, ArrowRight, Trash2, UserPlus, ChevronDown, Check, X } from 'lucide-react';
+import { Plus, Search, Pencil, ArrowRight, Trash2, UserPlus, ChevronDown, Check, X, MessageCircle } from 'lucide-react';
 import { api, type Employee, type Position, type Department, type AbsenceRequest, type Regulation, type Partner } from '../lib/api';
+import { dmChannelId } from '../lib/chat';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
 import { parseSqliteUtc, formatLocalDate } from '../lib/date';
@@ -395,6 +396,23 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
                   </div>
                 )}
               </div>
+              {!currentEmployee.isPartner && !selected.isPartner && selected.id !== currentEmployee.id && (
+                <button
+                  type="button"
+                  className="icon-btn"
+                  title={t('topbar.chat')}
+                  onClick={() =>
+                    navigate('/dashboard/chat', {
+                      state: {
+                        channel: dmChannelId(currentEmployee.id, selected.id),
+                        dmWith: { id: selected.id, name: selected.fullName || selected.login, avatarData: selected.avatarData },
+                      },
+                    })
+                  }
+                >
+                  <MessageCircle size={18} />
+                </button>
+              )}
             </div>
 
             <div className="employee-card-row">

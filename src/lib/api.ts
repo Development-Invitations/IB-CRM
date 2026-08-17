@@ -299,6 +299,15 @@ export type ChatMessage = {
   createdAt: string;
 };
 
+export type DmChannelSummary = {
+  channel: string;
+  otherEmployeeId: string;
+  otherEmployeeName: string;
+  otherEmployeeAvatar: string | null;
+  lastMessage: string | null;
+  lastMessageAt: string | null;
+};
+
 export type Employee = {
   id: string;
   employeeNumber: string;
@@ -671,6 +680,7 @@ export const api = {
   }) => invoke<ChatMessage>('send_chat_message', { payload }),
   markChatChannelRead: (payload: { employeeId: string; channel: string }) =>
     invoke<void>('mark_chat_channel_read', { payload }),
+  listMyDmChannels: (employeeId: string) => invoke<DmChannelSummary[]>('list_my_dm_channels', { employeeId }),
 
   recordLogin: (employeeId: string) => invoke<void>('record_login', { employeeId }),
 

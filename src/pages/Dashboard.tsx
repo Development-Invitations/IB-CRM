@@ -14,7 +14,6 @@ import {
   FolderKanban,
   FileText,
   MessageSquare,
-  MessageCircle,
   Cake,
   LogOut,
   ClipboardList,
@@ -53,7 +52,6 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
     { label: t('sidebar.projects'), icon: FolderKanban, path: 'projects' },
     { label: t('sidebar.regulations'), icon: FileText, path: 'regulations' },
     { label: t('sidebar.blog'), icon: MessageSquare, path: 'blog' },
-    { label: t('sidebar.chat'), icon: MessageCircle, path: 'chat' },
     { label: t('sidebar.birthdays'), icon: Cake, path: 'birthdays' },
   ];
 

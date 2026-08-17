@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, ChangeEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Phone, Briefcase, Building2, UserCog, Users, Clock, Send, Calendar, History, CalendarPlus, Cake, Camera, X, ChevronDown, KeyRound, Handshake } from 'lucide-react';
+import { ArrowLeft, Phone, Briefcase, Building2, UserCog, Users, Clock, Send, Calendar, History, CalendarPlus, Cake, Camera, X, ChevronDown, KeyRound, Handshake, MessageCircle } from 'lucide-react';
 import { api, type Employee, type Session, type AbsenceRequest } from '../lib/api';
+import { dmChannelId } from '../lib/chat';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
 import { formatUzPhone } from '../lib/phone';
@@ -271,6 +272,23 @@ export default function EmployeeProfile({ currentEmployee }: { currentEmployee: 
                 </div>
               )}
             </div>
+            {!isOwnProfile && !currentEmployee.isPartner && !employee.isPartner && (
+              <button
+                type="button"
+                className="icon-btn"
+                title={t('topbar.chat')}
+                onClick={() =>
+                  navigate('/dashboard/chat', {
+                    state: {
+                      channel: dmChannelId(currentEmployee.id, employee.id),
+                      dmWith: { id: employee.id, name: employee.fullName || employee.login, avatarData: employee.avatarData },
+                    },
+                  })
+                }
+              >
+                <MessageCircle size={18} />
+              </button>
+            )}
           </div>
 
           <div className="profile-grid">

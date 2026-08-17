@@ -65,6 +65,15 @@ pub struct ChatMessageRecord {
     pub created_at: String,
 }
 
+pub struct DmChannelSummary {
+    pub channel: String,
+    pub other_employee_id: String,
+    pub other_employee_name: String,
+    pub other_employee_avatar: Option<String>,
+    pub last_message: Option<String>,
+    pub last_message_at: Option<String>,
+}
+
 pub struct SessionRecord {
     pub id: String,
     pub login_at: String,
@@ -1153,15 +1162,41 @@ impl Db {
     }
 
     // ---- Чат ----
-    // Два вида каналов: 'general' (общий чат всех не-партнёров) и id из
-    // partners (приватный тред CRM с конкретным партнёром — переписываться с
-    // партнёром может только админ; аккаунты самого партнёра видят свой канал).
+    // Три вида каналов: 'general' (общий чат всех не-партнёров), 'dm:<id1>:<id2>'
+    // (личка между двумя сотрудниками CRM — не партнёрами) и id из partners
+    // (приватный тред CRM с конкретным партнёром — переписываться с партнёром
+    // может только админ; аккаунты самого партнёра видят свой канал).
 
+    // Канал 'dm:<id1>:<id2>' — id отсортированы, собирается на фронтенде
+    // (src/lib/chat.ts::dmChannelId) одинаково независимо от того, кто из
+    // двух сотрудников его вычисляет; здесь только парсится, не строится.
     fn can_access_chat_channel(&self, employee_id: &str, channel: &str) -> Result<EmployeeRecord, String> {
         let employee = self.get_employee(employee_id).ok_or_else(|| "Сотрудник не найден".to_string())?;
         if channel == "general" {
             if employee.is_partner {
                 return Err("Партнёрам недоступен общий чат".into());
+            }
+            return Ok(employee);
+        }
+        if let Some(rest) = channel.strip_prefix("dm:") {
+            if employee.is_partner {
+                return Err("Партнёрам недоступна личная переписка".into());
+            }
+            let parts: Vec<&str> = rest.split(':').collect();
+            if parts.len() != 2 {
+                return Err("Некорректный канал".into());
+            }
+            if parts[0] != employee_id && parts[1] != employee_id {
+                return Err("Недостаточно прав".into());
+            }
+            for pid in &parts {
+                let ok: bool = self
+                    .conn
+                    .query_row("SELECT 1 FROM employees WHERE id = ?1 AND is_partner = 0", params![pid], |_| Ok(true))
+                    .unwrap_or(false);
+                if !ok {
+                    return Err("Собеседник не найден".into());
+                }
             }
             return Ok(employee);
         }
@@ -1265,6 +1300,13 @@ impl Db {
     // notify_all_admins), если пишет админ — уведомляем аккаунты этого партнёра.
     fn notify_chat_message(&self, channel: &str, sender_id: &str, sender: &EmployeeRecord, content: &str) {
         let title = format!("Новое сообщение в чате от {}", sender.full_name);
+        if let Some(rest) = channel.strip_prefix("dm:") {
+            if let Some((a, b)) = rest.split_once(':') {
+                let other = if a == sender_id { b } else { a };
+                self.notify(other, "chat_message", &title, Some(content), Some("chat"), Some(channel));
+            }
+            return;
+        }
         if channel == "general" {
             let mut stmt = match self.conn.prepare("SELECT id FROM employees WHERE is_partner = 0 AND id != ?1") {
                 Ok(s) => s,
@@ -1302,6 +1344,62 @@ impl Db {
             "UPDATE notifications SET is_read = 1 WHERE employee_id = ?1 AND type = 'chat_message' AND related_entity_id = ?2",
             params![employee_id, channel],
         );
+    }
+
+    // Список личных переписок сотрудника — каналы вида 'dm:<id1>:<id2>', где
+    // employee_id — один из двух участников. Отдельной таблицы "диалогов" нет
+    // (см. комментарий выше про dm_channel_id), поэтому смотрим на уже
+    // отправленные сообщения: раз сообщение есть — переписка существует.
+    // Новый диалог, в котором ещё нет ни одного сообщения, тут не появится —
+    // это ожидаемо, он и не нужен в списке "уже начатых" переписок.
+    pub fn list_my_dm_channels(&self, employee_id: &str) -> Vec<DmChannelSummary> {
+        let mut stmt = match self.conn.prepare(
+            "SELECT DISTINCT channel FROM chat_messages
+             WHERE channel LIKE 'dm:' || ?1 || ':%' OR channel LIKE 'dm:%:' || ?1",
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        let channels: Vec<String> = match stmt.query_map(params![employee_id], |row| row.get(0)) {
+            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+            Err(_) => return Vec::new(),
+        };
+
+        let mut summaries: Vec<DmChannelSummary> = channels
+            .into_iter()
+            .filter_map(|channel| {
+                let rest = channel.strip_prefix("dm:")?;
+                let (a, b) = rest.split_once(':')?;
+                let other_id = (if a == employee_id { b } else { a }).to_string();
+                let (other_name, other_avatar): (String, Option<String>) = self
+                    .conn
+                    .query_row(
+                        "SELECT full_name, avatar_data FROM employees WHERE id = ?1",
+                        params![other_id],
+                        |row| Ok((row.get(0)?, row.get(1)?)),
+                    )
+                    .ok()?;
+                let last: Option<(String, String)> = self
+                    .conn
+                    .query_row(
+                        "SELECT content, created_at FROM chat_messages WHERE channel = ?1 ORDER BY created_at DESC LIMIT 1",
+                        params![channel],
+                        |row| Ok((row.get(0)?, row.get(1)?)),
+                    )
+                    .ok();
+                Some(DmChannelSummary {
+                    channel,
+                    other_employee_id: other_id,
+                    other_employee_name: other_name,
+                    other_employee_avatar: other_avatar,
+                    last_message: last.as_ref().map(|(c, _)| c.clone()),
+                    last_message_at: last.map(|(_, t)| t),
+                })
+            })
+            .collect();
+
+        summaries.sort_by(|a, b| b.last_message_at.cmp(&a.last_message_at));
+        summaries
     }
 
     // ---- Подразделения ----

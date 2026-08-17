@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.2.11';
+export const APP_VERSION = '0.2.12';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,15 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.2.12',
+      items: [
+        'В IB Чате появилась личная переписка — поиск сотрудника в чате и сразу открывается диалог с ним, слева виден список уже начатых личных чатов с превью последнего сообщения',
+        'Кнопка чата теперь и в карточке сотрудника, и в его кабинете — переход сразу в переписку с этим человеком',
+        'Шапка личного чата показывает аватар и имя собеседника вместо названия канала',
+        '"IB Чат" убран из бокового меню — переход теперь только по кнопке в шапке',
+      ],
+    },
     {
       version: '0.2.11',
       items: [
@@ -350,6 +359,15 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.2.12',
+      items: [
+        "IB Chatga shaxsiy yozishma qo'shildi — chatda xodimni qidiring va u bilan suhbat darhol ochiladi, chapda oxirgi xabar ko'rinishi bilan allaqachon boshlangan shaxsiy chatlar ro'yxati bor",
+        "Chat tugmasi endi xodim kartasida ham, uning kabinetida ham — bosilganda o'sha odam bilan yozishmaga o'tadi",
+        "Shaxsiy chat sarlavhasida kanal nomi o'rniga suhbatdoshning avatari va ismi ko'rsatiladi",
+        "\"IB Chat\" yon menyudan olib tashlandi — endi faqat yuqori panel tugmasi orqali o'tiladi",
+      ],
+    },
+    {
       version: '0.2.11',
       items: [
         "Blogda fayl biriktirish mumkin (nafaqat foto/video) — mavzu yaratishda, tahrirlashda va izohlarda; qo'yilgan foto va videoni endi yuklab olish ham mumkin",
@@ -683,6 +701,15 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.2.12',
+      items: [
+        "IB Чатга шахсий ёзишма қўшилди — чатда ходимни қидиринг ва у билан суҳбат дарҳол очилади, чапда охирги хабар кўриниши билан аллақачон бошланган шахсий чатлар рўйхати бор",
+        "Чат тугмаси энди ходим картасида ҳам, унинг кабинетида ҳам — босилганда ўша одам билан ёзишмага ўтади",
+        "Шахсий чат сарлавҳасида канал номи ўрнига суҳбатдошнинг аватари ва исми кўрсатилади",
+        "\"IB Чат\" ён менюдан олиб ташланди — энди фақат юқори панел тугмаси орқали ўтилади",
+      ],
+    },
     {
       version: '0.2.11',
       items: [

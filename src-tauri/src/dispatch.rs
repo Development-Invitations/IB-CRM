@@ -395,6 +395,10 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
             db.list_chat_messages(&employee_id, &channel)
                 .map(|v| to_json(v.into_iter().map(crate::to_chat_message).collect::<Vec<_>>()))
         }
+        "list_my_dm_channels" => {
+            let employee_id = field(&payload, "employeeId")?;
+            Ok(to_json(db.list_my_dm_channels(&employee_id).into_iter().map(crate::to_dm_channel_summary).collect::<Vec<_>>()))
+        }
         "send_chat_message" => {
             let p: crate::SendChatMessagePayload = from_payload(payload)?;
             db.send_chat_message(

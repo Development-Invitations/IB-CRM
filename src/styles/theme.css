@@ -1342,6 +1342,7 @@ button.employees-add-btn {
   gap: 14px;
   margin-bottom: 20px;
 }
+.employee-card-head .icon-btn { margin-left: auto; flex-shrink: 0; align-self: flex-start; }
 
 .employee-card-name { font-size: 16px; font-weight: 700; }
 
@@ -1513,6 +1514,7 @@ button.employees-add-btn {
   gap: 24px;
   margin-bottom: 28px;
 }
+.profile-card-head .icon-btn { margin-left: auto; flex-shrink: 0; align-self: flex-start; }
 
 .profile-card-head h1 { margin: 0 0 4px; }
 
@@ -1941,6 +1943,47 @@ button.employees-add-btn {
   color: var(--color-accent);
   font-weight: 600;
 }
+
+.chat-dm-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.chat-dm-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.chat-dm-item:hover { background: var(--color-border); }
+.chat-dm-item.active {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface-2));
+}
+.chat-dm-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.chat-dm-item-name { font-size: 13px; font-weight: 600; }
+.chat-dm-item-preview {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-thread-peer { display: flex; align-items: center; gap: 10px; }
+.chat-thread-peer .department-members-title { margin: 0; }
 
 /* ---- Заявки на отсутствие ---- */
 

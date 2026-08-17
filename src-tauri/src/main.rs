@@ -485,6 +485,21 @@ struct ChatMessage {
     created_at: String,
 }
 
+#[derive(Clone, serde::Serialize)]
+struct DmChannelSummary {
+    channel: String,
+    #[serde(rename = "otherEmployeeId")]
+    other_employee_id: String,
+    #[serde(rename = "otherEmployeeName")]
+    other_employee_name: String,
+    #[serde(rename = "otherEmployeeAvatar")]
+    other_employee_avatar: Option<String>,
+    #[serde(rename = "lastMessage")]
+    last_message: Option<String>,
+    #[serde(rename = "lastMessageAt")]
+    last_message_at: Option<String>,
+}
+
 #[derive(serde::Deserialize)]
 struct CreateAdminPayload {
     login: String,
@@ -1350,6 +1365,17 @@ fn to_chat_message(m: db::ChatMessageRecord) -> ChatMessage {
     }
 }
 
+fn to_dm_channel_summary(s: db::DmChannelSummary) -> DmChannelSummary {
+    DmChannelSummary {
+        channel: s.channel,
+        other_employee_id: s.other_employee_id,
+        other_employee_name: s.other_employee_name,
+        other_employee_avatar: s.other_employee_avatar,
+        last_message: s.last_message,
+        last_message_at: s.last_message_at,
+    }
+}
+
 fn to_server_settings(s: db::ServerSettingsRecord) -> ServerSettings {
     ServerSettings { enabled: s.enabled, port: s.port }
 }
@@ -2010,6 +2036,12 @@ fn list_chat_messages(employee_id: String, channel: String, state: tauri::State<
 }
 
 #[tauri::command]
+fn list_my_dm_channels(employee_id: String, state: tauri::State<AppState>) -> Vec<DmChannelSummary> {
+    let db = state.0.lock().unwrap();
+    db.list_my_dm_channels(&employee_id).into_iter().map(to_dm_channel_summary).collect()
+}
+
+#[tauri::command]
 fn send_chat_message(payload: SendChatMessagePayload, state: tauri::State<AppState>) -> Result<ChatMessage, String> {
     let db = state.0.lock().unwrap();
     db.send_chat_message(
@@ -2207,6 +2239,7 @@ fn main() {
             list_blog_comments,
             add_blog_comment,
             list_chat_messages,
+            list_my_dm_channels,
             send_chat_message,
             mark_chat_channel_read,
             get_server_settings,

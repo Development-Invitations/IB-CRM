@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.2.17';
+export const APP_VERSION = '0.2.18';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.2.18',
+      items: [
+        'Исправлена реальная причина ошибки "Не удается найти downloaded-installer.exe" при обновлении в режиме клиента — приложение по ошибке спрашивало путь к файлу у сервера вместо вычисления своего собственного пути',
+        'В IB Чате при открытии переписки теперь сразу показывается последнее сообщение, а не начало истории',
+        'Поправлен внешний вид композера чата — конфликт стилей делал его выше, чем нужно, и показывал лишнюю "ручку" изменения размера',
+      ],
+    },
     {
       version: '0.2.17',
       items: [
@@ -407,6 +415,14 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.2.18',
+      items: [
+        "Mijoz rejimida yangilanishda \"downloaded-installer.exe topilmadi\" xatosining haqiqiy sababi tuzatildi — ilova xato bilan fayl yo'lini o'zi hisoblash o'rniga serverdan so'rardi",
+        "IB Chatda yozishmani ochganda endi darhol oxirgi xabar ko'rsatiladi, tarix boshi emas",
+        "Chat komposerining ko'rinishi tuzatildi — uslublar to'qnashuvi uni kerakidan balandroq ko'rsatib, ortiqcha o'lcham o'zgartirish tutqichini chiqarardi",
+      ],
+    },
+    {
       version: '0.2.17',
       items: [
         "Bildirishnomalar endi ilova kichraytirilgan yoki boshqa dasturda ishlayotgan bo'lsangiz ham ishonchli yetib boradi — yangi bildirishnomalarni so'rash fonda sekinlashadigan brauzer taymeri o'rniga alohida tizim oqimiga o'tkazildi",
@@ -797,6 +813,14 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.2.18',
+      items: [
+        "Мижоз режимида янгиланишда \"downloaded-installer.exe топилмади\" хатосининг ҳақиқий сабаби тузатилди — илова хато билан файл йўлини ўзи ҳисоблаш ўрнига сервердан сўрарди",
+        "IB Чатда ёзишмани очганда энди дарҳол охирги хабар кўрсатилади, тарих боши эмас",
+        "Чат композерининг кўриниши тузатилди — услублар тўқнашуви уни керакидан баландроқ кўрсатиб, ортиқча ўлчам ўзгартириш тутқичини чиқарарди",
+      ],
+    },
     {
       version: '0.2.17',
       items: [

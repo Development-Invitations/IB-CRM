@@ -105,6 +105,12 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
   const [sendBusy, setSendBusy] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  // true сразу после открытия/смены канала — чтобы проскроллить к последнему
+  // сообщению один раз при заходе в переписку, но не дёргать скролл вниз при
+  // каждом тихом фоновом опросе (POLL_INTERVAL_MS), пока пользователь читает
+  // историю выше.
+  const shouldScrollToBottomRef = useRef(false);
 
   useEffect(() => {
     enterFullscreen();
@@ -225,12 +231,24 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
     setMessages([]);
     setReplyTo(null);
     setEmojiOpen(false);
+    shouldScrollToBottomRef.current = true;
     loadMessages();
     if (!channel) return;
     const interval = setInterval(() => loadMessages(true), POLL_INTERVAL_MS);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel]);
+
+  // Проскроллить к последнему сообщению сразу после открытия переписки —
+  // без behavior: 'auto' (не 'smooth') это происходит мгновенно, ещё до
+  // первого кадра отрисовки с прокруткой сверху, так что пользователь не
+  // видит "прыжок".
+  useEffect(() => {
+    if (shouldScrollToBottomRef.current && messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      shouldScrollToBottomRef.current = false;
+    }
+  }, [messages]);
 
   const openChannel = (id: string) => {
     setChannel(id);
@@ -664,6 +682,7 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
                 );
               })
             )}
+            <div ref={messagesEndRef} />
           </div>
 
           <div className="reg-add-entry">

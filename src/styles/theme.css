@@ -3022,7 +3022,13 @@ button.employees-add-btn {
 .chat-composer-icon-btn:hover { background: var(--color-border); }
 .chat-composer-icon-btn:disabled { opacity: 0.5; cursor: default; }
 
-.chat-composer-input {
+/* Специфичность .chat-composer-bar .chat-composer-input (2 класса) нарочно
+   выше, чем у .reg-add-entry textarea (1 класс + тег) из общего блока формы
+   записи regulations/projects/blog — иначе тот побеждал бы в каскаде (тот же
+   <textarea> физически всё ещё внутри .reg-add-entry) и протаскивал сюда
+   свои border/background/min-height/resize:vertical, из-за чего композер
+   выглядел как два наложенных друг на друга блока с "ручкой" ресайза снизу. */
+.chat-composer-bar .chat-composer-input {
   flex: 1;
   resize: none;
   border: none;
@@ -3031,7 +3037,9 @@ button.employees-add-btn {
   font-size: 13px;
   font-family: inherit;
   padding: 8px 4px;
+  min-height: 0;
   max-height: 120px;
+  margin-bottom: 0;
   outline: none;
 }
 

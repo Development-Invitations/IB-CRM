@@ -4,6 +4,7 @@ import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { writeFile, mkdir, BaseDirectory } from '@tauri-apps/plugin-fs';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { exit } from '@tauri-apps/plugin-process';
+import { appDataDir, join } from '@tauri-apps/api/path';
 import { connection, sessionToken } from './connection';
 import { api } from './api';
 import { APP_VERSION } from './changelog';
@@ -104,7 +105,14 @@ async function downloadAndLaunchServerInstaller(onProgress?: (p: UpdateProgress)
   await mkdir('updates', { baseDir: BaseDirectory.AppData, recursive: true });
   await writeFile('updates/downloaded-installer.exe', bytes, { baseDir: BaseDirectory.AppData });
 
-  const installerPath = await api.getUpdateInstallerPath();
+  // ВАЖНО: путь берём через @tauri-apps/api/path (чисто локальный core-API,
+  // всегда бьёт напрямую в свой же бэкенд), а НЕ через api.getUpdateInstallerPath() —
+  // та команда идёт через общий invoke() из api.ts, который в режиме клиента
+  // отправляет её ПО СЕТИ на сервер (см. dispatch.rs) и получает обратно ПУТЬ
+  // СЕРВЕРА, а не свой собственный. Из-за этого shellOpen() пытался открыть
+  // "C:\Users\...\downloaded-installer.exe" сервера на диске клиента, где
+  // такого файла нет — see журнал v0.2.18 в docs/TZ.md.
+  const installerPath = await join(await appDataDir(), 'updates', 'downloaded-installer.exe');
   await shellOpen(installerPath);
 }
 

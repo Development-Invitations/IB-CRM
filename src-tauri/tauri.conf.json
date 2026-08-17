@@ -28,6 +28,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "createUpdaterArtifacts": true,
     "publisher": "IB - Команда",
     "copyright": "© IB - Команда",
     "shortDescription": "Корпоративная CRM для IB OOO \"ISHONCHLI BOSH BUXGALTER\"",

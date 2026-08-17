@@ -308,6 +308,27 @@ export type DmChannelSummary = {
   lastMessageAt: string | null;
 };
 
+export type ChatGroup = {
+  id: string;
+  name: string;
+  description: string | null;
+  photoData: string | null;
+  departmentId: string | null;
+  inviteCode: string;
+  createdBy: string | null;
+  createdAt: string;
+  memberCount: number;
+};
+
+export type ChatGroupSummary = {
+  id: string;
+  name: string;
+  photoData: string | null;
+  memberCount: number;
+  lastMessage: string | null;
+  lastMessageAt: string | null;
+};
+
 export type Employee = {
   id: string;
   employeeNumber: string;
@@ -682,6 +703,27 @@ export const api = {
     invoke<void>('mark_chat_channel_read', { payload }),
   listMyDmChannels: (employeeId: string) => invoke<DmChannelSummary[]>('list_my_dm_channels', { employeeId }),
 
+  createChatGroup: (payload: {
+    actorId: string;
+    name: string;
+    description?: string | null;
+    photoData?: string | null;
+    departmentId?: string | null;
+    memberIds?: string[] | null;
+  }) => invoke<ChatGroup>('create_chat_group', { payload }),
+  listMyChatGroups: (employeeId: string) => invoke<ChatGroupSummary[]>('list_my_chat_groups', { employeeId }),
+  getChatGroup: (groupId: string) => invoke<ChatGroup | null>('get_chat_group', { groupId }),
+  listChatGroupMembers: (employeeId: string, groupId: string) =>
+    invoke<Employee[]>('list_chat_group_members', { employeeId, groupId }),
+  updateChatGroup: (payload: { actorId: string; groupId: string; name: string; description?: string | null; photoData?: string | null }) =>
+    invoke<ChatGroup>('update_chat_group', { payload }),
+  addChatGroupMember: (payload: { actorId: string; groupId: string; employeeId: string }) =>
+    invoke<void>('add_chat_group_member', { payload }),
+  removeChatGroupMember: (payload: { actorId: string; groupId: string; employeeId: string }) =>
+    invoke<void>('remove_chat_group_member', { payload }),
+  joinChatGroupByInvite: (payload: { actorId: string; inviteCode: string }) =>
+    invoke<ChatGroup>('join_chat_group_by_invite', { payload }),
+
   recordLogin: (employeeId: string) => invoke<void>('record_login', { employeeId }),
 
   recordLogout: (employeeId: string) => invoke<void>('record_logout', { employeeId }),
@@ -695,4 +737,5 @@ export const api = {
   getAppVersion: () => invoke<string>('get_app_version'),
   getUpdateInstallerInfo: () => invoke<UpdateInstallerInfo>('get_update_installer_info'),
   getUpdateInstallerPath: () => invoke<string>('get_update_installer_path'),
+  setUpdateInstaller: (payload: { adminId: string; sourcePath: string }) => invoke<void>('set_update_installer', { payload }),
 };

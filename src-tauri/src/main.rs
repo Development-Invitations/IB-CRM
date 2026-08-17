@@ -500,6 +500,83 @@ struct DmChannelSummary {
     last_message_at: Option<String>,
 }
 
+#[derive(Clone, serde::Serialize)]
+struct ChatGroup {
+    id: String,
+    name: String,
+    description: Option<String>,
+    #[serde(rename = "photoData")]
+    photo_data: Option<String>,
+    #[serde(rename = "departmentId")]
+    department_id: Option<String>,
+    #[serde(rename = "inviteCode")]
+    invite_code: String,
+    #[serde(rename = "createdBy")]
+    created_by: Option<String>,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+    #[serde(rename = "memberCount")]
+    member_count: i64,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct ChatGroupSummary {
+    id: String,
+    name: String,
+    #[serde(rename = "photoData")]
+    photo_data: Option<String>,
+    #[serde(rename = "memberCount")]
+    member_count: i64,
+    #[serde(rename = "lastMessage")]
+    last_message: Option<String>,
+    #[serde(rename = "lastMessageAt")]
+    last_message_at: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct CreateChatGroupPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    name: String,
+    description: Option<String>,
+    #[serde(rename = "photoData")]
+    photo_data: Option<String>,
+    #[serde(rename = "departmentId")]
+    department_id: Option<String>,
+    #[serde(rename = "memberIds")]
+    member_ids: Option<Vec<String>>,
+}
+
+#[derive(serde::Deserialize)]
+struct UpdateChatGroupPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "groupId")]
+    group_id: String,
+    name: String,
+    description: Option<String>,
+    #[serde(rename = "photoData")]
+    photo_data: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct ChatGroupMemberPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "groupId")]
+    group_id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct JoinChatGroupPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "inviteCode")]
+    invite_code: String,
+}
+
 #[derive(serde::Deserialize)]
 struct CreateAdminPayload {
     login: String,
@@ -1123,6 +1200,14 @@ pub fn get_update_installer_info_impl(app_data_dir: &std::path::Path) -> UpdateI
     }
 }
 
+#[derive(serde::Deserialize)]
+struct SetUpdateInstallerPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    #[serde(rename = "sourcePath")]
+    source_path: String,
+}
+
 fn to_employee(e: db::EmployeeRecord) -> Employee {
     Employee {
         id: e.id,
@@ -1371,6 +1456,31 @@ fn to_dm_channel_summary(s: db::DmChannelSummary) -> DmChannelSummary {
         other_employee_id: s.other_employee_id,
         other_employee_name: s.other_employee_name,
         other_employee_avatar: s.other_employee_avatar,
+        last_message: s.last_message,
+        last_message_at: s.last_message_at,
+    }
+}
+
+fn to_chat_group(g: db::ChatGroupRecord) -> ChatGroup {
+    ChatGroup {
+        id: g.id,
+        name: g.name,
+        description: g.description,
+        photo_data: g.photo_data,
+        department_id: g.department_id,
+        invite_code: g.invite_code,
+        created_by: g.created_by,
+        created_at: g.created_at,
+        member_count: g.member_count,
+    }
+}
+
+fn to_chat_group_summary(s: db::ChatGroupSummary) -> ChatGroupSummary {
+    ChatGroupSummary {
+        id: s.id,
+        name: s.name,
+        photo_data: s.photo_data,
+        member_count: s.member_count,
         last_message: s.last_message,
         last_message_at: s.last_message_at,
     }
@@ -2042,6 +2152,63 @@ fn list_my_dm_channels(employee_id: String, state: tauri::State<AppState>) -> Ve
 }
 
 #[tauri::command]
+fn create_chat_group(payload: CreateChatGroupPayload, state: tauri::State<AppState>) -> Result<ChatGroup, String> {
+    let db = state.0.lock().unwrap();
+    db.create_chat_group(
+        &payload.actor_id,
+        &payload.name,
+        payload.description.as_deref(),
+        payload.photo_data.as_deref(),
+        payload.department_id.as_deref(),
+        payload.member_ids.as_deref(),
+    )
+    .map(to_chat_group)
+}
+
+#[tauri::command]
+fn list_my_chat_groups(employee_id: String, state: tauri::State<AppState>) -> Vec<ChatGroupSummary> {
+    let db = state.0.lock().unwrap();
+    db.list_my_chat_groups(&employee_id).into_iter().map(to_chat_group_summary).collect()
+}
+
+#[tauri::command]
+fn get_chat_group(group_id: String, state: tauri::State<AppState>) -> Option<ChatGroup> {
+    let db = state.0.lock().unwrap();
+    db.get_chat_group(&group_id).map(to_chat_group)
+}
+
+#[tauri::command]
+fn list_chat_group_members(employee_id: String, group_id: String, state: tauri::State<AppState>) -> Result<Vec<Employee>, String> {
+    let db = state.0.lock().unwrap();
+    db.list_chat_group_members(&employee_id, &group_id).map(|v| v.into_iter().map(to_employee).collect())
+}
+
+#[tauri::command]
+fn update_chat_group(payload: UpdateChatGroupPayload, state: tauri::State<AppState>) -> Result<ChatGroup, String> {
+    let db = state.0.lock().unwrap();
+    db.update_chat_group(&payload.actor_id, &payload.group_id, &payload.name, payload.description.as_deref(), payload.photo_data.as_deref())
+        .map(to_chat_group)
+}
+
+#[tauri::command]
+fn add_chat_group_member(payload: ChatGroupMemberPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.add_chat_group_member(&payload.actor_id, &payload.group_id, &payload.employee_id)
+}
+
+#[tauri::command]
+fn remove_chat_group_member(payload: ChatGroupMemberPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.remove_chat_group_member(&payload.actor_id, &payload.group_id, &payload.employee_id)
+}
+
+#[tauri::command]
+fn join_chat_group_by_invite(payload: JoinChatGroupPayload, state: tauri::State<AppState>) -> Result<ChatGroup, String> {
+    let db = state.0.lock().unwrap();
+    db.join_chat_group_by_invite(&payload.actor_id, &payload.invite_code).map(to_chat_group)
+}
+
+#[tauri::command]
 fn send_chat_message(payload: SendChatMessagePayload, state: tauri::State<AppState>) -> Result<ChatMessage, String> {
     let db = state.0.lock().unwrap();
     db.send_chat_message(
@@ -2127,6 +2294,31 @@ fn get_update_installer_path(app_data_dir: tauri::State<AppDataDir>) -> String {
     update_installer_path(&app_data_dir.0).display().to_string()
 }
 
+// Админ выбирает свежесобранный установщик через нативный диалог выбора
+// файла (см. Settings.tsx) — команда сама копирует и переименовывает файл
+// в нужное место, без ручного поиска папки AppData и переименования, из-за
+// которых на практике возникла путаница (см. журнал v0.2.12 в docs/TZ.md).
+// Только локально: source_path — это путь на диске ТОГО ЖЕ компьютера, где
+// открылся диалог выбора, поэтому не регистрируется в dispatch.rs (по сети
+// такой путь не имел бы смысла).
+#[tauri::command]
+fn set_update_installer(
+    payload: SetUpdateInstallerPayload,
+    state: tauri::State<AppState>,
+    app_data_dir: tauri::State<AppDataDir>,
+) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    if !db.is_admin(&payload.admin_id) {
+        return Err("Недостаточно прав".into());
+    }
+    let dest = update_installer_path(&app_data_dir.0);
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::copy(&payload.source_path, &dest).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -2134,9 +2326,16 @@ fn main() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir().expect("нет app data dir");
             std::fs::create_dir_all(&app_data_dir).ok();
+            // Папка для установщика создаётся заранее, а не только когда клиент
+            // туда что-то скачивает — иначе админу пришлось бы вручную угадывать
+            // и создавать вложенную папку "updates" самому, прежде чем класть
+            // туда файл (см. журнал v0.2.9/v0.2.12 в docs/TZ.md — реальная
+            // путаница на практике).
+            std::fs::create_dir_all(app_data_dir.join("updates")).ok();
             let db = Arc::new(Mutex::new(Db::init(&app_data_dir.join("ib-crm.db"))));
 
             // Если включён режим сервера (настройка в app_meta, см. Settings →
@@ -2240,6 +2439,14 @@ fn main() {
             add_blog_comment,
             list_chat_messages,
             list_my_dm_channels,
+            create_chat_group,
+            list_my_chat_groups,
+            get_chat_group,
+            list_chat_group_members,
+            update_chat_group,
+            add_chat_group_member,
+            remove_chat_group_member,
+            join_chat_group_by_invite,
             send_chat_message,
             mark_chat_channel_read,
             get_server_settings,
@@ -2248,6 +2455,7 @@ fn main() {
             get_app_version,
             get_update_installer_info,
             get_update_installer_path,
+            set_update_installer,
             record_login,
             record_logout,
             list_recent_sessions

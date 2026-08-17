@@ -74,6 +74,27 @@ pub struct DmChannelSummary {
     pub last_message_at: Option<String>,
 }
 
+pub struct ChatGroupRecord {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub photo_data: Option<String>,
+    pub department_id: Option<String>,
+    pub invite_code: String,
+    pub created_by: Option<String>,
+    pub created_at: String,
+    pub member_count: i64,
+}
+
+pub struct ChatGroupSummary {
+    pub id: String,
+    pub name: String,
+    pub photo_data: Option<String>,
+    pub member_count: i64,
+    pub last_message: Option<String>,
+    pub last_message_at: Option<String>,
+}
+
 pub struct SessionRecord {
     pub id: String,
     pub login_at: String,
@@ -659,6 +680,31 @@ impl Db {
             CREATE INDEX IF NOT EXISTS idx_chat_messages_channel ON chat_messages(channel, created_at);",
         );
 
+        // Группы чата — четвёртый вид канала, 'group:<id>' (см. Db::can_access_chat_channel).
+        // В отличие от 'general'/'dm:'/партнёрского канала у группы есть метаданные
+        // (название/описание/фото/кто состоит) — нужна собственная таблица + таблица
+        // участников. invite_code — короткий код для вступления по приглашению (не
+        // URL со своей схемой — регистрировать кастомный протокол в NSIS ради этого
+        // не нужно, код просто передаётся словами/через общий чат).
+        let _ = conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS chat_groups (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT,
+                photo_data TEXT,
+                department_id TEXT REFERENCES departments(id),
+                invite_code TEXT NOT NULL UNIQUE,
+                created_by TEXT REFERENCES employees(id),
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS chat_group_members (
+                group_id TEXT NOT NULL REFERENCES chat_groups(id),
+                employee_id TEXT NOT NULL REFERENCES employees(id),
+                joined_at TEXT NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY (group_id, employee_id)
+            );",
+        );
+
         let db = Db { conn };
         db.notify_todays_birthdays();
         db
@@ -747,7 +793,7 @@ impl Db {
         format!("EMP-{:05}", count + 1)
     }
 
-    fn is_admin(&self, employee_id: &str) -> bool {
+    pub fn is_admin(&self, employee_id: &str) -> bool {
         self.conn
             .query_row(
                 "SELECT is_admin FROM employees WHERE id = ?1",
@@ -1162,10 +1208,11 @@ impl Db {
     }
 
     // ---- Чат ----
-    // Три вида каналов: 'general' (общий чат всех не-партнёров), 'dm:<id1>:<id2>'
-    // (личка между двумя сотрудниками CRM — не партнёрами) и id из partners
-    // (приватный тред CRM с конкретным партнёром — переписываться с партнёром
-    // может только админ; аккаунты самого партнёра видят свой канал).
+    // Четыре вида каналов: 'general' (общий чат всех не-партнёров), 'dm:<id1>:<id2>'
+    // (личка между двумя сотрудниками CRM — не партнёрами), 'group:<id>' (группа —
+    // см. секцию "Группы чата" ниже) и id из partners (приватный тред CRM с
+    // конкретным партнёром — переписываться с партнёром может только админ;
+    // аккаунты самого партнёра видят свой канал).
 
     // Канал 'dm:<id1>:<id2>' — id отсортированы, собирается на фронтенде
     // (src/lib/chat.ts::dmChannelId) одинаково независимо от того, кто из
@@ -1197,6 +1244,23 @@ impl Db {
                 if !ok {
                     return Err("Собеседник не найден".into());
                 }
+            }
+            return Ok(employee);
+        }
+        if let Some(group_id) = channel.strip_prefix("group:") {
+            if employee.is_partner {
+                return Err("Партнёрам недоступны группы".into());
+            }
+            let is_member: bool = self
+                .conn
+                .query_row(
+                    "SELECT 1 FROM chat_group_members WHERE group_id = ?1 AND employee_id = ?2",
+                    params![group_id, employee_id],
+                    |_| Ok(true),
+                )
+                .unwrap_or(false);
+            if !is_member {
+                return Err("Недостаточно прав".into());
             }
             return Ok(employee);
         }
@@ -1307,6 +1371,20 @@ impl Db {
             }
             return;
         }
+        if let Some(group_id) = channel.strip_prefix("group:") {
+            let mut stmt = match self.conn.prepare("SELECT employee_id FROM chat_group_members WHERE group_id = ?1 AND employee_id != ?2") {
+                Ok(s) => s,
+                Err(_) => return,
+            };
+            let ids: Vec<String> = stmt
+                .query_map(params![group_id, sender_id], |row| row.get(0))
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                .unwrap_or_default();
+            for id in ids {
+                self.notify(&id, "chat_message", &title, Some(content), Some("chat"), Some(channel));
+            }
+            return;
+        }
         if channel == "general" {
             let mut stmt = match self.conn.prepare("SELECT id FROM employees WHERE is_partner = 0 AND id != ?1") {
                 Ok(s) => s,
@@ -1400,6 +1478,246 @@ impl Db {
 
         summaries.sort_by(|a, b| b.last_message_at.cmp(&a.last_message_at));
         summaries
+    }
+
+    // ---- Группы чата ----
+    // Два способа создания: "по подразделению" (только глава этого подразделения
+    // или админ, участники — автоматически весь состав подразделения) и "вручную"
+    // (любой сотрудник, сам выбирает состав). После создания состав никак не связан
+    // с фактическим составом подразделения — если туда кто-то придёт позже, в
+    // группу его придётся добавить отдельно (осознанное упрощение, не синхронизация).
+
+    fn generate_invite_code() -> String {
+        Uuid::new_v4().to_string().replace('-', "")[..8].to_uppercase()
+    }
+
+    fn is_department_head(&self, employee_id: &str, department_id: &str) -> bool {
+        self.conn
+            .query_row(
+                "SELECT 1 FROM departments WHERE id = ?1 AND head_employee_id = ?2",
+                params![department_id, employee_id],
+                |_| Ok(true),
+            )
+            .unwrap_or(false)
+    }
+
+    fn map_chat_group_row(row: &rusqlite::Row) -> rusqlite::Result<ChatGroupRecord> {
+        Ok(ChatGroupRecord {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            description: row.get(2)?,
+            photo_data: row.get(3)?,
+            department_id: row.get(4)?,
+            invite_code: row.get(5)?,
+            created_by: row.get(6)?,
+            created_at: row.get(7)?,
+            member_count: row.get(8)?,
+        })
+    }
+
+    const CHAT_GROUP_SELECT: &'static str = "SELECT
+            g.id, g.name, g.description, g.photo_data, g.department_id, g.invite_code,
+            g.created_by, g.created_at,
+            (SELECT COUNT(*) FROM chat_group_members gm WHERE gm.group_id = g.id)
+        FROM chat_groups g";
+
+    pub fn get_chat_group(&self, group_id: &str) -> Option<ChatGroupRecord> {
+        let sql = format!("{} WHERE g.id = ?1", Self::CHAT_GROUP_SELECT);
+        self.conn.query_row(&sql, params![group_id], Self::map_chat_group_row).ok()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_chat_group(
+        &self,
+        actor_id: &str,
+        name: &str,
+        description: Option<&str>,
+        photo_data: Option<&str>,
+        department_id: Option<&str>,
+        member_ids: Option<&[String]>,
+    ) -> Result<ChatGroupRecord, String> {
+        let actor = self.get_employee(actor_id).ok_or_else(|| "Сотрудник не найден".to_string())?;
+        if actor.is_partner {
+            return Err("Партнёрам недоступны группы".into());
+        }
+        let name = name.trim();
+        if name.is_empty() {
+            return Err("Укажите название группы".into());
+        }
+
+        let mut members: Vec<String> = if let Some(dep_id) = department_id {
+            if !self.is_department_head(actor_id, dep_id) && !actor.is_admin {
+                return Err("Создавать группу подразделения может только его руководитель".into());
+            }
+            let mut stmt = self
+                .conn
+                .prepare("SELECT id FROM employees WHERE department_id = ?1 AND is_partner = 0")
+                .map_err(|e| e.to_string())?;
+            let dep_members: Vec<String> = stmt
+                .query_map(params![dep_id], |row| row.get(0))
+                .map_err(|e| e.to_string())?
+                .filter_map(|r| r.ok())
+                .collect();
+            dep_members
+        } else {
+            let picked = member_ids.filter(|m| !m.is_empty()).ok_or_else(|| "Выберите хотя бы одного участника".to_string())?;
+            picked.to_vec()
+        };
+        if !members.iter().any(|m| m == actor_id) {
+            members.push(actor_id.to_string());
+        }
+
+        let id = Uuid::new_v4().to_string();
+        let invite_code = Self::generate_invite_code();
+        self.conn
+            .execute(
+                "INSERT INTO chat_groups (id, name, description, photo_data, department_id, invite_code, created_by)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![id, name, description, photo_data, department_id, invite_code, actor_id],
+            )
+            .map_err(|e| e.to_string())?;
+        for member_id in &members {
+            let _ = self.conn.execute(
+                "INSERT OR IGNORE INTO chat_group_members (group_id, employee_id) VALUES (?1, ?2)",
+                params![id, member_id],
+            );
+        }
+
+        self.get_chat_group(&id).ok_or_else(|| "Не удалось создать группу".to_string())
+    }
+
+    pub fn list_my_chat_groups(&self, employee_id: &str) -> Vec<ChatGroupSummary> {
+        let sql = format!(
+            "{} WHERE g.id IN (SELECT group_id FROM chat_group_members WHERE employee_id = ?1)",
+            Self::CHAT_GROUP_SELECT
+        );
+        let mut stmt = match self.conn.prepare(&sql) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        let groups: Vec<ChatGroupRecord> = match stmt.query_map(params![employee_id], Self::map_chat_group_row) {
+            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+            Err(_) => return Vec::new(),
+        };
+
+        let mut summaries: Vec<ChatGroupSummary> = groups
+            .into_iter()
+            .map(|g| {
+                let channel = format!("group:{}", g.id);
+                let last: Option<(String, String)> = self
+                    .conn
+                    .query_row(
+                        "SELECT content, created_at FROM chat_messages WHERE channel = ?1 ORDER BY created_at DESC LIMIT 1",
+                        params![channel],
+                        |row| Ok((row.get(0)?, row.get(1)?)),
+                    )
+                    .ok();
+                ChatGroupSummary {
+                    id: g.id,
+                    name: g.name,
+                    photo_data: g.photo_data,
+                    member_count: g.member_count,
+                    last_message: last.as_ref().map(|(c, _)| c.clone()),
+                    last_message_at: last.map(|(_, t)| t),
+                }
+            })
+            .collect();
+
+        summaries.sort_by(|a, b| b.last_message_at.cmp(&a.last_message_at));
+        summaries
+    }
+
+    pub fn list_chat_group_members(&self, employee_id: &str, group_id: &str) -> Result<Vec<EmployeeRecord>, String> {
+        self.can_access_chat_channel(employee_id, &format!("group:{group_id}"))?;
+        let sql = format!(
+            "{} WHERE e.id IN (SELECT employee_id FROM chat_group_members WHERE group_id = ?1)",
+            Self::EMPLOYEE_SELECT
+        );
+        let mut stmt = self.conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let rows = stmt.query_map(params![group_id], Self::map_employee_row).map_err(|e| e.to_string())?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    fn is_chat_group_manager(&self, employee_id: &str, group: &ChatGroupRecord) -> bool {
+        self.is_admin(employee_id) || group.created_by.as_deref() == Some(employee_id)
+    }
+
+    pub fn update_chat_group(
+        &self,
+        actor_id: &str,
+        group_id: &str,
+        name: &str,
+        description: Option<&str>,
+        photo_data: Option<&str>,
+    ) -> Result<ChatGroupRecord, String> {
+        let group = self.get_chat_group(group_id).ok_or_else(|| "Группа не найдена".to_string())?;
+        if !self.is_chat_group_manager(actor_id, &group) {
+            return Err("Недостаточно прав".into());
+        }
+        let name = name.trim();
+        if name.is_empty() {
+            return Err("Укажите название группы".into());
+        }
+        self.conn
+            .execute(
+                "UPDATE chat_groups SET name = ?1, description = ?2, photo_data = ?3 WHERE id = ?4",
+                params![name, description, photo_data, group_id],
+            )
+            .map_err(|e| e.to_string())?;
+        self.get_chat_group(group_id).ok_or_else(|| "Группа не найдена".to_string())
+    }
+
+    pub fn add_chat_group_member(&self, actor_id: &str, group_id: &str, employee_id: &str) -> Result<(), String> {
+        let group = self.get_chat_group(group_id).ok_or_else(|| "Группа не найдена".to_string())?;
+        if !self.is_chat_group_manager(actor_id, &group) {
+            return Err("Недостаточно прав".into());
+        }
+        let target = self.get_employee(employee_id).ok_or_else(|| "Сотрудник не найден".to_string())?;
+        if target.is_partner {
+            return Err("Партнёрам недоступны группы".into());
+        }
+        self.conn
+            .execute(
+                "INSERT OR IGNORE INTO chat_group_members (group_id, employee_id) VALUES (?1, ?2)",
+                params![group_id, employee_id],
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    // Убрать СЕБЯ (выйти из группы) может любой участник; убрать ДРУГОГО —
+    // только создатель группы/админ.
+    pub fn remove_chat_group_member(&self, actor_id: &str, group_id: &str, employee_id: &str) -> Result<(), String> {
+        let group = self.get_chat_group(group_id).ok_or_else(|| "Группа не найдена".to_string())?;
+        if actor_id != employee_id && !self.is_chat_group_manager(actor_id, &group) {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn
+            .execute(
+                "DELETE FROM chat_group_members WHERE group_id = ?1 AND employee_id = ?2",
+                params![group_id, employee_id],
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn join_chat_group_by_invite(&self, actor_id: &str, invite_code: &str) -> Result<ChatGroupRecord, String> {
+        let actor = self.get_employee(actor_id).ok_or_else(|| "Сотрудник не найден".to_string())?;
+        if actor.is_partner {
+            return Err("Партнёрам недоступны группы".into());
+        }
+        let sql = format!("{} WHERE g.invite_code = ?1", Self::CHAT_GROUP_SELECT);
+        let group = self
+            .conn
+            .query_row(&sql, params![invite_code.trim().to_uppercase()], Self::map_chat_group_row)
+            .map_err(|_| "Код приглашения не найден".to_string())?;
+        self.conn
+            .execute(
+                "INSERT OR IGNORE INTO chat_group_members (group_id, employee_id) VALUES (?1, ?2)",
+                params![group.id, actor_id],
+            )
+            .map_err(|e| e.to_string())?;
+        self.get_chat_group(&group.id).ok_or_else(|| "Группа не найдена".to_string())
     }
 
     // ---- Подразделения ----

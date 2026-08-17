@@ -1,5 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, FolderOpen, Upload } from 'lucide-react';
+import { open as openFileDialog } from '@tauri-apps/plugin-dialog';
+import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { api, type Employee, type ServerSettings } from '../lib/api';
 import { useLocale, LOCALE_LABELS, type Locale } from '../lib/i18n';
 import { useTheme, THEME_NAMES } from '../lib/theme';
@@ -15,6 +17,13 @@ import {
   setStoredToastPosition,
   type ToastPosition,
 } from '../lib/chatNotificationPrefs';
+import {
+  CHAT_WALLPAPER_IDS,
+  CHAT_WALLPAPER_CSS,
+  getStoredChatWallpaper,
+  setStoredChatWallpaper,
+  type ChatWallpaperId,
+} from '../lib/chatWallpaper';
 import Select from '../components/Select';
 
 export default function Settings({ employee }: { employee: Employee }) {
@@ -55,6 +64,12 @@ export default function Settings({ employee }: { employee: Employee }) {
     setStoredToastPosition(pos);
   };
 
+  const [chatWallpaper, setChatWallpaperState] = useState<ChatWallpaperId>(getStoredChatWallpaper());
+  const handleChatWallpaperChange = (id: ChatWallpaperId) => {
+    setChatWallpaperState(id);
+    setStoredChatWallpaper(id);
+  };
+
   const isClient = connection.isClient();
   const [serverSettings, setServerSettingsState] = useState<ServerSettings | null>(null);
   const [lanAddress, setLanAddress] = useState<string | null>(null);
@@ -63,6 +78,8 @@ export default function Settings({ employee }: { employee: Employee }) {
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [installerPath, setInstallerPath] = useState<string | null>(null);
   const [copiedInstallerPath, setCopiedInstallerPath] = useState(false);
+  const [installerAvailable, setInstallerAvailable] = useState<boolean | null>(null);
+  const [installerBusy, setInstallerBusy] = useState(false);
 
   useEffect(() => {
     if (!employee.isAdmin || isClient) return;
@@ -72,7 +89,26 @@ export default function Settings({ employee }: { employee: Employee }) {
     });
     api.getLanAddress().then(setLanAddress);
     api.getUpdateInstallerPath().then(setInstallerPath).catch(() => {});
+    api.getUpdateInstallerInfo().then((info) => setInstallerAvailable(info.available)).catch(() => {});
   }, [employee.isAdmin, isClient]);
+
+  // Диалог выбора файла + прямое копирование на бэкенде — без этого админ
+  // должен вручную найти/создать папку в AppData и переименовать файл, что
+  // на практике оказалось запутанным (см. журнал v0.2.12 в docs/TZ.md).
+  const handlePickInstaller = async () => {
+    try {
+      const selected = await openFileDialog({ multiple: false, filters: [{ name: 'Installer', extensions: ['exe'] }] });
+      if (!selected || typeof selected !== 'string') return;
+      setInstallerBusy(true);
+      await api.setUpdateInstaller({ adminId: employee.id, sourcePath: selected });
+      setInstallerAvailable(true);
+      showToast('success', t('settings.server.installerSetSuccess'));
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('settings.errorGeneric'));
+    } finally {
+      setInstallerBusy(false);
+    }
+  };
 
   const handleCopyInstallerPath = () => {
     if (!installerPath) return;
@@ -80,6 +116,17 @@ export default function Settings({ employee }: { employee: Employee }) {
       setCopiedInstallerPath(true);
       setTimeout(() => setCopiedInstallerPath(false), 2000);
     });
+  };
+
+  // Открывает саму папку в проводнике — без этого админ должен вручную
+  // набрать/создать путь в AppData, что на практике оказалось запутанным
+  // (см. журнал v0.2.12 в docs/TZ.md). Открываем родительскую папку, а не
+  // сам файл — файла может ещё не быть, это нормально, папка уже создаётся
+  // заранее при старте приложения.
+  const handleOpenInstallerFolder = () => {
+    if (!installerPath) return;
+    const folder = installerPath.replace(/[\\/][^\\/]*$/, '');
+    shellOpen(folder).catch(() => showToast('error', t('settings.errorGeneric')));
   };
 
   const handleToggleServer = async () => {
@@ -249,6 +296,25 @@ export default function Settings({ employee }: { employee: Employee }) {
           />
           <p className="settings-hint">{t('settings.toastPositionHint')}</p>
         </div>
+
+        <div style={{ marginTop: 14 }}>
+          <span className="settings-hint">{t('settings.chatWallpaperLabel')}</span>
+          <div className="chat-wallpaper-grid">
+            {CHAT_WALLPAPER_IDS.map((id) => (
+              <button
+                key={id}
+                type="button"
+                className={`chat-wallpaper-swatch${chatWallpaper === id ? ' active' : ''}`}
+                style={{ background: CHAT_WALLPAPER_CSS[id] || 'var(--color-bg)' }}
+                title={t(`settings.chatWallpaper.${id}`)}
+                onClick={() => handleChatWallpaperChange(id)}
+              >
+                {chatWallpaper === id && <Check size={16} />}
+              </button>
+            ))}
+          </div>
+          <p className="settings-hint">{t('settings.chatWallpaperHint')}</p>
+        </div>
       </section>
 
       <section className="settings-section">
@@ -365,11 +431,25 @@ export default function Settings({ employee }: { employee: Employee }) {
             <span style={{ wordBreak: 'break-all' }}>
               {installerPath ?? '—'}
               {installerPath && (
-                <button className="reg-action-btn" style={{ marginLeft: 8 }} onClick={handleCopyInstallerPath} title={t('settings.server.copyAddress')}>
-                  {copiedInstallerPath ? <Check size={13} /> : <Copy size={13} />}
-                </button>
+                <>
+                  <button className="reg-action-btn" style={{ marginLeft: 8 }} onClick={handleCopyInstallerPath} title={t('settings.server.copyAddress')}>
+                    {copiedInstallerPath ? <Check size={13} /> : <Copy size={13} />}
+                  </button>
+                  <button className="reg-action-btn" style={{ marginLeft: 4 }} onClick={handleOpenInstallerFolder} title={t('settings.server.openInstallerFolder')}>
+                    <FolderOpen size={13} />
+                  </button>
+                </>
               )}
             </span>
+          </div>
+
+          <div className="account-row" style={{ marginTop: 10 }}>
+            <span className="settings-hint">
+              {installerAvailable ? t('settings.server.installerReady') : t('settings.server.installerMissing')}
+            </span>
+            <button className="modal-btn" onClick={handlePickInstaller} disabled={installerBusy}>
+              <Upload size={14} /> {installerBusy ? t('settings.server.installerSetBusy') : t('settings.server.installerSetBtn')}
+            </button>
           </div>
         </section>
       )}

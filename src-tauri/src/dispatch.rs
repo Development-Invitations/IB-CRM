@@ -399,6 +399,51 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
             let employee_id = field(&payload, "employeeId")?;
             Ok(to_json(db.list_my_dm_channels(&employee_id).into_iter().map(crate::to_dm_channel_summary).collect::<Vec<_>>()))
         }
+        "create_chat_group" => {
+            let p: crate::CreateChatGroupPayload = from_payload(payload)?;
+            db.create_chat_group(
+                &p.actor_id,
+                &p.name,
+                p.description.as_deref(),
+                p.photo_data.as_deref(),
+                p.department_id.as_deref(),
+                p.member_ids.as_deref(),
+            )
+            .map(crate::to_chat_group)
+            .map(to_json)
+        }
+        "list_my_chat_groups" => {
+            let employee_id = field(&payload, "employeeId")?;
+            Ok(to_json(db.list_my_chat_groups(&employee_id).into_iter().map(crate::to_chat_group_summary).collect::<Vec<_>>()))
+        }
+        "get_chat_group" => {
+            let group_id = field(&payload, "groupId")?;
+            Ok(to_json(db.get_chat_group(&group_id).map(crate::to_chat_group)))
+        }
+        "list_chat_group_members" => {
+            let employee_id = field(&payload, "employeeId")?;
+            let group_id = field(&payload, "groupId")?;
+            db.list_chat_group_members(&employee_id, &group_id)
+                .map(|v| to_json(v.into_iter().map(crate::to_employee).collect::<Vec<_>>()))
+        }
+        "update_chat_group" => {
+            let p: crate::UpdateChatGroupPayload = from_payload(payload)?;
+            db.update_chat_group(&p.actor_id, &p.group_id, &p.name, p.description.as_deref(), p.photo_data.as_deref())
+                .map(crate::to_chat_group)
+                .map(to_json)
+        }
+        "add_chat_group_member" => {
+            let p: crate::ChatGroupMemberPayload = from_payload(payload)?;
+            db.add_chat_group_member(&p.actor_id, &p.group_id, &p.employee_id).map(to_json)
+        }
+        "remove_chat_group_member" => {
+            let p: crate::ChatGroupMemberPayload = from_payload(payload)?;
+            db.remove_chat_group_member(&p.actor_id, &p.group_id, &p.employee_id).map(to_json)
+        }
+        "join_chat_group_by_invite" => {
+            let p: crate::JoinChatGroupPayload = from_payload(payload)?;
+            db.join_chat_group_by_invite(&p.actor_id, &p.invite_code).map(crate::to_chat_group).map(to_json)
+        }
         "send_chat_message" => {
             let p: crate::SendChatMessagePayload = from_payload(payload)?;
             db.send_chat_message(

@@ -9,7 +9,7 @@ import { useLocale } from '../lib/i18n';
 import { getChatNotificationsMuted, getStoredToastPosition, type ToastPosition } from '../lib/chatNotificationPrefs';
 import EditRequestReviewModal from './EditRequestReviewModal';
 import AbsenceRequestReviewModal from './AbsenceRequestReviewModal';
-import type { ToastPayload } from '../pages/ToastWindow';
+import type { ToastPayload, ToastKind } from '../pages/ToastWindow';
 
 // Куда ведёт клик по уведомлению — вычисляется один раз и используется как
 // для клика в выпадающей панели (в этом же окне), так и для клика по
@@ -81,6 +81,20 @@ export default function Topbar({ employee }: { employee: Employee }) {
     return { kind: 'navigate', path: `/dashboard/employees/${employee.id}` };
   };
 
+  // Отдельно от resolveNotificationTarget (куда ведёт клик) — это про то, ЧТО
+  // показать (цвет полоски/иконку баннера), см. ToastWindow.tsx::KIND_ICON.
+  // Условия специально зеркалят resolveNotificationTarget, чтобы "куда ведёт"
+  // и "как выглядит" не разъезжались для одного и того же уведомления.
+  const notificationKind = (n: Notification): ToastKind => {
+    if (n.type === 'edit_request') return 'edit_request';
+    if (n.type === 'absence_request') return 'absence';
+    if (n.relatedEntityType === 'regulation') return 'regulation';
+    if (n.relatedEntityType === 'project') return 'project';
+    if (n.type === 'birthday') return 'birthday';
+    if (n.type === 'chat_message') return 'chat';
+    return 'other';
+  };
+
   const applyNotificationTarget = (target: NotificationTarget) => {
     if (target.kind === 'modal-edit-request') setReviewRequestId(target.id);
     else if (target.kind === 'modal-absence') setReviewAbsenceId(target.id);
@@ -121,6 +135,7 @@ export default function Topbar({ employee }: { employee: Employee }) {
         body: n.body,
         path: target.kind === 'navigate' ? target.path : `/dashboard/employees/${employee.id}`,
         navState: target.kind === 'navigate' ? target.state : { reviewKind: target.kind, reviewId: target.id },
+        kind: notificationKind(n),
       };
 
       let win = await WebviewWindow.getByLabel('toast');
@@ -153,6 +168,25 @@ export default function Topbar({ employee }: { employee: Employee }) {
         await new Promise<void>((resolve) => {
           win!.once('tauri://created', () => resolve());
           win!.once('tauri://error', () => resolve());
+        });
+        // 'tauri://created' значит только что нативное окно существует — не
+        // что его веб-контент (ToastWindow.tsx) уже загрузился и подписался
+        // на 'toast-show'. Без этого ожидания emit() ниже уходил в никуда на
+        // первом уведомлении после запуска — окно показывалось пустым (см.
+        // журнал v0.2.14 в docs/TZ.md). Таймаут — подстраховка, если сигнал
+        // готовности почему-то не придёт.
+        await new Promise<void>((resolve) => {
+          let done = false;
+          const finish = () => {
+            if (done) return;
+            done = true;
+            resolve();
+          };
+          const timeoutId = setTimeout(finish, 2000);
+          listen('toast-ready', () => {
+            clearTimeout(timeoutId);
+            finish();
+          }).catch(finish);
         });
       } else {
         await win.setPosition(new LogicalPosition(x, y));

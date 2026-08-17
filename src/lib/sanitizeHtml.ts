@@ -54,8 +54,17 @@ function sanitizeNode(node: Node): void {
       }
     }
     if (el.tagName === 'A') {
-      el.setAttribute('target', '_blank');
-      el.setAttribute('rel', 'noreferrer noopener');
+      // Ссылки на скачивание (download="...") — НЕ добавляем target="_blank":
+      // это ломает download на data:-URL (браузер вместо сохранения файла
+      // пытается открыть данные новой вкладкой/окном, что для многомегабайтной
+      // data:-строки в вебвью просто тихо ничего не делает — ровно то, что
+      // выглядело как "скачать не работает").
+      if (el.hasAttribute('download')) {
+        el.removeAttribute('target');
+      } else {
+        el.setAttribute('target', '_blank');
+        el.setAttribute('rel', 'noreferrer noopener');
+      }
     }
     sanitizeNode(el);
   }

@@ -2,7 +2,13 @@ import { useEffect, useState } from 'react';
 import { emit, listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { X, Bell } from 'lucide-react';
+import { X, Bell, FileText, FolderKanban, MessageCircle, Cake, ClipboardList, Pencil } from 'lucide-react';
+
+// Источник уведомления — определяется в Topbar.tsx (resolveNotificationTarget)
+// и передаётся сюда вместе с payload, чтобы баннер визуально отличался по
+// иконке/цвету в зависимости от того, откуда пришло уведомление (регламент/
+// проект/чат/день рождения/заявка), а не только текстом заголовка.
+export type ToastKind = 'regulation' | 'project' | 'chat' | 'birthday' | 'absence' | 'edit_request' | 'other';
 
 export type ToastPayload = {
   notificationId: string;
@@ -10,6 +16,17 @@ export type ToastPayload = {
   body: string | null;
   path: string;
   navState?: unknown;
+  kind?: ToastKind;
+};
+
+const KIND_ICON: Record<ToastKind, typeof Bell> = {
+  regulation: FileText,
+  project: FolderKanban,
+  chat: MessageCircle,
+  birthday: Cake,
+  absence: ClipboardList,
+  edit_request: Pencil,
+  other: Bell,
 };
 
 // Отдельное лёгкое OS-окно поверх остальных — своё, а не системный тост
@@ -36,6 +53,15 @@ export default function ToastWindow() {
     const unlisten = listen<ToastPayload>('toast-show', (event) => {
       setData(event.payload);
     });
+    // Сообщаем главному окну, что страница домонтировалась и подписка на
+    // toast-show уже готова — при первом показе после запуска приложения
+    // окно 'toast' создаётся с нуля, и просто дождаться 'tauri://created'
+    // (см. Topbar.tsx) недостаточно: это событие означает только что
+    // нативное окно существует, а не что его веб-контент (этот React-код)
+    // уже загрузился и подписался. Без этого хэндшейка первое уведомление
+    // после запуска показывало пустое окно — emit('toast-show') уходил в
+    // никуда, слушателя ещё не было.
+    emit('toast-ready').catch(() => {});
     return () => {
       unlisten.then((f) => f());
     };
@@ -64,11 +90,14 @@ export default function ToastWindow() {
 
   if (!data) return null;
 
+  const kind = data.kind ?? 'other';
+  const KindIcon = KIND_ICON[kind];
+
   return (
-    <div className="toast-window" onClick={open}>
+    <div className={`toast-window toast-window-kind-${kind}`} onClick={open}>
       <div className="toast-window-header">
         <span className="toast-window-brand">
-          <Bell size={13} /> IB CRM
+          <KindIcon size={13} /> IB CRM
         </span>
         <button
           type="button"

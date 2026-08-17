@@ -75,11 +75,57 @@ export default function RichEditor({
     historyRef.current = [initial];
     historyIndexRef.current = 0;
     updateUndoRedoState();
+    wireMediaRemoveButtons();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey]);
 
+  // Кнопки "✕ Удалить" на вставленных медиа/файлах — настоящие DOM-узлы,
+  // добавленные напрямую (не через innerHTML-строку), поэтому в разметку,
+  // которую видит sanitizeBlogHtml, они в принципе не попадают как рабочие
+  // кнопки — из общего белого списка тегов BUTTON всё равно исключён, и его
+  // просто развернуло бы, оставив висящий текст "✕" в опубликованном посте.
+  // Поэтому emitChange ниже сначала клонирует DOM и вырезает кнопки из
+  // клона — а не полагается на санитайзер, чтобы не рисковать протечкой.
+  const wireMediaRemoveButtons = () => {
+    if (!ref.current) return;
+    const makeButton = (onRemove: () => void) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'rich-media-remove-overlay';
+      btn.textContent = '✕';
+      btn.title = t('blog.editorRemoveMedia');
+      btn.contentEditable = 'false';
+      btn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onRemove();
+        emitChange();
+        pushHistory();
+      };
+      return btn;
+    };
+
+    ref.current.querySelectorAll(':scope > div').forEach((div) => {
+      if (!div.querySelector(':scope > img, :scope > video')) return;
+      if (div.querySelector(':scope > .rich-media-remove-overlay')) return;
+      (div as HTMLElement).style.position = 'relative';
+      div.appendChild(makeButton(() => div.remove()));
+    });
+
+    ref.current.querySelectorAll('a[download]').forEach((a) => {
+      const parent = a.parentElement;
+      if (!parent || parent.querySelector('img, video')) return; // уже обработано выше как часть медиа-блока
+      if (parent.querySelector(':scope > .rich-media-remove-overlay')) return;
+      (parent as HTMLElement).style.position = 'relative';
+      parent.appendChild(makeButton(() => a.remove()));
+    });
+  };
+
   const emitChange = () => {
-    if (ref.current) onChange(sanitizeBlogHtml(ref.current.innerHTML));
+    if (!ref.current) return;
+    const clone = ref.current.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll('.rich-media-remove-overlay').forEach((btn) => btn.remove());
+    onChange(sanitizeBlogHtml(clone.innerHTML));
   };
 
   // Фиксирует текущее содержимое как отдельный шаг истории (обрезает "будущее",
@@ -129,6 +175,7 @@ export default function RichEditor({
   const insertHtmlAtCursor = (html: string) => {
     ref.current?.focus();
     document.execCommand('insertHTML', false, html);
+    wireMediaRemoveButtons();
     emitChange();
     pushHistory();
   };

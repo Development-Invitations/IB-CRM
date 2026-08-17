@@ -117,11 +117,21 @@ html.toast-window-root, html.toast-window-root body, html.toast-window-root #roo
   border-radius: 12px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-accent);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   cursor: pointer;
   overflow: hidden;
   user-select: none;
 }
+/* Цветная полоса слева — визуально отличает источник уведомления (не только
+   текстом), даже мельком/боковым зрением, как в Telegram. */
+.toast-window-kind-regulation { border-left-color: #0EA5E9; }
+.toast-window-kind-project { border-left-color: #7C3AED; }
+.toast-window-kind-chat { border-left-color: var(--color-accent); }
+.toast-window-kind-birthday { border-left-color: #DB2777; }
+.toast-window-kind-absence { border-left-color: #F97316; }
+.toast-window-kind-edit_request { border-left-color: #16A34A; }
+.toast-window-kind-other { border-left-color: var(--color-text-muted); }
 
 .toast-window-header {
   display: flex;
@@ -1985,6 +1995,70 @@ button.employees-add-btn {
 .chat-thread-peer { display: flex; align-items: center; gap: 10px; }
 .chat-thread-peer .department-members-title { margin: 0; }
 
+.chat-groups-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.chat-groups-title-row .department-members-title { margin: 0; }
+
+.chat-join-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.chat-join-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: 12px;
+}
+
+.chat-wallpaper-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+.chat-wallpaper-swatch {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius);
+  border: 2px solid var(--color-border);
+  background-color: var(--color-bg);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  padding: 0;
+  transition: border-color 0.15s ease, transform 0.1s ease;
+}
+.chat-wallpaper-swatch:hover { transform: scale(1.06); }
+.chat-wallpaper-swatch.active { border-color: var(--color-accent); }
+
+.chat-reply-jump {
+  display: block;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.chat-reply-jump:hover { text-decoration: underline; color: var(--color-accent); }
+
+@keyframes chat-msg-flash {
+  0%, 100% { background: transparent; }
+  30% { background: color-mix(in srgb, var(--color-accent) 22%, transparent); }
+}
+.chat-msg-highlight .reg-chat-bubble { animation: chat-msg-flash 1.5s ease-out; border-radius: var(--radius); }
+
 /* ---- Заявки на отсутствие ---- */
 
 .absence-form-dates {
@@ -3198,6 +3272,26 @@ button.employees-add-btn {
 .rich-editor-content ul, .rich-editor-content ol { padding-left: 22px; }
 .rich-editor-content img, .rich-editor-content video { max-width: 100%; max-height: 300px; border-radius: var(--radius); }
 .rich-editor-content a { color: var(--color-accent); }
+
+.rich-media-remove-overlay {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+}
+.rich-media-remove-overlay:hover { background: var(--color-danger); }
 
 .rich-editor-color-wrap { position: relative; }
 .rich-editor-color-popover {

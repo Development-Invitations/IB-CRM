@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.2.12';
+export const APP_VERSION = '0.2.15';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,33 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.2.15',
+      items: [
+        'В IB Чате появились группы: руководитель подразделения может создать группу из всех сотрудников подразделения одним кликом, а любой сотрудник может собрать свою группу вручную из коллег — с названием, описанием и фото',
+        'У каждой группы есть код приглашения — скопировал и передал коллеге, тот вводит его в чате и сразу попадает в группу',
+        'Панель участников группы: создатель (или админ) может добавлять и убирать участников, любой участник может сам покинуть группу',
+        'В Настройках — новый раздел "Фон чата": 7 готовых фонов для окна переписки IB Чата, выбор сразу применяется и сохраняется на этом устройстве',
+      ],
+    },
+    {
+      version: '0.2.14',
+      items: [
+        'Исправлено: уведомление-баннер иногда показывалось пустым (первое уведомление после запуска приложения) — теперь окно баннера ждёт полной готовности перед показом',
+        'Баннер уведомлений теперь визуально различается по источнику (регламент/проект/чат/день рождения/заявка) — цветная полоска и своя иконка',
+        'В чате клик по "Ответ для …" теперь прокручивает к тому сообщению, на которое отвечали, и подсвечивает его',
+        'Исправлено: кнопка "Скачать" у фото/видео в блоге не работала (ссылка открывалась не так, из-за чего скачивание тихо не происходило)',
+        'В редакторе блога у вставленных фото/видео/файлов появилась кнопка "✕" — можно убрать вложение, пока пишете, без ручного выделения в тексте',
+      ],
+    },
+    {
+      version: '0.2.13',
+      items: [
+        'Настройки → Сервер: новая кнопка "Выбрать и загрузить установщик" — админ просто выбирает файл через обычный проводник, приложение само копирует и переименовывает его в нужное место (больше не нужно вручную искать папку AppData и переименовывать файл)',
+        'Там же — кнопка "Открыть папку" и статус "Установщик загружен / не загружен"',
+        'Папка для установщика теперь создаётся автоматически при первом запуске сервера',
+      ],
+    },
     {
       version: '0.2.12',
       items: [
@@ -359,6 +386,33 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.2.15',
+      items: [
+        "IB Chatda guruhlar paydo bo'ldi: bo'lim rahbari bitta bosish bilan bo'limning barcha xodimlaridan guruh yaratishi mumkin, istalgan xodim esa hamkasblardan qo'lda o'z guruhini yig'ishi mumkin — nomi, tavsifi va rasmi bilan",
+        "Har bir guruhning taklif kodi bor — nusxalab hamkasbga bering, u chatga kiritsa darhol guruhga qo'shiladi",
+        "Guruh ishtirokchilari paneli: yaratuvchi (yoki administrator) ishtirokchi qo'shishi va olib tashlashi mumkin, istalgan ishtirokchi esa guruhni o'zi tark etishi mumkin",
+        "Sozlamalarda yangi bo'lim — \"Chat foni\": IB Chat yozishmalar oynasi uchun 7 ta tayyor fon, tanlov darhol qo'llaniladi va ushbu qurilmada saqlanadi",
+      ],
+    },
+    {
+      version: '0.2.14',
+      items: [
+        "Tuzatildi: bildirishnoma-banneri ba'zan bo'sh ko'rinardi (ilova ishga tushgandan keyingi birinchi bildirishnoma) — endi banner oynasi ko'rsatishdan oldin to'liq tayyor bo'lishini kutadi",
+        "Bildirishnoma banneri endi manbasi bo'yicha vizual farqlanadi (reglament/loyiha/chat/tug'ilgan kun/ariza) — rangli chiziq va o'z ikonkasi",
+        "Chatda \"Javob: …\" ustiga bosish endi javob berilgan xabarga aylantirib olib boradi va uni ajratib ko'rsatadi",
+        "Tuzatildi: blogda foto/video ostidagi \"Yuklab olish\" tugmasi ishlamasdi (havola noto'g'ri ochilardi, shu sababli yuklab olish sodir bo'lmasdi)",
+        "Blog muharririda qo'yilgan foto/video/fayllarga \"✕\" tugmasi qo'shildi — yozayotganda ilovani matndan qo'lda ajratmasdan olib tashlash mumkin",
+      ],
+    },
+    {
+      version: '0.2.13',
+      items: [
+        "Sozlamalar → Server: yangi \"O'rnatuvchini tanlash va yuklash\" tugmasi — administrator faylni oddiy fayl tanlash oynasi orqali tanlaydi, ilova o'zi uni kerakli joyga nusxalab, nomini o'zgartiradi (endi AppData papkasini qo'lda qidirish va faylni qayta nomlash shart emas)",
+        "Shu yerda — \"Papkani ochish\" tugmasi va \"O'rnatuvchi yuklangan / yuklanmagan\" statusi",
+        "O'rnatuvchi uchun papka endi server birinchi marta ishga tushganda avtomatik yaratiladi",
+      ],
+    },
+    {
       version: '0.2.12',
       items: [
         "IB Chatga shaxsiy yozishma qo'shildi — chatda xodimni qidiring va u bilan suhbat darhol ochiladi, chapda oxirgi xabar ko'rinishi bilan allaqachon boshlangan shaxsiy chatlar ro'yxati bor",
@@ -701,6 +755,33 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.2.15',
+      items: [
+        "IB Чатда гуруҳлар пайдо бўлди: бўлим раҳбари битта босиш билан бўлимнинг барча ходимларидан гуруҳ яратиши мумкин, исталган ходим эса ҳамкасблардан қўлда ўз гуруҳини йиғиши мумкин — номи, тавсифи ва расми билан",
+        "Ҳар бир гуруҳнинг таклиф коди бор — нусхалаб ҳамкасбга беринг, у чатга киритса дарҳол гуруҳга қўшилади",
+        "Гуруҳ иштирокчилари панели: яратувчи (ёки администратор) иштирокчи қўшиши ва олиб ташлаши мумкин, исталган иштирокчи эса гуруҳни ўзи тарк этиши мумкин",
+        "Созламаларда янги бўлим — \"Чат фони\": IB Чат ёзишмалар ойнаси учун 7 та тайёр фон, танлов дарҳол қўлланилади ва ушбу қурилмада сақланади",
+      ],
+    },
+    {
+      version: '0.2.14',
+      items: [
+        "Тузатилди: билдиришнома-баннери баъзан бўш кўринарди (илова ишга тушгандан кейинги биринчи билдиришнома) — энди баннер ойнаси кўрсатишдан олдин тўлиқ тайёр бўлишини кутади",
+        "Билдиришнома баннери энди манбаси бўйича визуал фарқланади (регламент/лойиҳа/чат/туғилган кун/ариза) — рангли чизиқ ва ўз иконкаси",
+        "Чатда \"Жавоб: …\" устига босиш энди жавоб берилган хабарга айлантириб олиб боради ва уни ажратиб кўрсатади",
+        "Тузатилди: блогда фото/видео остидаги \"Юклаб олиш\" тугмаси ишламасди (ҳавола нотўғри очиларди, шу сабабли юклаб олиш содир бўлмасди)",
+        "Блог муҳарририда қўйилган фото/видео/файлларга \"✕\" тугмаси қўшилди — ёзаётганда иловани матндан қўлда ажратмасдан олиб ташлаш мумкин",
+      ],
+    },
+    {
+      version: '0.2.13',
+      items: [
+        "Созламалар → Сервер: янги \"Ўрнатувчини танлаш ва юклаш\" тугмаси — администратор файлни оддий файл танлаш ойнаси орқали танлайди, илова ўзи уни керакли жойга нусхалаб, номини ўзгартиради (энди AppData папкасини қўлда қидириш ва файлни қайта номлаш шарт эмас)",
+        "Шу ерда — \"Папкани очиш\" тугмаси ва \"Ўрнатувчи юкланган / юкланмаган\" статуси",
+        "Ўрнатувчи учун папка энди сервер биринчи марта ишга тушганда автоматик яратилади",
+      ],
+    },
     {
       version: '0.2.12',
       items: [

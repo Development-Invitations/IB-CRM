@@ -2348,8 +2348,24 @@ impl Db {
 
     // Заявки, ожидающие решения именно этого сотрудника как руководителя (или
     // заместителя руководителя) — чтобы показать их прямо на странице "Заявки",
-    // а не только через клик по уведомлению.
+    // а не только через клик по уведомлению. Админ видит ВСЕ ожидающие заявки
+    // (не только те, где он назначен руководителем/заместителем) — он и так
+    // может рассмотреть любую (см. can_resolve_absence), а без этого заявка
+    // сотрудника без руководителя приходила ему только разовым уведомлением
+    // в колокольчик: пропустил/закрыл — и заявка нигде больше не видна как
+    // требующая действия (оставалась только в read-only таблице "Все заявки").
     pub fn list_pending_approvals(&self, actor_id: &str) -> Vec<AbsenceRequestRecord> {
+        if self.is_admin(actor_id) {
+            let sql = format!("{} WHERE ar.status = 'pending' ORDER BY ar.created_at ASC", Self::ABSENCE_SELECT);
+            let mut stmt = match self.conn.prepare(&sql) {
+                Ok(s) => s,
+                Err(_) => return Vec::new(),
+            };
+            return stmt
+                .query_map([], Self::map_absence_row)
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                .unwrap_or_default();
+        }
         let sql = format!(
             "{} WHERE ar.status = 'pending' AND (
                 e.manager_id = ?1

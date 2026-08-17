@@ -380,7 +380,7 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
               <div>
                 <div className="employee-card-name">{selected.fullName || selected.login}</div>
                 <div className="settings-hint">{selected.employeeNumber}</div>
-                {selected.birthDate && <div className="settings-hint">{formatLocalDate(selected.birthDate)}</div>}
+                {!selected.isPartner && selected.birthDate && <div className="settings-hint">{formatLocalDate(selected.birthDate)}</div>}
                 {(selected.headOfDepartmentName || selected.deputyOfDepartmentName) && (
                   <div className="role-badges">
                     {selected.headOfDepartmentName && (
@@ -415,22 +415,26 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
               )}
             </div>
 
-            <div className="employee-card-row">
-              <span className="settings-hint">{t('employees.positionLabel')}</span>
-              <span>{selected.positionTitle || '—'}</span>
-            </div>
-            <div className="employee-card-row">
-              <span className="settings-hint">{t('employees.departmentLabel')}</span>
-              <span>{selected.departmentName || '—'}</span>
-            </div>
-            <div className="employee-card-row">
-              <span className="settings-hint">{t('employees.managerLabel')}</span>
-              <span>{selected.managerName || '—'}</span>
-            </div>
-            <div className="employee-card-row">
-              <span className="settings-hint">{t('employees.deputyLabel')}</span>
-              <span>{selected.deputyName || '—'}</span>
-            </div>
+            {!selected.isPartner && (
+              <>
+                <div className="employee-card-row">
+                  <span className="settings-hint">{t('employees.positionLabel')}</span>
+                  <span>{selected.positionTitle || '—'}</span>
+                </div>
+                <div className="employee-card-row">
+                  <span className="settings-hint">{t('employees.departmentLabel')}</span>
+                  <span>{selected.departmentName || '—'}</span>
+                </div>
+                <div className="employee-card-row">
+                  <span className="settings-hint">{t('employees.managerLabel')}</span>
+                  <span>{selected.managerName || '—'}</span>
+                </div>
+                <div className="employee-card-row">
+                  <span className="settings-hint">{t('employees.deputyLabel')}</span>
+                  <span>{selected.deputyName || '—'}</span>
+                </div>
+              </>
+            )}
             <div className="employee-card-row">
               <span className="settings-hint">{t('employees.phoneLabel')}</span>
               <span>{selected.phone || '—'}</span>

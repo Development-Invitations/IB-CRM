@@ -2782,6 +2782,10 @@ button.employees-add-btn {
   padding-right: 6px;
 }
 
+.chat-entries-list {
+  padding: 16px 20px;
+}
+
 .reg-thread-header {
   display: flex;
   align-items: center;
@@ -2989,6 +2993,105 @@ button.employees-add-btn {
   border-top: 1px solid var(--color-border);
   padding-top: 10px;
 }
+
+/* ---- Композер чата — единый "пилюльный" блок (смайлики/вложение/поле
+   ввода/отправка внутри одной рамки), как в мессенджерах ---- */
+.chat-composer-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 22px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+}
+
+.chat-composer-icon-btn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.chat-composer-icon-btn:hover { background: var(--color-border); }
+.chat-composer-icon-btn:disabled { opacity: 0.5; cursor: default; }
+
+.chat-composer-input {
+  flex: 1;
+  resize: none;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 13px;
+  font-family: inherit;
+  padding: 8px 4px;
+  max-height: 120px;
+  outline: none;
+}
+
+.chat-composer-send-btn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-accent);
+  color: #101828;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.chat-composer-send-btn:disabled { opacity: 0.5; cursor: default; }
+
+.chat-composer-attach-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius);
+  background: var(--color-surface-2);
+  font-size: 12px;
+  width: fit-content;
+}
+.chat-composer-attach-chip button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  display: flex;
+}
+
+.chat-emoji-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  max-width: 340px;
+  margin-bottom: 8px;
+  padding: 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  max-height: 160px;
+  overflow-y: auto;
+}
+.chat-emoji-picker button {
+  border: none;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+}
+.chat-emoji-picker button:hover { background: var(--color-surface-2); }
 
 /* ---- Блок формы в меню участника (напоминание/продление) ---- */
 .reg-member-menu-form-block {

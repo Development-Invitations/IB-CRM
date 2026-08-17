@@ -6,7 +6,7 @@ mod server;
 
 use db::Db;
 use std::sync::{Arc, Mutex};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[derive(Clone, serde::Serialize)]
 struct Employee {
@@ -2383,6 +2383,25 @@ fn main() {
 
             app.manage(AppState(db));
             app.manage(AppDataDir(app_data_dir));
+
+            // Тикер уведомлений — отдельный ОС-поток (не JS-таймер!). Раньше
+            // опрос новых уведомлений держался на `setInterval` во фронтенде
+            // (Topbar.tsx), а Chromium/WebView2 сильно замедляет таймеры
+            // свёрнутого/неактивного окна — на практике баннер мог не
+            // появляться минутами, пока пользователь работал в другом
+            // приложении. Поток ОС такому троттлингу не подвержен: тикает
+            // регулярно независимо от видимости окна, событие 'notification-tick'
+            // долетает до вебвью и обрабатывается сразу, даже свёрнутого —
+            // доставка событий это не setTimeout/setInterval, а входящее IPC-
+            // сообщение (см. журнал v0.2.17 в docs/TZ.md). Сам поток ничего не
+            // знает про сотрудников/сессии — просто "будит" фронтенд, вся
+            // логика "что и для кого загрузить" остаётся в Topbar.tsx как была.
+            let ticker_handle = app.handle().clone();
+            std::thread::spawn(move || loop {
+                std::thread::sleep(std::time::Duration::from_secs(8));
+                let _ = ticker_handle.emit("notification-tick", ());
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

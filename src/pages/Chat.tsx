@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useContext } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Paperclip, X, Reply, Download, Search, Plus, Users, LogOut, Copy, Check, UserPlus, Settings as SettingsIcon } from 'lucide-react';
+import { ArrowLeft, Send, Paperclip, X, Reply, Download, Search, Plus, Users, LogOut, Copy, Check, UserPlus, Settings as SettingsIcon, Smile } from 'lucide-react';
 import { api, type Employee, type Partner, type Department, type ChatMessage, type DmChannelSummary, type PartnerChatSummary, type ChatGroupSummary } from '../lib/api';
 import { dmChannelId, dmOtherParticipant } from '../lib/chat';
 import { FullscreenContext } from './Dashboard';
@@ -16,6 +16,15 @@ import ChatSettingsModal from '../components/ChatSettingsModal';
 import { getStoredChatWallpaper, CHAT_WALLPAPER_CSS } from '../lib/chatWallpaper';
 
 const POLL_INTERVAL_MS = 4000;
+
+// Небольшой готовый набор смайликов вместо полноценного поиска/категорий —
+// для композера чата этого достаточно, не нужна отдельная библиотека.
+const CHAT_EMOJIS = [
+  '😀', '😁', '😂', '🤣', '😊', '😉', '😍', '😘', '😎', '🤔',
+  '😐', '😢', '😭', '😡', '😱', '🥳', '😴', '🤝', '🙏', '👍',
+  '👎', '👏', '🙌', '💪', '❤️', '🔥', '⭐', '✅', '❌', '🎉',
+  '😅', '🙂', '☺️', '😇', '🤗', '🤫', '🤨', '😏', '😬', '🥺',
+];
 
 type Channel = { id: string; label: string };
 type DmPeer = { id: string; name: string; avatarData: string | null };
@@ -94,6 +103,7 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
   const [attachName, setAttachName] = useState<string | null>(null);
   const [attachBusy, setAttachBusy] = useState(false);
   const [sendBusy, setSendBusy] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -214,6 +224,7 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
   useEffect(() => {
     setMessages([]);
     setReplyTo(null);
+    setEmojiOpen(false);
     loadMessages();
     if (!channel) return;
     const interval = setInterval(() => loadMessages(true), POLL_INTERVAL_MS);
@@ -386,6 +397,7 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
       setAttachData(null);
       setAttachName(null);
       setReplyTo(null);
+      setEmojiOpen(false);
       loadMessages(true);
     } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('chat.loadError'));
@@ -609,7 +621,7 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
             )}
           </div>
 
-          <div className="reg-entries-list" style={wallpaperCss ? { background: wallpaperCss } : undefined}>
+          <div className="reg-entries-list chat-entries-list" style={wallpaperCss ? { background: wallpaperCss } : undefined}>
             {loading ? (
               <LoadingScreen compact />
             ) : messages.length === 0 ? (
@@ -663,31 +675,45 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
                 </button>
               </div>
             )}
-            <textarea
-              rows={2}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder={t('chat.composerPlaceholder')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-            />
-            <div className="reg-add-entry-row">
-              <button className="modal-btn" onClick={() => fileInputRef.current?.click()} title={t('chat.attachBtn')} disabled={attachBusy}>
-                <Paperclip size={14} />
-                {attachName && <span style={{ maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachName}</span>}
-              </button>
-              <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleFileAttach} accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" />
-              {attachName && (
-                <button className="regulation-remove-attach" onClick={() => { setAttachData(null); setAttachName(null); }}>
+            {attachName && (
+              <div className="chat-composer-attach-chip">
+                <Paperclip size={12} />
+                <span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachName}</span>
+                <button onClick={() => { setAttachData(null); setAttachName(null); }}>
                   <X size={12} />
                 </button>
-              )}
-              <button className="modal-btn" onClick={handleSend} disabled={!text.trim() || sendBusy}>
-                <Send size={14} /> {t('chat.sendBtn')}
+              </div>
+            )}
+            {emojiOpen && (
+              <div className="chat-emoji-picker">
+                {CHAT_EMOJIS.map((em) => (
+                  <button key={em} type="button" onClick={() => setText((t2) => t2 + em)}>{em}</button>
+                ))}
+              </div>
+            )}
+            <div className="chat-composer-bar">
+              <button type="button" className="chat-composer-icon-btn" onClick={() => setEmojiOpen((o) => !o)} title={t('chat.emojiBtn')}>
+                <Smile size={18} />
+              </button>
+              <button type="button" className="chat-composer-icon-btn" onClick={() => fileInputRef.current?.click()} title={t('chat.attachBtn')} disabled={attachBusy}>
+                <Paperclip size={18} />
+              </button>
+              <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleFileAttach} accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" />
+              <textarea
+                rows={1}
+                className="chat-composer-input"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder={t('chat.composerPlaceholder')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+              />
+              <button type="button" className="chat-composer-send-btn" onClick={handleSend} disabled={!text.trim() || sendBusy} title={t('chat.sendBtn')}>
+                <Send size={16} />
               </button>
             </div>
           </div>

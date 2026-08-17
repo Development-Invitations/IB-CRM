@@ -67,6 +67,12 @@ export default function EmployeeFormModal({
   const [isPartner, setIsPartner] = useState(false);
   const [partnerId, setPartnerId] = useState('');
   const [partners, setPartners] = useState<Partner[]>([]);
+  const [partnerPositionTitle, setPartnerPositionTitle] = useState('');
+
+  // Аккаунту партнёра не нужны подразделение/руководитель/заместитель (он вне
+  // внутренней иерархии компании) и должность — не общий выпадающий список,
+  // а простое текстовое поле (см. журнал v0.2.16 в docs/TZ.md).
+  const isPartnerAccount = mode === 'create' ? isPartner : !!employee?.isPartner;
 
   useEffect(() => {
     if (open && mode === 'create') {
@@ -100,6 +106,7 @@ export default function EmployeeFormModal({
       setWorkDays(employee.workDays ? employee.workDays.split(',').map(Number).filter((n) => n >= 1 && n <= 7) : []);
       setWorkStart(employee.workStart ?? '');
       setWorkEnd(employee.workEnd ?? '');
+      setPartnerPositionTitle(employee.positionTitle ?? '');
     } else {
       setFullName('');
       setLogin('');
@@ -116,6 +123,7 @@ export default function EmployeeFormModal({
       setWorkEnd('');
       setIsPartner(!!initialPartner);
       setPartnerId(initialPartner?.id ?? '');
+      setPartnerPositionTitle('');
     }
     setAddingPosition(false);
     setNewPositionTitle('');
@@ -170,18 +178,41 @@ export default function EmployeeFormModal({
       return;
     }
 
+    setBusy(true);
+    let resolvedPositionId = positionId || null;
+    if (isPartnerAccount) {
+      const title = partnerPositionTitle.trim();
+      if (title) {
+        const existing = positions.find((p) => p.title.toLowerCase() === title.toLowerCase());
+        if (existing) {
+          resolvedPositionId = existing.id;
+        } else {
+          try {
+            const created = await api.createPosition(title);
+            onPositionCreated(created);
+            resolvedPositionId = created.id;
+          } catch (err: any) {
+            setError(typeof err === 'string' ? err : t('employees.errorGeneric'));
+            setBusy(false);
+            return;
+          }
+        }
+      } else {
+        resolvedPositionId = null;
+      }
+    }
+
     const shared = {
       fullName: fullName.trim(),
       phone: phone.trim() || null,
       birthDate: birthDate || null,
-      positionId: positionId || null,
+      positionId: resolvedPositionId,
       departmentId: departmentId || null,
       managerId: managerId || null,
       deputyId: deputyId || null,
       avatarData: avatarData || null,
     };
 
-    setBusy(true);
     try {
       let savedEmployee: Employee;
       if (mode === 'create') {
@@ -331,54 +362,71 @@ export default function EmployeeFormModal({
           />
         </div>
 
-        <div className="field">
-          <label>{t('employees.birthDateLabel')}</label>
-          <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
-        </div>
+        {!isPartnerAccount && (
+          <div className="field">
+            <label>{t('employees.birthDateLabel')}</label>
+            <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
+          </div>
+        )}
 
         <div className="field">
           <label>{t('employees.positionLabel')}</label>
-          <Select value={positionId} options={positionOptions} onChange={setPositionId} />
-          {!addingPosition ? (
-            <button type="button" className="link-btn" onClick={() => setAddingPosition(true)}>
-              <Plus size={13} /> {t('employees.addPositionToggle')}
-            </button>
+          {isPartnerAccount ? (
+            <input
+              value={partnerPositionTitle}
+              onChange={(e) => setPartnerPositionTitle(e.target.value)}
+              placeholder={t('employees.newPositionPlaceholder')}
+            />
           ) : (
-            <div className="inline-add-row">
-              <input
-                value={newPositionTitle}
-                onChange={(e) => setNewPositionTitle(e.target.value)}
-                placeholder={t('employees.newPositionPlaceholder')}
-              />
-              <button type="button" className="modal-btn" onClick={handleAddPosition} disabled={positionBusy}>
-                {t('employees.addPositionConfirm')}
-              </button>
-            </div>
+            <>
+              <Select value={positionId} options={positionOptions} onChange={setPositionId} />
+              {!addingPosition ? (
+                <button type="button" className="link-btn" onClick={() => setAddingPosition(true)}>
+                  <Plus size={13} /> {t('employees.addPositionToggle')}
+                </button>
+              ) : (
+                <div className="inline-add-row">
+                  <input
+                    value={newPositionTitle}
+                    onChange={(e) => setNewPositionTitle(e.target.value)}
+                    placeholder={t('employees.newPositionPlaceholder')}
+                  />
+                  <button type="button" className="modal-btn" onClick={handleAddPosition} disabled={positionBusy}>
+                    {t('employees.addPositionConfirm')}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
 
-        <div className="field">
-          <label>{t('employees.departmentLabel')}</label>
-          <Select
-            value={departmentId}
-            options={[{ value: '', label: t('employees.notSelected') }, ...departments.map((d) => ({ value: d.id, label: d.name }))]}
-            onChange={setDepartmentId}
-          />
-          <p className="settings-hint">{t('employees.departmentAutoManagerHint')}</p>
-        </div>
+        {!isPartnerAccount && (
+          <div className="field">
+            <label>{t('employees.departmentLabel')}</label>
+            <Select
+              value={departmentId}
+              options={[{ value: '', label: t('employees.notSelected') }, ...departments.map((d) => ({ value: d.id, label: d.name }))]}
+              onChange={setDepartmentId}
+            />
+            <p className="settings-hint">{t('employees.departmentAutoManagerHint')}</p>
+          </div>
+        )}
 
-        <div className="field">
-          <label>{t('employees.managerLabel')}</label>
-          <SearchableSelect
-            value={managerId}
-            options={managerOptions}
-            onChange={setManagerId}
-            searchPlaceholder={t('employees.searchPlaceholder')}
-            emptyLabel={t('employees.searchEmpty')}
-          />
-          <p className="settings-hint">{t('employees.managerFilterHint')}</p>
-        </div>
+        {!isPartnerAccount && (
+          <div className="field">
+            <label>{t('employees.managerLabel')}</label>
+            <SearchableSelect
+              value={managerId}
+              options={managerOptions}
+              onChange={setManagerId}
+              searchPlaceholder={t('employees.searchPlaceholder')}
+              emptyLabel={t('employees.searchEmpty')}
+            />
+            <p className="settings-hint">{t('employees.managerFilterHint')}</p>
+          </div>
+        )}
 
+        {!isPartnerAccount && (
         <div className="field">
           <label>{t('employees.deputyLabel')}</label>
           <SearchableSelect
@@ -389,6 +437,7 @@ export default function EmployeeFormModal({
             emptyLabel={t('employees.searchEmpty')}
           />
         </div>
+        )}
 
         <div className="field">
           <label>{t('schedule.daysLabel')}</label>

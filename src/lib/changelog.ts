@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.2.16';
+export const APP_VERSION = '0.2.17';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,16 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.2.17',
+      items: [
+        'Уведомления теперь надёжно доходят, даже если приложение свёрнуто или вы работаете в другой программе — опрос новых уведомлений переведён на отдельный системный поток вместо таймера в браузерном движке, который замедлялся в фоне',
+        'Исправлено: заявка на отсутствие сотрудника без назначенного руководителя раньше приходила админу только разовым уведомлением — если его пропустить, заявка нигде больше не появлялась как требующая решения. Теперь админ видит в разделе "Заявки" вообще все заявки на рассмотрении, а не только те, где он сам руководитель',
+        'В IB Чате область переписки получила отступы от края окна',
+        'Композер IB Чата переоформлен в единый блок — смайлики, прикрепление файла, поле ввода и отправка теперь в одной рамке, как в мессенджерах; добавлен выбор смайликов',
+        'В карточке партнёра и в форме добавления его аккаунта убраны ненужные поля (дата рождения, подразделение, руководитель, заместитель) — должность теперь простое текстовое поле, а не выбор из общего списка',
+      ],
+    },
     {
       version: '0.2.16',
       items: [
@@ -397,6 +407,16 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.2.17',
+      items: [
+        "Bildirishnomalar endi ilova kichraytirilgan yoki boshqa dasturda ishlayotgan bo'lsangiz ham ishonchli yetib boradi — yangi bildirishnomalarni so'rash fonda sekinlashadigan brauzer taymeri o'rniga alohida tizim oqimiga o'tkazildi",
+        "Tuzatildi: rahbari tayinlanmagan xodimning yo'qlik arizasi avval administratorga faqat bir martalik bildirishnoma sifatida kelardi — uni o'tkazib yuborsa, ariza boshqa hech qayerda ko'rinmasdi. Endi administrator \"Arizalar\" bo'limida barcha kutilayotgan arizalarni ko'radi, nafaqat o'zi rahbar bo'lganlarini",
+        "IB Chatda yozishmalar maydoni oyna chetidan bo'shliq oldi",
+        "IB Chat komposeri yagona blokka qayta ishlandi — smaylchalar, fayl biriktirish, matn kiritish maydoni va yuborish endi bitta ramkada, messenjerlardagidek; smayl tanlash qo'shildi",
+        "Hamkor kartasida va uning akkauntini qo'shish formasida keraksiz maydonlar olib tashlandi (tug'ilgan sana, bo'lim, rahbar, o'rinbosar) — lavozim endi umumiy ro'yxatdan tanlash emas, oddiy matn maydoni",
+      ],
+    },
+    {
       version: '0.2.16',
       items: [
         "Sozlamalar → Server bo'limida \"Papkani ochish\" tugmasidagi xato va yangilanish yuklanishining 0%da to'xtab qolishining haqiqiy sababi tuzatildi — Windows oddiy papka/faylni ochishni bloklayotgan edi, endi ruxsat berilgan",
@@ -777,6 +797,16 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.2.17',
+      items: [
+        "Билдиришномалар энди илова кичрайтирилган ёки бошқа дастурда ишлаётган бўлсангиз ҳам ишончли етиб боради — янги билдиришномаларни сўраш фонда секинлашадиган браузер таймери ўрнига алоҳида тизим оқимига ўтказилди",
+        "Тузатилди: раҳбари тайинланмаган ходимнинг йўқлик аризаси аввал администраторга фақат бир мартали билдиришнома сифатида келарди — уни ўтказиб юборса, ариза бошқа ҳеч қаерда кўринмасди. Энди администратор \"Аризалар\" бўлимида барча кутилаётган аризаларни кўради, нафақат ўзи раҳбар бўлганларини",
+        "IB Чатда ёзишмалар майдони ойна четидан бўшлиқ олди",
+        "IB Чат композери ягона блокка қайта ишланди — смайлчалар, файл бириктириш, матн киритиш майдони ва юбориш энди битта рамкада, мессенжерлардагидек; смайл танлаш қўшилди",
+        "Ҳамкор картасида ва унинг аккаунтини қўшиш формасида керакси майдонлар олиб ташланди (туғилган сана, бўлим, раҳбар, ўринбосар) — лавозим энди умумий рўйхатдан танлаш эмас, оддий матн майдони",
+      ],
+    },
     {
       version: '0.2.16',
       items: [

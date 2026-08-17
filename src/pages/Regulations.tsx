@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback, useContext } from 'react';
 import { useLocation, useNavigate, type NavigateFunction } from 'react-router-dom';
 import { FullscreenContext } from './Dashboard';
-import { Plus, Pencil, FileText, Trash2, UserPlus, X, Paperclip, CheckSquare, XSquare, RotateCcw, ChevronDown, ChevronRight, Search, Copy, Check, ArrowLeft, Link2, Bell, CalendarClock, MoreVertical, Forward } from 'lucide-react';
+import { Plus, Pencil, FileText, Trash2, UserPlus, X, Paperclip, CheckSquare, XSquare, RotateCcw, ChevronDown, ChevronRight, Search, Copy, Check, ArrowLeft, Link2, Bell, CalendarClock, MoreVertical, Forward, Download } from 'lucide-react';
 import { api, type Employee, type Regulation, type RegulationMember, type RegulationMemberRole, type RegulationEntry, type RegulationReply, type RegulationStatus, type RegulationEntryStatus, type Client } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
@@ -20,17 +20,28 @@ const ENTRY_STATUS_KEYS: Record<RegulationEntryStatus, string> = {
 };
 
 function AttachmentPreview({ dataUrl, name, onExpand }: { dataUrl: string; name: string | null; onExpand: () => void }) {
+  const { t } = useLocale();
   const kind = classifyAttachment(dataUrl);
   if (kind === 'image') {
     return (
-      <button type="button" className="reg-attachment-image-btn" onClick={onExpand} title={name ?? undefined}>
-        <img className="reg-attachment-image" src={dataUrl} alt={name ?? ''} />
-      </button>
+      <div className="reg-attachment-media-wrap">
+        <button type="button" className="reg-attachment-image-btn" onClick={onExpand} title={name ?? undefined}>
+          <img className="reg-attachment-image" src={dataUrl} alt={name ?? ''} />
+        </button>
+        <a className="reg-attachment-download-btn" href={dataUrl} download={name ?? undefined} title={t('common.download')}>
+          <Download size={13} />
+        </a>
+      </div>
     );
   }
   if (kind === 'video') {
     return (
-      <video className="reg-attachment-video" src={dataUrl} controls preload="metadata" />
+      <div className="reg-attachment-media-wrap">
+        <video className="reg-attachment-video" src={dataUrl} controls preload="metadata" />
+        <a className="reg-attachment-download-link" href={dataUrl} download={name ?? undefined}>
+          <Download size={13} /> {t('common.download')}
+        </a>
+      </div>
     );
   }
   return (

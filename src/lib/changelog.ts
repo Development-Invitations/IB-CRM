@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.2.9';
+export const APP_VERSION = '0.2.11';
 
 export type ChangelogEntry = {
   version: string;
@@ -16,6 +16,22 @@ export type ChangelogEntry = {
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
     {
+      version: '0.2.11',
+      items: [
+        'В блоге можно прикреплять файлы (не только фото/видео) — при создании темы, при редактировании и в комментариях; вставленные фото и видео теперь тоже можно скачать',
+        'В переписке проектов, регламентов и чате — у прикреплённых фото и видео появилась отдельная кнопка "Скачать" (раньше приходилось сохранять через правый клик, а он теперь отключён в собранном приложении)',
+      ],
+    },
+    {
+      version: '0.2.10',
+      items: [
+        'Новый раздел — "IB Чат": общий чат для всех сотрудников CRM (кнопка в шапке и в меню) плюс отдельный приватный чат с каждым партнёром (переписываться с партнёром может только админ)',
+        'В чате — текст, вложение (фото/видео/файл) и ответ на конкретное сообщение, обновляется в реальном времени, пока открыт',
+        'Новые сообщения в чате приходят как обычные уведомления — колокольчик и всплывающий баннер',
+        'В Настройках — новый раздел "Уведомления чата": можно скрыть чат-уведомления или переставить всплывающий баннер в другой угол экрана',
+      ],
+    },
+    {
       version: '0.2.9',
       items: [
         'В режиме клиента "Проверить обновления" теперь может не только сообщить о новой версии на сервере, но и скачать установщик с сервера и запустить его одной кнопкой (админ заранее кладёт файл установщика на сервер — путь виден в Настройках → Сервер)',
@@ -25,7 +41,7 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
         'В кабинете аккаунта партнёра теперь видно, что это партнёр (с названием организации), лишние поля (дата рождения, подразделение, руководитель, заместитель, телефон) скрыты — показываются только ФИО, должность, график и статус',
         'Админ может назначить новый пароль аккаунту партнёра прямо из его кабинета, не зная старый',
         'В своей панели партнёр теперь может сам сменить пароль, который выдал админ',
-        'Новый раздел в Настройках — "Экран": масштаб окна приложения, доступен всем сотрудникам',
+        'Новый раздел в Настройках — "Экран": масштаб окна приложения и формат окна (обычное/развёрнутое/полноэкранное), доступен всем сотрудникам',
         'В собранном приложении отключены перезагрузка страницы (F5/Ctrl+R) и инструменты разработчика — как у обычной десктоп-программы',
         'Исправлена читаемость цифр в плитках статистики и текста задач на Главной, которые были плохо видны на тёмных темах',
         'В режиме клиента: если сервер перезапустили и сессия закончилась — теперь показывается понятное объяснение при входе, а после повторного входа вы возвращаетесь ровно на ту страницу, где были',
@@ -334,6 +350,22 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.2.11',
+      items: [
+        "Blogda fayl biriktirish mumkin (nafaqat foto/video) — mavzu yaratishda, tahrirlashda va izohlarda; qo'yilgan foto va videoni endi yuklab olish ham mumkin",
+        "Loyihalar, reglamentlar va chat yozishmalarida — biriktirilgan foto/videoda alohida \"Yuklab olish\" tugmasi paydo bo'ldi (avval o'ng tugma bilan saqlash kerak edi, u endi yig'ilgan ilovada o'chirilgan)",
+      ],
+    },
+    {
+      version: '0.2.10',
+      items: [
+        "Yangi bo'lim — \"IB Chat\": barcha CRM xodimlari uchun umumiy chat (yuqori panel va menyudagi tugma) plyus har bir hamkor bilan alohida maxfiy chat (hamkor bilan faqat administrator yozishmoqda mumkin)",
+        "Chatda — matn, biriktirma (foto/video/fayl) va aniq xabarga javob, ochiq turganda real vaqtda yangilanadi",
+        "Chatdagi yangi xabarlar oddiy bildirishnoma sifatida keladi — qo'ng'iroqcha va banner",
+        "Sozlamalarda yangi bo'lim — \"Chat bildirishnomalari\": chat bildirishnomalarini yashirish yoki banner joyini o'zgartirish mumkin",
+      ],
+    },
+    {
       version: '0.2.9',
       items: [
         "Mijoz rejimida \"Yangilanishlarni tekshirish\" endi serverda yangi versiya borligini aytibgina qolmay, o'rnatuvchini serverdan yuklab, bitta tugma bilan ishga tushirishi ham mumkin (administrator o'rnatuvchi faylni oldindan serverga joylashtiradi — yo'li Sozlamalar → Server bo'limida ko'rinadi)",
@@ -343,7 +375,7 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
         "Hamkor akkaunti kabinetida endi bu hamkor ekani (tashkilot nomi bilan) ko'rinadi, keraksiz maydonlar (tug'ilgan sana, bo'lim, rahbar, o'rinbosar, telefon) yashirilgan — faqat F.I.Sh., lavozim, grafik va status ko'rsatiladi",
         "Administrator hamkor akkauntiga eski parolni bilmasdan yangi parol tayinlashi mumkin",
         "O'z panelida hamkor endi administrator bergan parolni o'zi almashtirishi mumkin",
-        "Sozlamalarda yangi bo'lim — \"Ekran\": ilova oynasining masshtabi, barcha xodimlar uchun mavjud",
+        "Sozlamalarda yangi bo'lim — \"Ekran\": ilova oynasining masshtabi va oyna formati (oddiy/yoyilgan/to'liq ekran), barcha xodimlar uchun mavjud",
         "Yig'ilgan ilovada sahifani qayta yuklash (F5/Ctrl+R) va dasturchi asboblari o'chirilgan — oddiy desktop dastur kabi",
         "Bosh sahifadagi statistika raqamlari va vazifalar matni qorong'i mavzularda yaxshi ko'rinmasligi tuzatildi",
         "Mijoz rejimida: server qayta ishga tushirilib sessiya tugagan bo'lsa — kirishda tushunarli izoh ko'rsatiladi, qayta kirgandan so'ng aynan o'sha sahifaga qaytasiz",
@@ -652,6 +684,22 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   'uz-cyrl': [
     {
+      version: '0.2.11',
+      items: [
+        "Блогда файл бириктириш мумкин (нафақат фото/видео) — мавзу яратишда, таҳрирлашда ва изоҳларда; қўйилган фото ва видеони энди юклаб олиш ҳам мумкин",
+        "Лойиҳалар, регламентлар ва чат ёзишмаларида — бириктирилган фото/видеода алоҳида \"Юклаб олиш\" тугмаси пайдо бўлди (аввал ўнг тугма билан сақлаш керак эди, у энди йиғилган иловада ўчирилган)",
+      ],
+    },
+    {
+      version: '0.2.10',
+      items: [
+        "Янги бўлим — \"IB Чат\": барча CRM ходимлари учун умумий чат (юқори панел ва менюдаги тугма) плюс ҳар бир ҳамкор билан алоҳида махфий чат (ҳамкор билан фақат администратор ёзишмоқда мумкин)",
+        "Чатда — матн, бириктирма (фото/видео/файл) ва аниқ хабарга жавоб, очиқ турганда реал вақтда янгиланади",
+        "Чатдаги янги хабарлар одатий билдиришнома сифатида келади — қўнғироқча ва баннер",
+        "Созламаларда янги бўлим — \"Чат билдиришномалари\": чат билдиришномаларини яшириш ёки баннер жойини ўзгартириш мумкин",
+      ],
+    },
+    {
       version: '0.2.9',
       items: [
         "Мижоз режимида \"Янгиланишларни текшириш\" энди серверда янги версия борлигини айтибгина қолмай, ўрнатувчини сервердан юклаб, битта тугма билан ишга туширишни ҳам мумкин (администратор ўрнатувчи файлни олдиндан серверга жойлаштиради — йўли Созламалар → Сервер бўлимида кўринади)",
@@ -661,7 +709,7 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
         "Ҳамкор аккаунти кабинетида энди бу ҳамкор экани (ташкилот номи билан) кўринади, кераксиз майдонлар (туғилган сана, бўлим, раҳбар, ўринбосар, телефон) яширилган — фақат Ф.И.Ш., лавозим, график ва статус кўрсатилади",
         "Администратор ҳамкор аккаунтига эски паролни билмасдан янги парол тайинлаши мумкин",
         "Ўз панелида ҳамкор энди администратор берган паролни ўзи алмаштириши мумкин",
-        "Созламаларда янги бўлим — \"Экран\": илова ойнасининг масштаби, барча ходимлар учун мавжуд",
+        "Созламаларда янги бўлим — \"Экран\": илова ойнасининг масштаби ва ойна формати (оддий/ёйилган/тўлиқ экран), барча ходимлар учун мавжуд",
         "Йиғилган иловада саҳифани қайта юклаш (F5/Ctrl+R) ва дастурчи асбоблари ўчирилган — оддий десктоп дастур каби",
         "Бош саҳифадаги статистика рақамлари ва вазифалар матни қоронғи мавзуларда яхши кўринмаслиги тузатилди",
         "Мижоз режимида: сервер қайта ишга туширилиб сессия тугаган бўлса — киришда тушунарли изоҳ кўрсатилади, қайта киргандан сўнг худди шу саҳифага қайтасиз",

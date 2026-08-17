@@ -287,6 +287,18 @@ export type BlogComment = {
   createdAt: string;
 };
 
+export type ChatMessage = {
+  id: string;
+  channel: string;
+  senderId: string;
+  senderName: string;
+  content: string;
+  attachmentData: string | null;
+  attachmentName: string | null;
+  replyToId: string | null;
+  createdAt: string;
+};
+
 export type Employee = {
   id: string;
   employeeNumber: string;
@@ -646,6 +658,19 @@ export const api = {
   listBlogComments: (topicId: string) => invoke<BlogComment[]>('list_blog_comments', { topicId }),
   addBlogComment: (payload: { actorId: string; topicId: string; content: string; replyToId?: string | null }) =>
     invoke<BlogComment>('add_blog_comment', { payload }),
+
+  listChatMessages: (employeeId: string, channel: string) =>
+    invoke<ChatMessage[]>('list_chat_messages', { employeeId, channel }),
+  sendChatMessage: (payload: {
+    actorId: string;
+    channel: string;
+    content: string;
+    attachmentData?: string | null;
+    attachmentName?: string | null;
+    replyToId?: string | null;
+  }) => invoke<ChatMessage>('send_chat_message', { payload }),
+  markChatChannelRead: (payload: { employeeId: string; channel: string }) =>
+    invoke<void>('mark_chat_channel_read', { payload }),
 
   recordLogin: (employeeId: string) => invoke<void>('record_login', { employeeId }),
 

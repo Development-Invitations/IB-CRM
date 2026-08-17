@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bold, Italic, Underline, Heading2, Heading3, List, ListOrdered, Link as LinkIcon, ChevronsUpDown, Image as ImageIcon, Video, Undo2, Redo2, Baseline } from 'lucide-react';
+import { Bold, Italic, Underline, Heading2, Heading3, List, ListOrdered, Link as LinkIcon, ChevronsUpDown, Image as ImageIcon, Video, Paperclip, Undo2, Redo2, Baseline } from 'lucide-react';
 import { prepareAttachment, classifyAttachment } from '../lib/attachment';
 import { sanitizeBlogHtml } from '../lib/sanitizeHtml';
 import { useLocale } from '../lib/i18n';
@@ -9,6 +9,12 @@ const TEXT_COLORS = [
   '#E8EAF2', '#14213D', '#F5C518', '#1E3A8A', '#DC2626',
   '#16A34A', '#0EA5E9', '#7C3AED', '#DB2777', '#F97316',
 ];
+
+// Имя файла вставляется в HTML-атрибут (download="...") — экранируем, чтобы
+// кавычки/спецсимволы в оригинальном имени файла не сломали разметку.
+function escapeHtmlAttr(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
 // Простой contentEditable-редактор через document.execCommand — устаревший,
 // но по-прежнему рабочий API, который поддерживает WebView2/Chromium; тянуть
@@ -34,6 +40,7 @@ export default function RichEditor({
   const { t } = useLocale();
   const { showToast } = useToast();
   const ref = useRef<HTMLDivElement>(null);
+  const mediaInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const colorInputRef = useRef<HTMLInputElement>(null);
   const colorWrapRef = useRef<HTMLDivElement>(null);
@@ -163,17 +170,29 @@ export default function RichEditor({
     );
   };
 
-  const handleMediaChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Вставленные фото/видео теперь ещё и скачиваемы — рядом с самим медиа
+  // добавляется отдельная ссылка со своим download, а не оборачивает <video>
+  // в <a> (иначе клик по элементам управления видео мог бы триггерить
+  // скачивание вместо воспроизведения). "Прикрепить файл" (не фото/видео) —
+  // тот же prepareAttachment/classifyAttachment, просто рендерится как
+  // скачиваемая ссылка-чип, а не встроенное медиа.
+  const handleAttachChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
     setMediaBusy(true);
     try {
-      const { data } = await prepareAttachment(file);
+      const { data, name } = await prepareAttachment(file);
       const kind = classifyAttachment(data);
-      const html = kind === 'video'
-        ? `<video src="${data}" controls></video><p><br></p>`
-        : `<img src="${data}" alt="" /><p><br></p>`;
+      const safeName = escapeHtmlAttr(name);
+      let html: string;
+      if (kind === 'video') {
+        html = `<div><video src="${data}" controls></video><br><a href="${data}" download="${safeName}">⬇ ${t('blog.editorDownloadMedia')}</a></div><p><br></p>`;
+      } else if (kind === 'image') {
+        html = `<div><img src="${data}" alt="" /><br><a href="${data}" download="${safeName}">⬇ ${t('blog.editorDownloadMedia')}</a></div><p><br></p>`;
+      } else {
+        html = `<p><a href="${data}" download="${safeName}">📎 ${safeName}</a></p><p><br></p>`;
+      }
       insertHtmlAtCursor(html);
     } catch {
       showToast('error', t('blog.editorMediaTooLarge'));
@@ -226,9 +245,11 @@ export default function RichEditor({
         <button type="button" onClick={handleLink} title={t('blog.editorLink')}><LinkIcon size={14} /></button>
         <button type="button" onClick={handleDetails} title={t('blog.editorCollapsible')}><ChevronsUpDown size={14} /></button>
         <span className="rich-editor-sep" />
-        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={mediaBusy} title={t('blog.editorInsertImage')}><ImageIcon size={14} /></button>
-        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={mediaBusy} title={t('blog.editorInsertVideo')}><Video size={14} /></button>
-        <input ref={fileInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={handleMediaChange} />
+        <button type="button" onClick={() => mediaInputRef.current?.click()} disabled={mediaBusy} title={t('blog.editorInsertImage')}><ImageIcon size={14} /></button>
+        <button type="button" onClick={() => mediaInputRef.current?.click()} disabled={mediaBusy} title={t('blog.editorInsertVideo')}><Video size={14} /></button>
+        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={mediaBusy} title={t('blog.editorAttachFile')}><Paperclip size={14} /></button>
+        <input ref={mediaInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={handleAttachChange} />
+        <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleAttachChange} />
       </div>
       <div
         ref={ref}

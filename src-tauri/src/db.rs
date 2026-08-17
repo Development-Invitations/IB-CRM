@@ -53,6 +53,18 @@ pub struct PartnerRecord {
     pub account_count: i64,
 }
 
+pub struct ChatMessageRecord {
+    pub id: String,
+    pub channel: String,
+    pub sender_id: String,
+    pub sender_name: String,
+    pub content: String,
+    pub attachment_data: Option<String>,
+    pub attachment_name: Option<String>,
+    pub reply_to_id: Option<String>,
+    pub created_at: String,
+}
+
 pub struct SessionRecord {
     pub id: String,
     pub login_at: String,
@@ -617,6 +629,27 @@ impl Db {
         add_column_if_missing(&conn, "employees", "is_partner INTEGER NOT NULL DEFAULT 0");
         add_column_if_missing(&conn, "employees", "partner_id TEXT REFERENCES partners(id)");
 
+        // Чат — "channel" хранит либо литерал 'general' (общий чат всех не-партнёров),
+        // либо id из таблицы partners (приватный тред с этим партнёром, доступен только
+        // админам и аккаунтам этого партнёра — см. Db::can_access_chat_channel). Ответ на
+        // конкретное сообщение — self-referencing reply_to_id, тот же паттерн, что
+        // blog_comments.reply_to_id — без денормализации текста цитаты: весь канал
+        // грузится целиком за раз, фронт сам находит цитируемое сообщение в уже
+        // загруженном списке (как Blog.tsx делает для комментариев).
+        let _ = conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS chat_messages (
+                id TEXT PRIMARY KEY,
+                channel TEXT NOT NULL,
+                sender_id TEXT NOT NULL REFERENCES employees(id),
+                content TEXT NOT NULL,
+                attachment_data TEXT,
+                attachment_name TEXT,
+                reply_to_id TEXT REFERENCES chat_messages(id),
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_chat_messages_channel ON chat_messages(channel, created_at);",
+        );
+
         let db = Db { conn };
         db.notify_todays_birthdays();
         db
@@ -1117,6 +1150,158 @@ impl Db {
         }
         self.conn.execute("DELETE FROM partners WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
         Ok(())
+    }
+
+    // ---- Чат ----
+    // Два вида каналов: 'general' (общий чат всех не-партнёров) и id из
+    // partners (приватный тред CRM с конкретным партнёром — переписываться с
+    // партнёром может только админ; аккаунты самого партнёра видят свой канал).
+
+    fn can_access_chat_channel(&self, employee_id: &str, channel: &str) -> Result<EmployeeRecord, String> {
+        let employee = self.get_employee(employee_id).ok_or_else(|| "Сотрудник не найден".to_string())?;
+        if channel == "general" {
+            if employee.is_partner {
+                return Err("Партнёрам недоступен общий чат".into());
+            }
+            return Ok(employee);
+        }
+        let partner_exists: bool = self
+            .conn
+            .query_row("SELECT 1 FROM partners WHERE id = ?1", params![channel], |_| Ok(true))
+            .unwrap_or(false);
+        if !partner_exists {
+            return Err("Партнёр не найден".into());
+        }
+        if employee.is_partner {
+            if employee.partner_id.as_deref() != Some(channel) {
+                return Err("Недостаточно прав".into());
+            }
+        } else if !employee.is_admin {
+            return Err("Недостаточно прав".into());
+        }
+        Ok(employee)
+    }
+
+    pub fn list_chat_messages(&self, employee_id: &str, channel: &str) -> Result<Vec<ChatMessageRecord>, String> {
+        self.can_access_chat_channel(employee_id, channel)?;
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT m.id, m.channel, m.sender_id, e.full_name, m.content, m.attachment_data,
+                        m.attachment_name, m.reply_to_id, m.created_at
+                 FROM chat_messages m JOIN employees e ON e.id = m.sender_id
+                 WHERE m.channel = ?1 ORDER BY m.created_at ASC",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map(params![channel], |row| {
+                Ok(ChatMessageRecord {
+                    id: row.get(0)?,
+                    channel: row.get(1)?,
+                    sender_id: row.get(2)?,
+                    sender_name: row.get(3)?,
+                    content: row.get(4)?,
+                    attachment_data: row.get(5)?,
+                    attachment_name: row.get(6)?,
+                    reply_to_id: row.get(7)?,
+                    created_at: row.get(8)?,
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn send_chat_message(
+        &self,
+        actor_id: &str,
+        channel: &str,
+        content: &str,
+        attachment_data: Option<&str>,
+        attachment_name: Option<&str>,
+        reply_to_id: Option<&str>,
+    ) -> Result<ChatMessageRecord, String> {
+        let sender = self.can_access_chat_channel(actor_id, channel)?;
+        let content = content.trim();
+        if content.is_empty() {
+            return Err("Сообщение не может быть пустым".into());
+        }
+        if let Some(reply_id) = reply_to_id {
+            let reply_channel: Option<String> = self
+                .conn
+                .query_row("SELECT channel FROM chat_messages WHERE id = ?1", params![reply_id], |row| row.get(0))
+                .ok();
+            if reply_channel.as_deref() != Some(channel) {
+                return Err("Сообщение, на которое отвечаете, не найдено".into());
+            }
+        }
+        let id = Uuid::new_v4().to_string();
+        self.conn
+            .execute(
+                "INSERT INTO chat_messages (id, channel, sender_id, content, attachment_data, attachment_name, reply_to_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![id, channel, actor_id, content, attachment_data, attachment_name, reply_to_id],
+            )
+            .map_err(|e| e.to_string())?;
+
+        self.notify_chat_message(channel, actor_id, &sender, content);
+
+        Ok(ChatMessageRecord {
+            id,
+            channel: channel.to_string(),
+            sender_id: actor_id.to_string(),
+            sender_name: sender.full_name,
+            content: content.to_string(),
+            attachment_data: attachment_data.map(str::to_string),
+            attachment_name: attachment_name.map(str::to_string),
+            reply_to_id: reply_to_id.map(str::to_string),
+            created_at: String::new(),
+        })
+    }
+
+    // Получатели уведомления зависят от канала и от того, кто пишет:
+    // в общем чате — все остальные сотрудники (не партнёры); в партнёрском
+    // канале — если пишет сам партнёр, уведомляем всех админов (переиспользуем
+    // notify_all_admins), если пишет админ — уведомляем аккаунты этого партнёра.
+    fn notify_chat_message(&self, channel: &str, sender_id: &str, sender: &EmployeeRecord, content: &str) {
+        let title = format!("Новое сообщение в чате от {}", sender.full_name);
+        if channel == "general" {
+            let mut stmt = match self.conn.prepare("SELECT id FROM employees WHERE is_partner = 0 AND id != ?1") {
+                Ok(s) => s,
+                Err(_) => return,
+            };
+            let ids: Vec<String> = stmt
+                .query_map(params![sender_id], |row| row.get(0))
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                .unwrap_or_default();
+            for id in ids {
+                self.notify(&id, "chat_message", &title, Some(content), Some("chat"), Some(channel));
+            }
+        } else if sender.is_partner {
+            self.notify_all_admins("chat_message", &title, Some(content), Some("chat"), Some(channel));
+        } else {
+            let mut stmt = match self.conn.prepare("SELECT id FROM employees WHERE partner_id = ?1 AND id != ?2") {
+                Ok(s) => s,
+                Err(_) => return,
+            };
+            let ids: Vec<String> = stmt
+                .query_map(params![channel, sender_id], |row| row.get(0))
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                .unwrap_or_default();
+            for id in ids {
+                self.notify(&id, "chat_message", &title, Some(content), Some("chat"), Some(channel));
+            }
+        }
+    }
+
+    // НЕ переиспользует mark_notifications_for_entity_read — тот помечает
+    // прочитанным для ВСЕХ получателей одного уведомления (верно для "заявку
+    // рассмотрели"), а тут должна отмечаться только СВОЯ копия у открывшего канал.
+    pub fn mark_chat_channel_read(&self, employee_id: &str, channel: &str) {
+        let _ = self.conn.execute(
+            "UPDATE notifications SET is_read = 1 WHERE employee_id = ?1 AND type = 'chat_message' AND related_entity_id = ?2",
+            params![employee_id, channel],
+        );
     }
 
     // ---- Подразделения ----

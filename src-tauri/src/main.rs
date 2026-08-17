@@ -466,6 +466,25 @@ struct BlogComment {
     created_at: String,
 }
 
+#[derive(Clone, serde::Serialize)]
+struct ChatMessage {
+    id: String,
+    channel: String,
+    #[serde(rename = "senderId")]
+    sender_id: String,
+    #[serde(rename = "senderName")]
+    sender_name: String,
+    content: String,
+    #[serde(rename = "attachmentData")]
+    attachment_data: Option<String>,
+    #[serde(rename = "attachmentName")]
+    attachment_name: Option<String>,
+    #[serde(rename = "replyToId")]
+    reply_to_id: Option<String>,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+}
+
 #[derive(serde::Deserialize)]
 struct CreateAdminPayload {
     login: String,
@@ -980,6 +999,27 @@ struct AddBlogCommentPayload {
 }
 
 #[derive(serde::Deserialize)]
+struct SendChatMessagePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    channel: String,
+    content: String,
+    #[serde(rename = "attachmentData")]
+    attachment_data: Option<String>,
+    #[serde(rename = "attachmentName")]
+    attachment_name: Option<String>,
+    #[serde(rename = "replyToId")]
+    reply_to_id: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct MarkChatChannelReadPayload {
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+    channel: String,
+}
+
+#[derive(serde::Deserialize)]
 struct SetServerSettingsPayload {
     #[serde(rename = "adminId")]
     admin_id: String,
@@ -1293,6 +1333,20 @@ fn to_blog_comment(c: db::BlogCommentRecord) -> BlogComment {
     BlogComment {
         id: c.id, topic_id: c.topic_id, author_id: c.author_id, author_name: c.author_name,
         content: c.content, reply_to_id: c.reply_to_id, created_at: c.created_at,
+    }
+}
+
+fn to_chat_message(m: db::ChatMessageRecord) -> ChatMessage {
+    ChatMessage {
+        id: m.id,
+        channel: m.channel,
+        sender_id: m.sender_id,
+        sender_name: m.sender_name,
+        content: m.content,
+        attachment_data: m.attachment_data,
+        attachment_name: m.attachment_name,
+        reply_to_id: m.reply_to_id,
+        created_at: m.created_at,
     }
 }
 
@@ -1950,6 +2004,33 @@ fn add_blog_comment(payload: AddBlogCommentPayload, state: tauri::State<AppState
 }
 
 #[tauri::command]
+fn list_chat_messages(employee_id: String, channel: String, state: tauri::State<AppState>) -> Result<Vec<ChatMessage>, String> {
+    let db = state.0.lock().unwrap();
+    db.list_chat_messages(&employee_id, &channel).map(|v| v.into_iter().map(to_chat_message).collect())
+}
+
+#[tauri::command]
+fn send_chat_message(payload: SendChatMessagePayload, state: tauri::State<AppState>) -> Result<ChatMessage, String> {
+    let db = state.0.lock().unwrap();
+    db.send_chat_message(
+        &payload.actor_id,
+        &payload.channel,
+        &payload.content,
+        payload.attachment_data.as_deref(),
+        payload.attachment_name.as_deref(),
+        payload.reply_to_id.as_deref(),
+    )
+    .map(to_chat_message)
+}
+
+#[tauri::command]
+fn mark_chat_channel_read(payload: MarkChatChannelReadPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.mark_chat_channel_read(&payload.employee_id, &payload.channel);
+    Ok(())
+}
+
+#[tauri::command]
 fn get_server_settings(state: tauri::State<AppState>) -> ServerSettings {
     let db = state.0.lock().unwrap();
     to_server_settings(db.get_server_settings())
@@ -2125,6 +2206,9 @@ fn main() {
             delete_blog_topic,
             list_blog_comments,
             add_blog_comment,
+            list_chat_messages,
+            send_chat_message,
+            mark_chat_channel_read,
             get_server_settings,
             set_server_settings,
             get_lan_address,

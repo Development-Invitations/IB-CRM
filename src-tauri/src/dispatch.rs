@@ -389,6 +389,30 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
             let p: crate::AddBlogCommentPayload = from_payload(payload)?;
             db.add_blog_comment(&p.actor_id, &p.topic_id, &p.content, p.reply_to_id.as_deref()).map(crate::to_blog_comment).map(to_json)
         }
+        "list_chat_messages" => {
+            let employee_id = field(&payload, "employeeId")?;
+            let channel = field(&payload, "channel")?;
+            db.list_chat_messages(&employee_id, &channel)
+                .map(|v| to_json(v.into_iter().map(crate::to_chat_message).collect::<Vec<_>>()))
+        }
+        "send_chat_message" => {
+            let p: crate::SendChatMessagePayload = from_payload(payload)?;
+            db.send_chat_message(
+                &p.actor_id,
+                &p.channel,
+                &p.content,
+                p.attachment_data.as_deref(),
+                p.attachment_name.as_deref(),
+                p.reply_to_id.as_deref(),
+            )
+            .map(crate::to_chat_message)
+            .map(to_json)
+        }
+        "mark_chat_channel_read" => {
+            let p: crate::MarkChatChannelReadPayload = from_payload(payload)?;
+            db.mark_chat_channel_read(&p.employee_id, &p.channel);
+            Ok(to_json(()))
+        }
 
         // ---- Настройки сервера (обычно используются только локально на
         // самой серверной машине, но диспетчеру всё равно, откуда вызов) ----

@@ -14,6 +14,7 @@ import {
   FolderKanban,
   FileText,
   MessageSquare,
+  MessageCircle,
   Cake,
   LogOut,
   ClipboardList,
@@ -33,6 +34,7 @@ import ProjectsPage from './Projects';
 import RegulationsPage from './Regulations';
 import BlogPage from './Blog';
 import BirthdaysPage from './Birthdays';
+import ChatPage from './Chat';
 import type { Employee } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { APP_VERSION } from '../lib/changelog';
@@ -51,6 +53,7 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
     { label: t('sidebar.projects'), icon: FolderKanban, path: 'projects' },
     { label: t('sidebar.regulations'), icon: FileText, path: 'regulations' },
     { label: t('sidebar.blog'), icon: MessageSquare, path: 'blog' },
+    { label: t('sidebar.chat'), icon: MessageCircle, path: 'chat' },
     { label: t('sidebar.birthdays'), icon: Cake, path: 'birthdays' },
   ];
 
@@ -105,6 +108,7 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
             <Route path="projects" element={<ProjectsPage currentEmployee={employee} />} />
             <Route path="regulations" element={<RegulationsPage currentEmployee={employee} />} />
             <Route path="blog" element={<BlogPage currentEmployee={employee} />} />
+            <Route path="chat" element={<ChatPage currentEmployee={employee} />} />
             <Route path="birthdays" element={<BirthdaysPage />} />
             <Route path="absence-requests" element={<AbsenceRequestsPage currentEmployee={employee} />} />
             <Route path="settings" element={<SettingsPage employee={employee} />} />

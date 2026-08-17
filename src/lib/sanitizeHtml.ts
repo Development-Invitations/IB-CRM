@@ -9,7 +9,7 @@ const ALLOWED_TAGS = new Set([
 ]);
 
 const ALLOWED_ATTRS: Record<string, string[]> = {
-  A: ['href', 'target', 'rel'],
+  A: ['href', 'target', 'rel', 'download'],
   IMG: ['src', 'alt'],
   VIDEO: ['src', 'controls'],
   H2: ['id'],

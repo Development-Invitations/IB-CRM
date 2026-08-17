@@ -1073,8 +1073,25 @@ button.primary:hover { filter: brightness(0.95); }
   border-radius: var(--radius);
   padding: 32px;
 }
-.partner-panel-card h1 { font-size: 18px; margin: 0 0 10px; }
+.partner-panel-card h1 { font-size: 18px; margin: 0; }
 .partner-panel-card p { margin-bottom: 20px; }
+.partner-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.partner-panel-header .icon-btn { flex-shrink: 0; }
+
+.partner-panel-chat {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+.partner-panel-chat .reg-fullscreen {
+  height: calc(100vh - 64px);
+}
 
 button.employees-add-btn {
   width: auto;
@@ -1901,6 +1918,30 @@ button.employees-add-btn {
   background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface-2));
 }
 
+.chat-channel-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.chat-channel-item {
+  padding: 9px 10px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.chat-channel-item:hover { background: var(--color-border); }
+.chat-channel-item.active {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface-2));
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
 /* ---- Заявки на отсутствие ---- */
 
 .absence-form-dates {
@@ -2420,6 +2461,39 @@ button.employees-add-btn {
   margin-top: 8px;
   background: #000;
 }
+
+/* Обёртка для фото/видео вложения + отдельной кнопки/ссылки скачивания —
+   раньше единственным способом сохранить вложение было правое кнопки мыши
+   "Сохранить как", теперь недоступное в собранном приложении (см. журнал
+   v0.2.9, харденинг вебвью отключает контекстное меню). */
+.reg-attachment-media-wrap { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 8px; }
+.reg-attachment-media-wrap .reg-attachment-image-btn,
+.reg-attachment-media-wrap .reg-attachment-video { margin-top: 0; }
+.reg-attachment-download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+.reg-attachment-download-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.reg-attachment-download-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+.reg-attachment-download-link:hover { border-color: var(--color-accent); color: var(--color-accent); }
 
 .reg-lightbox {
   position: fixed;
@@ -2972,6 +3046,29 @@ button.employees-add-btn {
 }
 .blog-comment-content ul, .blog-comment-content ol { margin: 0 0 6px; padding-left: 18px; }
 .blog-comment-content a { color: var(--color-accent); }
+
+/* Скачиваемые ссылки (прикреплённый файл-чип, и ссылка "Скачать" под вставленным
+   фото/видео) — во всех трёх местах, где рендерится этот HTML: сам редактор,
+   тема блога и комментарий. */
+.rich-editor-content a[download],
+.blog-topic-content a[download],
+.blog-comment-content a[download] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  font-size: 12px;
+  text-decoration: none;
+}
+.rich-editor-content a[download]:hover,
+.blog-topic-content a[download]:hover,
+.blog-comment-content a[download]:hover {
+  border-color: var(--color-accent);
+}
 
 /* ---- Путь чтения (TOC) — теперь встроен вверху описания, а не отдельной
    колонкой, чтобы не мешать делению "описание слева / комментарии справа" ---- */

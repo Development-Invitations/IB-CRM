@@ -1658,7 +1658,7 @@ dependencies = [
 
 [[package]]
 name = "ib-crm"
-version = "0.2.9"
+version = "0.2.11"
 dependencies = [
  "axum",
  "bcrypt",

@@ -7,6 +7,14 @@ import { useToast } from '../lib/toast';
 import { connection } from '../lib/connection';
 import { session } from '../lib/session';
 import { ZOOM_LEVELS, getStoredZoom, applyZoom } from '../lib/zoom';
+import { getStoredWindowMode, applyWindowMode, type WindowMode } from '../lib/windowMode';
+import {
+  getChatNotificationsMuted,
+  setChatNotificationsMuted,
+  getStoredToastPosition,
+  setStoredToastPosition,
+  type ToastPosition,
+} from '../lib/chatNotificationPrefs';
 import Select from '../components/Select';
 
 export default function Settings({ employee }: { employee: Employee }) {
@@ -24,6 +32,27 @@ export default function Settings({ employee }: { employee: Employee }) {
     const percent = Number(v);
     setZoomState(percent);
     applyZoom(percent).catch(() => showToast('error', t('settings.errorGeneric')));
+  };
+
+  const [windowMode, setWindowModeState] = useState<WindowMode>(getStoredWindowMode());
+  const handleWindowModeChange = (v: string) => {
+    const mode = v as WindowMode;
+    setWindowModeState(mode);
+    applyWindowMode(mode).catch(() => showToast('error', t('settings.errorGeneric')));
+  };
+
+  const [chatMuted, setChatMutedState] = useState(getChatNotificationsMuted());
+  const handleToggleChatMute = () => {
+    const next = !chatMuted;
+    setChatMutedState(next);
+    setChatNotificationsMuted(next);
+  };
+
+  const [toastPosition, setToastPositionState] = useState<ToastPosition>(getStoredToastPosition());
+  const handleToastPositionChange = (v: string) => {
+    const pos = v as ToastPosition;
+    setToastPositionState(pos);
+    setStoredToastPosition(pos);
   };
 
   const isClient = connection.isClient();
@@ -182,6 +211,44 @@ export default function Settings({ employee }: { employee: Employee }) {
           onChange={handleZoomChange}
         />
         <p className="settings-hint">{t('settings.displayHint')}</p>
+
+        <div style={{ marginTop: 14 }}>
+          <Select
+            value={windowMode}
+            options={[
+              { value: 'windowed', label: t('settings.windowModeWindowed') },
+              { value: 'maximized', label: t('settings.windowModeMaximized') },
+              { value: 'fullscreen', label: t('settings.windowModeFullscreen') },
+            ]}
+            onChange={handleWindowModeChange}
+          />
+          <p className="settings-hint">{t('settings.windowModeHint')}</p>
+        </div>
+      </section>
+
+      <section className="settings-section">
+        <h2>{t('settings.chatSectionTitle')}</h2>
+        <div className="account-row">
+          <span className="settings-hint">{t('settings.chatMuteLabel')}</span>
+          <button className={`modal-btn${chatMuted ? ' danger' : ''}`} onClick={handleToggleChatMute}>
+            {chatMuted ? t('settings.chatMuteOffBtn') : t('settings.chatMuteOnBtn')}
+          </button>
+        </div>
+        <p className="settings-hint">{t('settings.chatMuteHint')}</p>
+
+        <div style={{ marginTop: 14 }}>
+          <Select
+            value={toastPosition}
+            options={[
+              { value: 'bottom-right', label: t('settings.toastPositionBottomRight') },
+              { value: 'bottom-left', label: t('settings.toastPositionBottomLeft') },
+              { value: 'top-right', label: t('settings.toastPositionTopRight') },
+              { value: 'top-left', label: t('settings.toastPositionTopLeft') },
+            ]}
+            onChange={handleToastPositionChange}
+          />
+          <p className="settings-hint">{t('settings.toastPositionHint')}</p>
+        </div>
       </section>
 
       <section className="settings-section">

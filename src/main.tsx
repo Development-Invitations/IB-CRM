@@ -7,10 +7,12 @@ import { ThemeProvider } from './lib/theme';
 import { ToastProvider } from './lib/toast';
 import { installWebviewHardening } from './lib/hardenWebview';
 import { initZoom } from './lib/zoom';
+import { initWindowMode } from './lib/windowMode';
 import './styles/theme.css';
 
 installWebviewHardening();
 initZoom();
+initWindowMode();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

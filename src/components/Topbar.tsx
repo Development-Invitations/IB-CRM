@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Settings as SettingsIcon, User, Home } from 'lucide-react';
+import { Bell, Settings as SettingsIcon, User, Home, MessageCircle } from 'lucide-react';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { primaryMonitor } from '@tauri-apps/api/window';
+import { primaryMonitor, LogicalPosition } from '@tauri-apps/api/window';
 import { emit, listen } from '@tauri-apps/api/event';
 import { api, type Employee, type Notification } from '../lib/api';
 import { useLocale } from '../lib/i18n';
+import { getChatNotificationsMuted, getStoredToastPosition, type ToastPosition } from '../lib/chatNotificationPrefs';
 import EditRequestReviewModal from './EditRequestReviewModal';
 import AbsenceRequestReviewModal from './AbsenceRequestReviewModal';
 import type { ToastPayload } from '../pages/ToastWindow';
@@ -21,6 +22,17 @@ type NotificationTarget =
 
 const TOAST_WIDTH = 340;
 const TOAST_HEIGHT = 110;
+
+// Отступ снизу больше, чем сверху/по бокам — чтобы не перекрывать панель
+// задач Windows, когда баннер стоит в одном из нижних углов.
+function computeToastPosition(pos: ToastPosition, logicalW: number, logicalH: number): { x: number; y: number } {
+  const marginX = 20;
+  const marginTop = 20;
+  const marginBottom = 60;
+  const x = pos.endsWith('right') ? logicalW - TOAST_WIDTH - marginX : marginX;
+  const y = pos.startsWith('bottom') ? logicalH - TOAST_HEIGHT - marginBottom : marginTop;
+  return { x: Math.max(0, Math.round(x)), y: Math.max(0, Math.round(y)) };
+}
 
 export default function Topbar({ employee }: { employee: Employee }) {
   const { t } = useLocale();
@@ -60,6 +72,11 @@ export default function Topbar({ employee }: { employee: Employee }) {
       // День рождения коллеги — ведём в календарь дней рождений, а не в свой кабинет.
       return { kind: 'navigate', path: '/dashboard/birthdays' };
     }
+    if (n.type === 'chat_message' && n.relatedEntityId) {
+      // Новое сообщение в чате — открываем чат сразу на нужном канале
+      // ('general' или id партнёра), см. Chat.tsx (читает location.state.channel).
+      return { kind: 'navigate', path: '/dashboard/chat', state: { channel: n.relatedEntityId } };
+    }
     // Остальные типы (например, результат рассмотрения своей же заявки) — ведём в кабинет.
     return { kind: 'navigate', path: `/dashboard/employees/${employee.id}` };
   };
@@ -72,7 +89,12 @@ export default function Topbar({ employee }: { employee: Employee }) {
 
   const loadNotifications = () => {
     api.listNotifications(employee.id)
-      .then((list) => {
+      .then((rawList) => {
+        // Замьюченные чат-уведомления отфильтровываются здесь же, в одном
+        // месте — бейдж, дропдаун и баннер разом перестают их показывать,
+        // без отдельной логики в каждом. Переоценивается на каждом опросе
+        // (10 сек), так что переключение настройки подхватывается быстро.
+        const list = getChatNotificationsMuted() ? rawList.filter((n) => n.type !== 'chat_message') : rawList;
         setNotifications(list);
         const unread = list.filter((n) => !n.isRead);
         if (seenIdsRef.current === null) {
@@ -102,17 +124,23 @@ export default function Topbar({ employee }: { employee: Employee }) {
       };
 
       let win = await WebviewWindow.getByLabel('toast');
+
+      // Позиция считается каждый показ (не только при создании окна) —
+      // иначе смена угла в Настройках не подействует до перезапуска
+      // приложения, ведь окно 'toast' создаётся один раз и живёт всю сессию.
+      const monitor = await primaryMonitor();
+      const scale = monitor?.scaleFactor ?? 1;
+      const logicalW = monitor ? monitor.size.width / scale : 1920;
+      const logicalH = monitor ? monitor.size.height / scale : 1080;
+      const { x, y } = computeToastPosition(getStoredToastPosition(), logicalW, logicalH);
+
       if (!win) {
-        const monitor = await primaryMonitor();
-        const scale = monitor?.scaleFactor ?? 1;
-        const logicalW = monitor ? monitor.size.width / scale : 1920;
-        const logicalH = monitor ? monitor.size.height / scale : 1080;
         win = new WebviewWindow('toast', {
           url: 'index.html#/toast',
           width: TOAST_WIDTH,
           height: TOAST_HEIGHT,
-          x: Math.max(0, Math.round(logicalW - TOAST_WIDTH - 20)),
-          y: Math.max(0, Math.round(logicalH - TOAST_HEIGHT - 60)),
+          x,
+          y,
           decorations: false,
           alwaysOnTop: true,
           skipTaskbar: true,
@@ -126,6 +154,8 @@ export default function Topbar({ employee }: { employee: Employee }) {
           win!.once('tauri://created', () => resolve());
           win!.once('tauri://error', () => resolve());
         });
+      } else {
+        await win.setPosition(new LogicalPosition(x, y));
       }
       await win.show();
       await emit('toast-show', payload);
@@ -190,6 +220,10 @@ export default function Topbar({ employee }: { employee: Employee }) {
       <div className="topbar-title">{t('topbar.welcome', { name: employee.fullName || employee.login })}</div>
 
       <div className="topbar-actions">
+        <button className="icon-btn" onClick={() => navigate('/dashboard/chat')} aria-label={t('topbar.chat')}>
+          <MessageCircle size={20} />
+        </button>
+
         <button className="icon-btn" onClick={() => navigate('/dashboard')} aria-label={t('sidebar.home')}>
           <Home size={20} />
         </button>

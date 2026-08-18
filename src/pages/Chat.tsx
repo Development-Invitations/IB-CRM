@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useContext } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Paperclip, X, Reply, Download, Search, Plus, Users, LogOut, Copy, Check, UserPlus, Settings as SettingsIcon, Smile } from 'lucide-react';
+import { ArrowLeft, Send, Paperclip, X, Reply, Download, Search, Plus, Users, LogOut, Copy, Check, UserPlus, Settings as SettingsIcon, Smile, Pencil, Trash2 } from 'lucide-react';
 import { api, type Employee, type Partner, type Department, type ChatMessage, type DmChannelSummary, type PartnerChatSummary, type ChatGroupSummary } from '../lib/api';
 import { dmChannelId, dmOtherParticipant } from '../lib/chat';
 import { FullscreenContext } from './Dashboard';
@@ -104,6 +104,11 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
   const [attachBusy, setAttachBusy] = useState(false);
   const [sendBusy, setSendBusy] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
+  const [editBusy, setEditBusy] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // true сразу после открытия/смены канала — чтобы проскроллить к последнему
@@ -383,6 +388,46 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
       )
     : [];
 
+  const startEditMessage = (m: ChatMessage) => {
+    setEditingId(m.id);
+    setEditDraft(m.content);
+  };
+
+  const cancelEditMessage = () => {
+    setEditingId(null);
+    setEditDraft('');
+  };
+
+  const saveEditMessage = async () => {
+    if (!editingId || !editDraft.trim()) return;
+    setEditBusy(true);
+    try {
+      const updated = await api.editChatMessage({ actorId: currentEmployee.id, messageId: editingId, content: editDraft.trim() });
+      setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+      setEditingId(null);
+      setEditDraft('');
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('chat.loadError'));
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
+  const handleDeleteMessage = async () => {
+    if (!deleteConfirmId) return;
+    const id = deleteConfirmId;
+    setDeleteBusy(true);
+    try {
+      await api.deleteChatMessage({ actorId: currentEmployee.id, messageId: id });
+      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, isDeleted: true, content: '', attachmentData: null, attachmentName: null } : m)));
+      setDeleteConfirmId(null);
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('chat.loadError'));
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   const handleFileAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -648,34 +693,63 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
               messages.map((m) => {
                 const parent = m.replyToId ? messages.find((p) => p.id === m.replyToId) : null;
                 const isOwn = m.senderId === currentEmployee.id;
-                const initials = m.senderName.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+                const isEditing = editingId === m.id;
                 return (
                   <div
                     key={m.id}
                     id={`chat-msg-${m.id}`}
                     className={`reg-chat-msg${isOwn ? ' own' : ''}${highlightedId === m.id ? ' chat-msg-highlight' : ''}`}
                   >
-                    <div className="reg-chat-avatar">{initials || '?'}</div>
+                    <Avatar name={m.senderName} size={30} src={m.senderAvatar} />
                     <div className="reg-chat-bubble">
                       <div className="reg-entry-header">
                         <div className="reg-entry-meta">
                           <strong>{m.senderName}</strong>
                           <span className="settings-hint">{parseSqliteUtc(m.createdAt).toLocaleString()}</span>
+                          {!m.isDeleted && m.editedAt && <span className="settings-hint">{t('common.editedLabel')}</span>}
                         </div>
-                        <div className="reg-entry-actions">
-                          <button className="reg-action-btn" onClick={() => setReplyTo(m)} title={t('chat.replyBtn')}>
-                            <Reply size={13} />
-                          </button>
-                        </div>
+                        {!m.isDeleted && (
+                          <div className="reg-entry-actions">
+                            <button className="reg-action-btn" onClick={() => setReplyTo(m)} title={t('chat.replyBtn')}>
+                              <Reply size={13} />
+                            </button>
+                            {isOwn && (
+                              <>
+                                <button className="reg-action-btn" onClick={() => startEditMessage(m)} title={t('common.editBtn')}>
+                                  <Pencil size={13} />
+                                </button>
+                                <button className="reg-action-btn" onClick={() => setDeleteConfirmId(m.id)} title={t('common.deleteBtn')}>
+                                  <Trash2 size={13} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      {parent && (
-                        <button type="button" className="blog-reply-to chat-reply-jump" onClick={() => scrollToMessage(parent.id)}>
-                          ↪ {t('chat.replyingTo', { name: parent.senderName })}
-                        </button>
-                      )}
-                      <div className="reg-entry-content" style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
-                      {m.attachmentData && (
-                        <AttachmentPreview dataUrl={m.attachmentData} name={m.attachmentName} onExpand={() => setLightboxUrl(m.attachmentData)} />
+                      {m.isDeleted ? (
+                        <p className="settings-hint">{t('common.messageDeleted')}</p>
+                      ) : isEditing ? (
+                        <div className="reg-inline-edit">
+                          <textarea value={editDraft} onChange={(e) => setEditDraft(e.target.value)} rows={2} />
+                          <div className="reg-inline-edit-actions">
+                            <button className="modal-btn" onClick={cancelEditMessage}>{t('common.editCancelBtn')}</button>
+                            <button className="modal-btn danger" onClick={saveEditMessage} disabled={!editDraft.trim() || editBusy}>
+                              {t('common.editSaveBtn')}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {parent && (
+                            <button type="button" className="blog-reply-to chat-reply-jump" onClick={() => scrollToMessage(parent.id)}>
+                              ↪ {t('chat.replyingTo', { name: parent.senderName })}
+                            </button>
+                          )}
+                          <div className="reg-entry-content" style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                          {m.attachmentData && (
+                            <AttachmentPreview dataUrl={m.attachmentData} name={m.attachmentName} onExpand={() => setLightboxUrl(m.attachmentData)} />
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -749,6 +823,24 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
       )}
 
       <ChatSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      <Modal
+        open={!!deleteConfirmId}
+        title={t('common.deleteConfirmTitle')}
+        onClose={() => setDeleteConfirmId(null)}
+        actions={
+          <>
+            <button className="modal-btn" onClick={() => setDeleteConfirmId(null)} disabled={deleteBusy}>
+              {t('common.cancel')}
+            </button>
+            <button className="modal-btn danger" onClick={handleDeleteMessage} disabled={deleteBusy}>
+              {deleteBusy ? t('common.loading') : t('common.deleteBtn')}
+            </button>
+          </>
+        }
+      >
+        {t('common.deleteConfirmBody')}
+      </Modal>
 
       {!currentEmployee.isPartner && (
         <ChatGroupFormModal

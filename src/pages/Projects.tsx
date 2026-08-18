@@ -61,6 +61,7 @@ function ChatMessage({
   onStatusChange,
   onAddReply,
   onAssign,
+  onMessageChanged,
   t,
 }: {
   m: ProjectChatMessage;
@@ -70,9 +71,11 @@ function ChatMessage({
   onStatusChange: (messageId: string, status: RegulationEntryStatus) => void;
   onAddReply: (messageId: string, content: string) => Promise<void>;
   onAssign: (messageId: string, targetEmployeeId: string, deadline: string) => Promise<void>;
+  onMessageChanged: () => void;
   t: (k: string, vars?: Record<string, string | number>) => string;
 }) {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [copied, setCopied] = useState(false);
   const [replies, setReplies] = useState<ProjectChatReply[]>([]);
   const [expanded, setExpanded] = useState(false);
@@ -83,6 +86,87 @@ function ChatMessage({
   const [assignTo, setAssignTo] = useState('');
   const [assignDeadline, setAssignDeadline] = useState(m.deadline ?? '');
   const [assignBusy, setAssignBusy] = useState(false);
+
+  const [msgEditing, setMsgEditing] = useState(false);
+  const [msgEditDraft, setMsgEditDraft] = useState('');
+  const [msgEditBusy, setMsgEditBusy] = useState(false);
+  const [msgDeleteConfirm, setMsgDeleteConfirm] = useState(false);
+  const [msgDeleteBusy, setMsgDeleteBusy] = useState(false);
+
+  const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
+  const [replyEditDraft, setReplyEditDraft] = useState('');
+  const [replyEditBusy, setReplyEditBusy] = useState(false);
+  const [deleteReplyConfirmId, setDeleteReplyConfirmId] = useState<string | null>(null);
+  const [deleteReplyBusy, setDeleteReplyBusy] = useState(false);
+
+  const startEditMsg = () => {
+    setMsgEditing(true);
+    setMsgEditDraft(m.content);
+  };
+  const cancelEditMsg = () => {
+    setMsgEditing(false);
+    setMsgEditDraft('');
+  };
+  const saveEditMsg = async () => {
+    if (!msgEditDraft.trim()) return;
+    setMsgEditBusy(true);
+    try {
+      await api.editProjectChatMessage({ actorId: currentEmployee.id, messageId: m.id, content: msgEditDraft.trim() });
+      setMsgEditing(false);
+      onMessageChanged();
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('projects.errorGeneric'));
+    } finally {
+      setMsgEditBusy(false);
+    }
+  };
+  const handleDeleteMsg = async () => {
+    setMsgDeleteBusy(true);
+    try {
+      await api.deleteProjectChatMessage({ actorId: currentEmployee.id, messageId: m.id });
+      setMsgDeleteConfirm(false);
+      onMessageChanged();
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('projects.errorGeneric'));
+    } finally {
+      setMsgDeleteBusy(false);
+    }
+  };
+
+  const startEditReply = (r: ProjectChatReply) => {
+    setEditingReplyId(r.id);
+    setReplyEditDraft(r.content);
+  };
+  const cancelEditReply = () => {
+    setEditingReplyId(null);
+    setReplyEditDraft('');
+  };
+  const saveEditReply = async () => {
+    if (!editingReplyId || !replyEditDraft.trim()) return;
+    setReplyEditBusy(true);
+    try {
+      await api.editProjectChatReply({ actorId: currentEmployee.id, replyId: editingReplyId, content: replyEditDraft.trim() });
+      setEditingReplyId(null);
+      await loadReplies();
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('projects.errorGeneric'));
+    } finally {
+      setReplyEditBusy(false);
+    }
+  };
+  const handleDeleteReply = async () => {
+    if (!deleteReplyConfirmId) return;
+    setDeleteReplyBusy(true);
+    try {
+      await api.deleteProjectChatReply({ actorId: currentEmployee.id, replyId: deleteReplyConfirmId });
+      setDeleteReplyConfirmId(null);
+      await loadReplies();
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('projects.errorGeneric'));
+    } finally {
+      setDeleteReplyBusy(false);
+    }
+  };
 
   const copyLink = () => {
     navigator.clipboard.writeText(buildProjectMessageLink(m.projectId, m.id)).then(() => {
@@ -137,90 +221,150 @@ function ChatMessage({
           <div className="reg-entry-meta">
             <strong>{m.senderName}</strong>
             <span className="settings-hint">{parseSqliteUtc(m.createdAt).toLocaleString()}</span>
+            {!m.isDeleted && m.editedAt && <span className="settings-hint">{t('common.editedLabel')}</span>}
           </div>
-          <div className="reg-entry-actions">
-            <button className="reg-action-btn" onClick={copyLink} title={t('projects.copyMsgLink')}>
-              {copied ? <Check size={13} /> : <Link2 size={13} />}
-            </button>
-            {canManage && (
-              <>
-                {m.status !== 'done' && (
-                  <button className="reg-action-btn done" onClick={() => onStatusChange(m.id, 'done')} title={t('projects.markDoneBtn')}>
-                    <CheckSquare size={14} />
+          {!m.isDeleted && (
+            <div className="reg-entry-actions">
+              <button className="reg-action-btn" onClick={copyLink} title={t('projects.copyMsgLink')}>
+                {copied ? <Check size={13} /> : <Link2 size={13} />}
+              </button>
+              {isOwn && (
+                <>
+                  <button className="reg-action-btn" onClick={startEditMsg} title={t('common.editBtn')}>
+                    <Pencil size={13} />
                   </button>
-                )}
-                {m.status === 'open' && (
-                  <button className="reg-action-btn cancel" onClick={() => onStatusChange(m.id, 'cancelled')} title={t('projects.markCancelBtn')}>
-                    <XSquare size={14} />
+                  <button className="reg-action-btn" onClick={() => setMsgDeleteConfirm(true)} title={t('common.deleteBtn')}>
+                    <Trash2 size={13} />
                   </button>
-                )}
-                {m.status !== 'open' && (
-                  <button className="reg-action-btn reopen" onClick={() => onStatusChange(m.id, 'open')} title={t('projects.reopenEntryBtn')}>
-                    <RotateCcw size={14} />
+                </>
+              )}
+              {canManage && (
+                <>
+                  {m.status !== 'done' && (
+                    <button className="reg-action-btn done" onClick={() => onStatusChange(m.id, 'done')} title={t('projects.markDoneBtn')}>
+                      <CheckSquare size={14} />
+                    </button>
+                  )}
+                  {m.status === 'open' && (
+                    <button className="reg-action-btn cancel" onClick={() => onStatusChange(m.id, 'cancelled')} title={t('projects.markCancelBtn')}>
+                      <XSquare size={14} />
+                    </button>
+                  )}
+                  {m.status !== 'open' && (
+                    <button className="reg-action-btn reopen" onClick={() => onStatusChange(m.id, 'open')} title={t('projects.reopenEntryBtn')}>
+                      <RotateCcw size={14} />
+                    </button>
+                  )}
+                  <button className="reg-action-btn" onClick={() => { setAssignOpen((v) => !v); setAssignTo(''); }} title={t('projects.assignBtn')}>
+                    <Forward size={14} />
                   </button>
-                )}
-                <button className="reg-action-btn" onClick={() => { setAssignOpen((v) => !v); setAssignTo(''); }} title={t('projects.assignBtn')}>
-                  <Forward size={14} />
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="reg-entry-content">{linkifyEntryContent(m.content, navigate)}</div>
-
-        <div className="reg-chat-chips">
-          <span className={`absence-status reg-entry-badge-${m.status}`}>{t(MSG_STATUS_KEYS[m.status])}</span>
-          {m.deadline && <span className="reg-chip-deadline">📅 {m.deadline}</span>}
-        </div>
-
-        {m.attachmentData && (
-          <AttachmentPreview dataUrl={m.attachmentData} name={m.attachmentName} onExpand={() => setLightbox(true)} />
-        )}
-
-        {assignOpen && (
-          <div className="reg-assign-form">
-            <SearchableSelect
-              value={assignTo}
-              options={assigneeOptions}
-              onChange={setAssignTo}
-              searchPlaceholder={t('employees.searchPlaceholder')}
-              emptyLabel={t('employees.searchEmpty')}
-            />
-            <input type="date" value={assignDeadline} onChange={(e) => setAssignDeadline(e.target.value)} />
-            <button className="modal-btn" onClick={handleAssignSubmit} disabled={!assignTo || assignBusy}>
-              <Forward size={12} /> {t('projects.assignConfirmBtn')}
-            </button>
-            <button className="modal-btn" onClick={() => setAssignOpen(false)}><X size={12} /></button>
-          </div>
-        )}
-
-        <button className="link-btn reg-replies-toggle" onClick={toggle}>
-          {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-          {t('projects.repliesTitle')} {m.replyCount > 0 ? `(${m.replyCount})` : ''}
-        </button>
-
-        {expanded && (
-          <div className="reg-replies">
-            {replies.map((r) => (
-              <div key={r.id} className="reg-reply">
-                <div className="reg-reply-meta">
-                  <strong>{r.authorName}</strong>
-                  <span className="settings-hint">{parseSqliteUtc(r.createdAt).toLocaleString()}</span>
-                </div>
-                <div>{linkifyEntryContent(r.content, navigate)}</div>
-              </div>
-            ))}
-            <div className="reg-reply-form">
-              <input
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                placeholder={t('projects.addReplyPlaceholder')}
-                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleReply()}
-              />
-              <button className="modal-btn" onClick={handleReply} disabled={!replyText.trim() || replyBusy}>↵</button>
+                </>
+              )}
             </div>
-          </div>
+          )}
+        </div>
+
+        {m.isDeleted ? (
+          <p className="settings-hint">{t('common.messageDeleted')}</p>
+        ) : (
+          <>
+            {msgEditing ? (
+              <div className="reg-inline-edit">
+                <textarea value={msgEditDraft} onChange={(e) => setMsgEditDraft(e.target.value)} rows={3} />
+                <div className="reg-inline-edit-actions">
+                  <button className="modal-btn" onClick={cancelEditMsg}>{t('common.editCancelBtn')}</button>
+                  <button className="modal-btn danger" onClick={saveEditMsg} disabled={!msgEditDraft.trim() || msgEditBusy}>
+                    {t('common.editSaveBtn')}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="reg-entry-content">{linkifyEntryContent(m.content, navigate)}</div>
+            )}
+
+            <div className="reg-chat-chips">
+              <span className={`absence-status reg-entry-badge-${m.status}`}>{t(MSG_STATUS_KEYS[m.status])}</span>
+              {m.deadline && <span className="reg-chip-deadline">📅 {m.deadline}</span>}
+            </div>
+
+            {m.attachmentData && (
+              <AttachmentPreview dataUrl={m.attachmentData} name={m.attachmentName} onExpand={() => setLightbox(true)} />
+            )}
+
+            {assignOpen && (
+              <div className="reg-assign-form">
+                <SearchableSelect
+                  value={assignTo}
+                  options={assigneeOptions}
+                  onChange={setAssignTo}
+                  searchPlaceholder={t('employees.searchPlaceholder')}
+                  emptyLabel={t('employees.searchEmpty')}
+                />
+                <input type="date" value={assignDeadline} onChange={(e) => setAssignDeadline(e.target.value)} />
+                <button className="modal-btn" onClick={handleAssignSubmit} disabled={!assignTo || assignBusy}>
+                  <Forward size={12} /> {t('projects.assignConfirmBtn')}
+                </button>
+                <button className="modal-btn" onClick={() => setAssignOpen(false)}><X size={12} /></button>
+              </div>
+            )}
+
+            <button className="link-btn reg-replies-toggle" onClick={toggle}>
+              {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+              {t('projects.repliesTitle')} {m.replyCount > 0 ? `(${m.replyCount})` : ''}
+            </button>
+
+            {expanded && (
+              <div className="reg-replies">
+                {replies.map((r) => {
+                  const isOwnReply = r.authorId === currentEmployee.id;
+                  const isEditingReply = editingReplyId === r.id;
+                  return (
+                    <div key={r.id} className="reg-reply">
+                      <div className="reg-reply-meta">
+                        <strong>{r.authorName}</strong>
+                        <span className="settings-hint">{parseSqliteUtc(r.createdAt).toLocaleString()}</span>
+                        {!r.isDeleted && r.editedAt && <span className="settings-hint">{t('common.editedLabel')}</span>}
+                        {isOwnReply && !r.isDeleted && (
+                          <div className="reg-entry-actions" style={{ marginLeft: 'auto' }}>
+                            <button className="reg-action-btn" onClick={() => startEditReply(r)} title={t('common.editBtn')}>
+                              <Pencil size={12} />
+                            </button>
+                            <button className="reg-action-btn" onClick={() => setDeleteReplyConfirmId(r.id)} title={t('common.deleteBtn')}>
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {r.isDeleted ? (
+                        <p className="settings-hint">{t('common.messageDeleted')}</p>
+                      ) : isEditingReply ? (
+                        <div className="reg-inline-edit">
+                          <textarea value={replyEditDraft} onChange={(e) => setReplyEditDraft(e.target.value)} rows={2} />
+                          <div className="reg-inline-edit-actions">
+                            <button className="modal-btn" onClick={cancelEditReply}>{t('common.editCancelBtn')}</button>
+                            <button className="modal-btn danger" onClick={saveEditReply} disabled={!replyEditDraft.trim() || replyEditBusy}>
+                              {t('common.editSaveBtn')}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>{linkifyEntryContent(r.content, navigate)}</div>
+                      )}
+                    </div>
+                  );
+                })}
+                <div className="reg-reply-form">
+                  <input
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    placeholder={t('projects.addReplyPlaceholder')}
+                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleReply()}
+                  />
+                  <button className="modal-btn" onClick={handleReply} disabled={!replyText.trim() || replyBusy}>↵</button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -230,6 +374,42 @@ function ChatMessage({
           <button className="reg-lightbox-close" onClick={() => setLightbox(false)}><X size={20} /></button>
         </div>
       )}
+
+      <Modal
+        open={msgDeleteConfirm}
+        title={t('common.deleteConfirmTitle')}
+        onClose={() => setMsgDeleteConfirm(false)}
+        actions={
+          <>
+            <button className="modal-btn" onClick={() => setMsgDeleteConfirm(false)} disabled={msgDeleteBusy}>
+              {t('common.cancel')}
+            </button>
+            <button className="modal-btn danger" onClick={handleDeleteMsg} disabled={msgDeleteBusy}>
+              {msgDeleteBusy ? t('common.loading') : t('common.deleteBtn')}
+            </button>
+          </>
+        }
+      >
+        {t('common.deleteConfirmBody')}
+      </Modal>
+
+      <Modal
+        open={!!deleteReplyConfirmId}
+        title={t('common.deleteConfirmTitle')}
+        onClose={() => setDeleteReplyConfirmId(null)}
+        actions={
+          <>
+            <button className="modal-btn" onClick={() => setDeleteReplyConfirmId(null)} disabled={deleteReplyBusy}>
+              {t('common.cancel')}
+            </button>
+            <button className="modal-btn danger" onClick={handleDeleteReply} disabled={deleteReplyBusy}>
+              {deleteReplyBusy ? t('common.loading') : t('common.deleteBtn')}
+            </button>
+          </>
+        }
+      >
+        {t('common.deleteConfirmBody')}
+      </Modal>
     </div>
   );
 }
@@ -702,6 +882,7 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
                           onStatusChange={handleStatusChange}
                           onAddReply={handleAddReply}
                           onAssign={handleAssignMessage}
+                          onMessageChanged={loadDetail}
                           t={t}
                         />
                       ))

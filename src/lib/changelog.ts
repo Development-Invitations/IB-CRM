@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.2.18';
+export const APP_VERSION = '0.2.20';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,19 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.2.20',
+      items: [
+        'В IB Чате, регламентах и проектах теперь можно редактировать и удалять своё сообщение/запись/ответ — карандаш и корзина рядом со своими сообщениями, отредактированное помечено "(изменено)", удалённое показывается как "Сообщение удалено"',
+        'В регламентах и проектах ответы на запись/сообщение тоже получили эту возможность — раньше их вообще нельзя было ни изменить, ни убрать',
+      ],
+    },
+    {
+      version: '0.2.19',
+      items: [
+        'Исправлено: аватар в сообщениях IB Чата всегда показывал только инициалы, даже если у сотрудника загружено фото профиля — теперь показывается настоящее фото',
+      ],
+    },
     {
       version: '0.2.18',
       items: [
@@ -415,6 +428,19 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.2.20',
+      items: [
+        "IB Chat, reglamentlar va loyihalarda endi o'z xabarini/yozuvini/javobini tahrirlash va o'chirish mumkin — o'z xabarlaringiz yonida qalam va savat, tahrirlangani \"(tahrirlangan)\" deb belgilanadi, o'chirilgani \"Xabar o'chirildi\" deb ko'rsatiladi",
+        "Reglamentlar va loyihalarda yozuv/xabarga javoblar ham shu imkoniyatga ega bo'ldi — avval ularni umuman o'zgartirib yoki olib tashlab bo'lmasdi",
+      ],
+    },
+    {
+      version: '0.2.19',
+      items: [
+        "Tuzatildi: IB Chat xabarlaridagi avatar xodimning profil rasmi yuklangan bo'lsa ham doim faqat bosh harflarni ko'rsatardi — endi haqiqiy rasm ko'rsatiladi",
+      ],
+    },
+    {
       version: '0.2.18',
       items: [
         "Mijoz rejimida yangilanishda \"downloaded-installer.exe topilmadi\" xatosining haqiqiy sababi tuzatildi — ilova xato bilan fayl yo'lini o'zi hisoblash o'rniga serverdan so'rardi",
@@ -813,6 +839,19 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.2.20',
+      items: [
+        "IB Чат, регламентлар ва лойиҳаларда энди ўз хабарини/ёзувини/жавобини таҳрирлаш ва ўчириш мумкин — ўз хабарларингиз ёнида қалам ва сават, таҳрирлангани \"(таҳрирланган)\" деб белгиланади, ўчирилгани \"Хабар ўчирилди\" деб кўрсатилади",
+        "Регламентлар ва лойиҳаларда ёзув/хабарга жавоблар ҳам шу имкониятга эга бўлди — аввал уларни умуман ўзгартириб ёки олиб ташлаб бўлмасди",
+      ],
+    },
+    {
+      version: '0.2.19',
+      items: [
+        "Тузатилди: IB Чат хабарларидаги аватар ходимнинг профил расми юкланган бўлса ҳам доим фақат бош ҳарфларни кўрсатарди — энди ҳақиқий расм кўрсатилади",
+      ],
+    },
     {
       version: '0.2.18',
       items: [

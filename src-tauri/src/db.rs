@@ -58,11 +58,14 @@ pub struct ChatMessageRecord {
     pub channel: String,
     pub sender_id: String,
     pub sender_name: String,
+    pub sender_avatar: Option<String>,
     pub content: String,
     pub attachment_data: Option<String>,
     pub attachment_name: Option<String>,
     pub reply_to_id: Option<String>,
     pub created_at: String,
+    pub edited_at: Option<String>,
+    pub is_deleted: bool,
 }
 
 pub struct DmChannelSummary {
@@ -223,6 +226,8 @@ pub struct ProjectChatMessageRecord {
     pub status: String,
     pub created_at: String,
     pub reply_count: i64,
+    pub edited_at: Option<String>,
+    pub is_deleted: bool,
 }
 
 pub struct ProjectChatReplyRecord {
@@ -232,6 +237,8 @@ pub struct ProjectChatReplyRecord {
     pub author_name: String,
     pub content: String,
     pub created_at: String,
+    pub edited_at: Option<String>,
+    pub is_deleted: bool,
 }
 
 pub struct RegulationRecord {
@@ -277,6 +284,8 @@ pub struct RegulationEntryRecord {
     pub created_at: String,
     pub updated_at: String,
     pub reply_count: i64,
+    pub edited_at: Option<String>,
+    pub is_deleted: bool,
 }
 
 pub struct MyTaskRecord {
@@ -297,6 +306,8 @@ pub struct RegulationReplyRecord {
     pub author_name: String,
     pub content: String,
     pub created_at: String,
+    pub edited_at: Option<String>,
+    pub is_deleted: bool,
 }
 
 pub struct RegulationReminderRecord {
@@ -686,6 +697,22 @@ impl Db {
             );
             CREATE INDEX IF NOT EXISTS idx_chat_messages_channel ON chat_messages(channel, created_at);",
         );
+
+        // Редактирование/удаление своего сообщения/записи/ответа — своя же (не
+        // админ/владелец) правка текста и мягкое удаление (is_deleted, содержимое
+        // физически не стирается — аудит; но map_*_row ниже подменяет content/
+        // attachment_* на пустые при отдаче наружу, если is_deleted). Единый
+        // паттерн на 5 таблиц.
+        for table in [
+            "chat_messages",
+            "regulation_entries",
+            "regulation_replies",
+            "project_chat_messages",
+            "project_chat_replies",
+        ] {
+            add_column_if_missing(&conn, table, "edited_at TEXT");
+            add_column_if_missing(&conn, table, "is_deleted INTEGER NOT NULL DEFAULT 0");
+        }
 
         // Группы чата — четвёртый вид канала, 'group:<id>' (см. Db::can_access_chat_channel).
         // В отличие от 'general'/'dm:'/партнёрского канала у группы есть метаданные
@@ -1293,24 +1320,28 @@ impl Db {
         let mut stmt = self
             .conn
             .prepare(
-                "SELECT m.id, m.channel, m.sender_id, e.full_name, m.content, m.attachment_data,
-                        m.attachment_name, m.reply_to_id, m.created_at
+                "SELECT m.id, m.channel, m.sender_id, e.full_name, e.avatar_data, m.content, m.attachment_data,
+                        m.attachment_name, m.reply_to_id, m.created_at, m.edited_at, m.is_deleted
                  FROM chat_messages m JOIN employees e ON e.id = m.sender_id
                  WHERE m.channel = ?1 ORDER BY m.created_at ASC",
             )
             .map_err(|e| e.to_string())?;
         let rows = stmt
             .query_map(params![channel], |row| {
+                let is_deleted: bool = row.get(11)?;
                 Ok(ChatMessageRecord {
                     id: row.get(0)?,
                     channel: row.get(1)?,
                     sender_id: row.get(2)?,
                     sender_name: row.get(3)?,
-                    content: row.get(4)?,
-                    attachment_data: row.get(5)?,
-                    attachment_name: row.get(6)?,
-                    reply_to_id: row.get(7)?,
-                    created_at: row.get(8)?,
+                    sender_avatar: row.get(4)?,
+                    content: if is_deleted { String::new() } else { row.get(5)? },
+                    attachment_data: if is_deleted { None } else { row.get(6)? },
+                    attachment_name: if is_deleted { None } else { row.get(7)? },
+                    reply_to_id: row.get(8)?,
+                    created_at: row.get(9)?,
+                    edited_at: row.get(10)?,
+                    is_deleted,
                 })
             })
             .map_err(|e| e.to_string())?;
@@ -1357,12 +1388,62 @@ impl Db {
             channel: channel.to_string(),
             sender_id: actor_id.to_string(),
             sender_name: sender.full_name,
+            sender_avatar: sender.avatar_data,
             content: content.to_string(),
             attachment_data: attachment_data.map(str::to_string),
             attachment_name: attachment_name.map(str::to_string),
             reply_to_id: reply_to_id.map(str::to_string),
             created_at: String::new(),
+            edited_at: None,
+            is_deleted: false,
         })
+    }
+
+    // Редактирование/удаление своего сообщения чата — только отправитель, без
+    // ограничения по времени; правит только текст (вложение/канал не трогаем).
+    pub fn edit_chat_message(&self, actor_id: &str, message_id: &str, content: &str) -> Result<ChatMessageRecord, String> {
+        let (sender_id, channel, is_deleted): (String, String, bool) = self
+            .conn
+            .query_row(
+                "SELECT sender_id, channel, is_deleted FROM chat_messages WHERE id = ?1",
+                params![message_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .map_err(|_| "Сообщение не найдено".to_string())?;
+        if sender_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        if is_deleted {
+            return Err("Сообщение удалено".into());
+        }
+        let content = content.trim();
+        if content.is_empty() {
+            return Err("Сообщение не может быть пустым".into());
+        }
+        self.conn
+            .execute(
+                "UPDATE chat_messages SET content = ?1, edited_at = datetime('now') WHERE id = ?2",
+                params![content, message_id],
+            )
+            .map_err(|e| e.to_string())?;
+        self.list_chat_messages(actor_id, &channel)?
+            .into_iter()
+            .find(|m| m.id == message_id)
+            .ok_or_else(|| "Сообщение не найдено".to_string())
+    }
+
+    pub fn delete_chat_message(&self, actor_id: &str, message_id: &str) -> Result<(), String> {
+        let sender_id: String = self
+            .conn
+            .query_row("SELECT sender_id FROM chat_messages WHERE id = ?1", params![message_id], |row| row.get(0))
+            .map_err(|_| "Сообщение не найдено".to_string())?;
+        if sender_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn
+            .execute("UPDATE chat_messages SET is_deleted = 1 WHERE id = ?1", params![message_id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
     }
 
     // Получатели уведомления зависят от канала и от того, кто пишет:
@@ -2994,7 +3075,8 @@ impl Db {
         let mut stmt = match self.conn.prepare(
             "SELECT m.id, m.project_id, m.sender_id, e.full_name, m.target_employee_id, t.full_name,
                     m.content, m.attachment_data, m.attachment_name, m.deadline, m.status, m.created_at,
-                    (SELECT COUNT(*) FROM project_chat_replies r WHERE r.message_id = m.id)
+                    (SELECT COUNT(*) FROM project_chat_replies r WHERE r.message_id = m.id),
+                    m.edited_at, m.is_deleted
              FROM project_chat_messages m
              JOIN employees e ON e.id = m.sender_id
              JOIN employees t ON t.id = m.target_employee_id
@@ -3004,6 +3086,7 @@ impl Db {
             Err(_) => return Vec::new(),
         };
         stmt.query_map(params![project_id], |row| {
+            let is_deleted: bool = row.get(14)?;
             Ok(ProjectChatMessageRecord {
                 id: row.get(0)?,
                 project_id: row.get(1)?,
@@ -3011,13 +3094,15 @@ impl Db {
                 sender_name: row.get(3)?,
                 target_employee_id: row.get(4)?,
                 target_name: row.get(5)?,
-                content: row.get(6)?,
-                attachment_data: row.get(7)?,
-                attachment_name: row.get(8)?,
+                content: if is_deleted { String::new() } else { row.get(6)? },
+                attachment_data: if is_deleted { None } else { row.get(7)? },
+                attachment_name: if is_deleted { None } else { row.get(8)? },
                 deadline: row.get(9)?,
                 status: row.get(10)?,
                 created_at: row.get(11)?,
                 reply_count: row.get(12)?,
+                edited_at: row.get(13)?,
+                is_deleted,
             })
         })
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
@@ -3081,7 +3166,58 @@ impl Db {
             status: "open".to_string(),
             created_at: String::new(),
             reply_count: 0,
+            edited_at: None,
+            is_deleted: false,
         })
+    }
+
+    // Редактирование/удаление своего сообщения проекта — строго отправитель
+    // (в отличие от assign_project_chat_message/update_project_chat_message_status
+    // выше, где ещё и владелец проекта/админ могут управлять статусом/
+    // исполнителем — тут именно "своё"). Правит только текст.
+    pub fn edit_project_chat_message(&self, actor_id: &str, message_id: &str, content: &str) -> Result<ProjectChatMessageRecord, String> {
+        let (sender_id, project_id, is_deleted): (String, String, bool) = self
+            .conn
+            .query_row(
+                "SELECT sender_id, project_id, is_deleted FROM project_chat_messages WHERE id = ?1",
+                params![message_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .map_err(|_| "Сообщение не найдено".to_string())?;
+        if sender_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        if is_deleted {
+            return Err("Сообщение удалено".into());
+        }
+        let content = content.trim();
+        if content.is_empty() {
+            return Err("Сообщение не может быть пустым".into());
+        }
+        self.conn
+            .execute(
+                "UPDATE project_chat_messages SET content = ?1, edited_at = datetime('now') WHERE id = ?2",
+                params![content, message_id],
+            )
+            .map_err(|e| e.to_string())?;
+        self.list_project_chat(&project_id)
+            .into_iter()
+            .find(|m| m.id == message_id)
+            .ok_or_else(|| "Сообщение не найдено".to_string())
+    }
+
+    pub fn delete_project_chat_message(&self, actor_id: &str, message_id: &str) -> Result<(), String> {
+        let sender_id: String = self
+            .conn
+            .query_row("SELECT sender_id FROM project_chat_messages WHERE id = ?1", params![message_id], |row| row.get(0))
+            .map_err(|_| "Сообщение не найдено".to_string())?;
+        if sender_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn
+            .execute("UPDATE project_chat_messages SET is_deleted = 1 WHERE id = ?1", params![message_id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
     }
 
     pub fn assign_project_chat_message(&self, actor_id: &str, message_id: &str, target_employee_id: &str, deadline: Option<&str>) -> Result<(), String> {
@@ -3128,7 +3264,7 @@ impl Db {
 
     pub fn list_project_chat_replies(&self, message_id: &str) -> Vec<ProjectChatReplyRecord> {
         let mut stmt = match self.conn.prepare(
-            "SELECT r.id, r.message_id, r.author_id, e.full_name, r.content, r.created_at
+            "SELECT r.id, r.message_id, r.author_id, e.full_name, r.content, r.created_at, r.edited_at, r.is_deleted
              FROM project_chat_replies r JOIN employees e ON e.id = r.author_id
              WHERE r.message_id = ?1 ORDER BY r.created_at ASC",
         ) {
@@ -3136,13 +3272,16 @@ impl Db {
             Err(_) => return Vec::new(),
         };
         stmt.query_map(params![message_id], |row| {
+            let is_deleted: bool = row.get(7)?;
             Ok(ProjectChatReplyRecord {
                 id: row.get(0)?,
                 message_id: row.get(1)?,
                 author_id: row.get(2)?,
                 author_name: row.get(3)?,
-                content: row.get(4)?,
+                content: if is_deleted { String::new() } else { row.get(4)? },
                 created_at: row.get(5)?,
+                edited_at: row.get(6)?,
+                is_deleted,
             })
         })
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
@@ -3180,7 +3319,54 @@ impl Db {
             author_name: author_name.unwrap_or_default(),
             content: content.trim().to_string(),
             created_at: String::new(),
+            edited_at: None,
+            is_deleted: false,
         })
+    }
+
+    pub fn edit_project_chat_reply(&self, actor_id: &str, reply_id: &str, content: &str) -> Result<ProjectChatReplyRecord, String> {
+        let (author_id, message_id, is_deleted): (String, String, bool) = self
+            .conn
+            .query_row(
+                "SELECT author_id, message_id, is_deleted FROM project_chat_replies WHERE id = ?1",
+                params![reply_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .map_err(|_| "Ответ не найден".to_string())?;
+        if author_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        if is_deleted {
+            return Err("Ответ удалён".into());
+        }
+        let content = content.trim();
+        if content.is_empty() {
+            return Err("Ответ не может быть пустым".into());
+        }
+        self.conn
+            .execute(
+                "UPDATE project_chat_replies SET content = ?1, edited_at = datetime('now') WHERE id = ?2",
+                params![content, reply_id],
+            )
+            .map_err(|e| e.to_string())?;
+        self.list_project_chat_replies(&message_id)
+            .into_iter()
+            .find(|r| r.id == reply_id)
+            .ok_or_else(|| "Ответ не найден".to_string())
+    }
+
+    pub fn delete_project_chat_reply(&self, actor_id: &str, reply_id: &str) -> Result<(), String> {
+        let author_id: String = self
+            .conn
+            .query_row("SELECT author_id FROM project_chat_replies WHERE id = ?1", params![reply_id], |row| row.get(0))
+            .map_err(|_| "Ответ не найден".to_string())?;
+        if author_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn
+            .execute("UPDATE project_chat_replies SET is_deleted = 1 WHERE id = ?1", params![reply_id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
     }
 
     // ---- Регламенты ----
@@ -3434,7 +3620,8 @@ impl Db {
             "SELECT e.id, e.regulation_id, e.author_id, a.full_name, e.target_employee_id, t.full_name,
                     e.content, e.attachment_data, e.attachment_name, e.deadline, e.status,
                     e.created_at, e.updated_at,
-                    (SELECT COUNT(*) FROM regulation_replies rr WHERE rr.entry_id = e.id)
+                    (SELECT COUNT(*) FROM regulation_replies rr WHERE rr.entry_id = e.id),
+                    e.edited_at, e.is_deleted
              FROM regulation_entries e
              JOIN employees a ON a.id = e.author_id
              JOIN employees t ON t.id = e.target_employee_id
@@ -3444,6 +3631,7 @@ impl Db {
             Err(_) => return Vec::new(),
         };
         stmt.query_map(params![regulation_id], |row| {
+            let is_deleted: bool = row.get(15)?;
             Ok(RegulationEntryRecord {
                 id: row.get(0)?,
                 regulation_id: row.get(1)?,
@@ -3451,14 +3639,16 @@ impl Db {
                 author_name: row.get(3)?,
                 target_employee_id: row.get(4)?,
                 target_name: row.get(5)?,
-                content: row.get(6)?,
-                attachment_data: row.get(7)?,
-                attachment_name: row.get(8)?,
+                content: if is_deleted { String::new() } else { row.get(6)? },
+                attachment_data: if is_deleted { None } else { row.get(7)? },
+                attachment_name: if is_deleted { None } else { row.get(8)? },
                 deadline: row.get(9)?,
                 status: row.get(10)?,
                 created_at: row.get(11)?,
                 updated_at: row.get(12)?,
                 reply_count: row.get(13)?,
+                edited_at: row.get(14)?,
+                is_deleted,
             })
         })
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
@@ -3474,7 +3664,7 @@ impl Db {
             "SELECT e.id, e.regulation_id, r.reg_number, r.title, r.slug, e.content, e.deadline, e.created_at
              FROM regulation_entries e
              JOIN regulations r ON r.id = e.regulation_id
-             WHERE e.target_employee_id = ?1 AND e.status = 'open' AND r.status = 'active'
+             WHERE e.target_employee_id = ?1 AND e.status = 'open' AND r.status = 'active' AND e.is_deleted = 0
              ORDER BY CASE WHEN e.deadline IS NULL THEN 1 ELSE 0 END, e.deadline ASC, e.created_at ASC",
         ) {
             Ok(s) => s,
@@ -3561,7 +3751,59 @@ impl Db {
             created_at: String::new(),
             updated_at: String::new(),
             reply_count: 0,
+            edited_at: None,
+            is_deleted: false,
         })
+    }
+
+    // Редактирование/удаление своей записи — только автор (строже, чем
+    // update_entry_status/assign_regulation_entry выше, где ещё и владелец
+    // регламента/админ могут управлять статусом/исполнителем — тут именно
+    // "своё", без переопределения). Правит только текст, не трогает
+    // вложение/дедлайн/статус/исполнителя.
+    pub fn edit_regulation_entry_content(&self, actor_id: &str, entry_id: &str, content: &str) -> Result<RegulationEntryRecord, String> {
+        let (author_id, regulation_id, is_deleted): (String, String, bool) = self
+            .conn
+            .query_row(
+                "SELECT author_id, regulation_id, is_deleted FROM regulation_entries WHERE id = ?1",
+                params![entry_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .map_err(|_| "Запись не найдена".to_string())?;
+        if author_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        if is_deleted {
+            return Err("Запись удалена".into());
+        }
+        let content = content.trim();
+        if content.is_empty() {
+            return Err("Запись не может быть пустой".into());
+        }
+        self.conn
+            .execute(
+                "UPDATE regulation_entries SET content = ?1, edited_at = datetime('now') WHERE id = ?2",
+                params![content, entry_id],
+            )
+            .map_err(|e| e.to_string())?;
+        self.list_regulation_entries(&regulation_id)
+            .into_iter()
+            .find(|e| e.id == entry_id)
+            .ok_or_else(|| "Запись не найдена".to_string())
+    }
+
+    pub fn delete_regulation_entry(&self, actor_id: &str, entry_id: &str) -> Result<(), String> {
+        let author_id: String = self
+            .conn
+            .query_row("SELECT author_id FROM regulation_entries WHERE id = ?1", params![entry_id], |row| row.get(0))
+            .map_err(|_| "Запись не найдена".to_string())?;
+        if author_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn
+            .execute("UPDATE regulation_entries SET is_deleted = 1 WHERE id = ?1", params![entry_id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
     }
 
     pub fn assign_regulation_entry(&self, actor_id: &str, entry_id: &str, target_employee_id: &str, deadline: Option<&str>) -> Result<(), String> {
@@ -3608,7 +3850,7 @@ impl Db {
 
     pub fn list_regulation_replies(&self, entry_id: &str) -> Vec<RegulationReplyRecord> {
         let mut stmt = match self.conn.prepare(
-            "SELECT rr.id, rr.entry_id, rr.author_id, e.full_name, rr.content, rr.created_at
+            "SELECT rr.id, rr.entry_id, rr.author_id, e.full_name, rr.content, rr.created_at, rr.edited_at, rr.is_deleted
              FROM regulation_replies rr JOIN employees e ON e.id = rr.author_id
              WHERE rr.entry_id = ?1 ORDER BY rr.created_at ASC",
         ) {
@@ -3616,13 +3858,16 @@ impl Db {
             Err(_) => return Vec::new(),
         };
         stmt.query_map(params![entry_id], |row| {
+            let is_deleted: bool = row.get(7)?;
             Ok(RegulationReplyRecord {
                 id: row.get(0)?,
                 entry_id: row.get(1)?,
                 author_id: row.get(2)?,
                 author_name: row.get(3)?,
-                content: row.get(4)?,
+                content: if is_deleted { String::new() } else { row.get(4)? },
                 created_at: row.get(5)?,
+                edited_at: row.get(6)?,
+                is_deleted,
             })
         })
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
@@ -3668,7 +3913,54 @@ impl Db {
             author_name: author_name.unwrap_or_default(),
             content: content.trim().to_string(),
             created_at: String::new(),
+            edited_at: None,
+            is_deleted: false,
         })
+    }
+
+    pub fn edit_regulation_reply(&self, actor_id: &str, reply_id: &str, content: &str) -> Result<RegulationReplyRecord, String> {
+        let (author_id, entry_id, is_deleted): (String, String, bool) = self
+            .conn
+            .query_row(
+                "SELECT author_id, entry_id, is_deleted FROM regulation_replies WHERE id = ?1",
+                params![reply_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .map_err(|_| "Ответ не найден".to_string())?;
+        if author_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        if is_deleted {
+            return Err("Ответ удалён".into());
+        }
+        let content = content.trim();
+        if content.is_empty() {
+            return Err("Ответ не может быть пустым".into());
+        }
+        self.conn
+            .execute(
+                "UPDATE regulation_replies SET content = ?1, edited_at = datetime('now') WHERE id = ?2",
+                params![content, reply_id],
+            )
+            .map_err(|e| e.to_string())?;
+        self.list_regulation_replies(&entry_id)
+            .into_iter()
+            .find(|r| r.id == reply_id)
+            .ok_or_else(|| "Ответ не найден".to_string())
+    }
+
+    pub fn delete_regulation_reply(&self, actor_id: &str, reply_id: &str) -> Result<(), String> {
+        let author_id: String = self
+            .conn
+            .query_row("SELECT author_id FROM regulation_replies WHERE id = ?1", params![reply_id], |row| row.get(0))
+            .map_err(|_| "Ответ не найден".to_string())?;
+        if author_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn
+            .execute("UPDATE regulation_replies SET is_deleted = 1 WHERE id = ?1", params![reply_id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
     }
 
     // ---- Напоминания по задачам регламента ----

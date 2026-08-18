@@ -277,6 +277,10 @@ struct ProjectChatMessage {
     created_at: String,
     #[serde(rename = "replyCount")]
     reply_count: i64,
+    #[serde(rename = "editedAt")]
+    edited_at: Option<String>,
+    #[serde(rename = "isDeleted")]
+    is_deleted: bool,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -291,6 +295,10 @@ struct ProjectChatReply {
     content: String,
     #[serde(rename = "createdAt")]
     created_at: String,
+    #[serde(rename = "editedAt")]
+    edited_at: Option<String>,
+    #[serde(rename = "isDeleted")]
+    is_deleted: bool,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -365,6 +373,10 @@ struct RegulationEntry {
     updated_at: String,
     #[serde(rename = "replyCount")]
     reply_count: i64,
+    #[serde(rename = "editedAt")]
+    edited_at: Option<String>,
+    #[serde(rename = "isDeleted")]
+    is_deleted: bool,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -396,6 +408,10 @@ struct RegulationReply {
     content: String,
     #[serde(rename = "createdAt")]
     created_at: String,
+    #[serde(rename = "editedAt")]
+    edited_at: Option<String>,
+    #[serde(rename = "isDeleted")]
+    is_deleted: bool,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -474,6 +490,8 @@ struct ChatMessage {
     sender_id: String,
     #[serde(rename = "senderName")]
     sender_name: String,
+    #[serde(rename = "senderAvatar")]
+    sender_avatar: Option<String>,
     content: String,
     #[serde(rename = "attachmentData")]
     attachment_data: Option<String>,
@@ -483,6 +501,10 @@ struct ChatMessage {
     reply_to_id: Option<String>,
     #[serde(rename = "createdAt")]
     created_at: String,
+    #[serde(rename = "editedAt")]
+    edited_at: Option<String>,
+    #[serde(rename = "isDeleted")]
+    is_deleted: bool,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -1117,6 +1139,91 @@ struct SendChatMessagePayload {
 }
 
 #[derive(serde::Deserialize)]
+struct EditChatMessagePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "messageId")]
+    message_id: String,
+    content: String,
+}
+
+#[derive(serde::Deserialize)]
+struct DeleteChatMessagePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "messageId")]
+    message_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct EditRegulationEntryPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "entryId")]
+    entry_id: String,
+    content: String,
+}
+
+#[derive(serde::Deserialize)]
+struct DeleteRegulationEntryPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "entryId")]
+    entry_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct EditRegulationReplyPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "replyId")]
+    reply_id: String,
+    content: String,
+}
+
+#[derive(serde::Deserialize)]
+struct DeleteRegulationReplyPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "replyId")]
+    reply_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct EditProjectChatMessagePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "messageId")]
+    message_id: String,
+    content: String,
+}
+
+#[derive(serde::Deserialize)]
+struct DeleteProjectChatMessagePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "messageId")]
+    message_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct EditProjectChatReplyPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "replyId")]
+    reply_id: String,
+    content: String,
+}
+
+#[derive(serde::Deserialize)]
+struct DeleteProjectChatReplyPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "replyId")]
+    reply_id: String,
+}
+
+#[derive(serde::Deserialize)]
 struct MarkChatChannelReadPayload {
     #[serde(rename = "employeeId")]
     employee_id: String,
@@ -1362,6 +1469,8 @@ fn to_project_chat_message(m: db::ProjectChatMessageRecord) -> ProjectChatMessag
         status: m.status,
         created_at: m.created_at,
         reply_count: m.reply_count,
+        edited_at: m.edited_at,
+        is_deleted: m.is_deleted,
     }
 }
 
@@ -1373,6 +1482,8 @@ fn to_project_chat_reply(r: db::ProjectChatReplyRecord) -> ProjectChatReply {
         author_name: r.author_name,
         content: r.content,
         created_at: r.created_at,
+        edited_at: r.edited_at,
+        is_deleted: r.is_deleted,
     }
 }
 
@@ -1398,6 +1509,7 @@ fn to_reg_entry(e: db::RegulationEntryRecord) -> RegulationEntry {
         target_employee_id: e.target_employee_id, target_name: e.target_name,
         content: e.content, attachment_data: e.attachment_data, attachment_name: e.attachment_name,
         deadline: e.deadline, status: e.status, created_at: e.created_at, updated_at: e.updated_at, reply_count: e.reply_count,
+        edited_at: e.edited_at, is_deleted: e.is_deleted,
     }
 }
 
@@ -1410,7 +1522,10 @@ fn to_my_task(t: db::MyTaskRecord) -> MyTask {
 }
 
 fn to_reg_reply(r: db::RegulationReplyRecord) -> RegulationReply {
-    RegulationReply { id: r.id, entry_id: r.entry_id, author_id: r.author_id, author_name: r.author_name, content: r.content, created_at: r.created_at }
+    RegulationReply {
+        id: r.id, entry_id: r.entry_id, author_id: r.author_id, author_name: r.author_name, content: r.content, created_at: r.created_at,
+        edited_at: r.edited_at, is_deleted: r.is_deleted,
+    }
 }
 
 fn to_reg_reminder(r: db::RegulationReminderRecord) -> RegulationReminder {
@@ -1454,11 +1569,14 @@ fn to_chat_message(m: db::ChatMessageRecord) -> ChatMessage {
         channel: m.channel,
         sender_id: m.sender_id,
         sender_name: m.sender_name,
+        sender_avatar: m.sender_avatar,
         content: m.content,
         attachment_data: m.attachment_data,
         attachment_name: m.attachment_name,
         reply_to_id: m.reply_to_id,
         created_at: m.created_at,
+        edited_at: m.edited_at,
+        is_deleted: m.is_deleted,
     }
 }
 
@@ -1968,6 +2086,18 @@ fn send_project_chat_message(payload: SendProjectChatMessagePayload, state: taur
 }
 
 #[tauri::command]
+fn edit_project_chat_message(payload: EditProjectChatMessagePayload, state: tauri::State<AppState>) -> Result<ProjectChatMessage, String> {
+    let db = state.0.lock().unwrap();
+    db.edit_project_chat_message(&payload.actor_id, &payload.message_id, &payload.content).map(to_project_chat_message)
+}
+
+#[tauri::command]
+fn delete_project_chat_message(payload: DeleteProjectChatMessagePayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.delete_project_chat_message(&payload.actor_id, &payload.message_id)
+}
+
+#[tauri::command]
 fn assign_project_chat_message(payload: AssignProjectChatMessagePayload, state: tauri::State<AppState>) -> Result<(), String> {
     let db = state.0.lock().unwrap();
     db.assign_project_chat_message(&payload.actor_id, &payload.message_id, &payload.target_employee_id, payload.deadline.as_deref())
@@ -1990,6 +2120,18 @@ fn add_project_chat_reply(payload: AddProjectChatReplyPayload, state: tauri::Sta
     let db = state.0.lock().unwrap();
     db.add_project_chat_reply(&payload.actor_id, &payload.message_id, &payload.content)
         .map(to_project_chat_reply)
+}
+
+#[tauri::command]
+fn edit_project_chat_reply(payload: EditProjectChatReplyPayload, state: tauri::State<AppState>) -> Result<ProjectChatReply, String> {
+    let db = state.0.lock().unwrap();
+    db.edit_project_chat_reply(&payload.actor_id, &payload.reply_id, &payload.content).map(to_project_chat_reply)
+}
+
+#[tauri::command]
+fn delete_project_chat_reply(payload: DeleteProjectChatReplyPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.delete_project_chat_reply(&payload.actor_id, &payload.reply_id)
 }
 
 #[tauri::command]
@@ -2062,6 +2204,18 @@ fn add_regulation_entry(payload: AddRegulationEntryPayload, state: tauri::State<
 }
 
 #[tauri::command]
+fn edit_regulation_entry(payload: EditRegulationEntryPayload, state: tauri::State<AppState>) -> Result<RegulationEntry, String> {
+    let db = state.0.lock().unwrap();
+    db.edit_regulation_entry_content(&payload.actor_id, &payload.entry_id, &payload.content).map(to_reg_entry)
+}
+
+#[tauri::command]
+fn delete_regulation_entry(payload: DeleteRegulationEntryPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.delete_regulation_entry(&payload.actor_id, &payload.entry_id)
+}
+
+#[tauri::command]
 fn assign_regulation_entry(payload: AssignRegulationEntryPayload, state: tauri::State<AppState>) -> Result<(), String> {
     let db = state.0.lock().unwrap();
     db.assign_regulation_entry(&payload.actor_id, &payload.entry_id, &payload.target_employee_id, payload.deadline.as_deref())
@@ -2084,6 +2238,18 @@ fn add_regulation_reply(payload: AddRegulationReplyPayload, state: tauri::State<
     let db = state.0.lock().unwrap();
     db.add_regulation_reply(&payload.actor_id, &payload.entry_id, &payload.content)
         .map(to_reg_reply)
+}
+
+#[tauri::command]
+fn edit_regulation_reply(payload: EditRegulationReplyPayload, state: tauri::State<AppState>) -> Result<RegulationReply, String> {
+    let db = state.0.lock().unwrap();
+    db.edit_regulation_reply(&payload.actor_id, &payload.reply_id, &payload.content).map(to_reg_reply)
+}
+
+#[tauri::command]
+fn delete_regulation_reply(payload: DeleteRegulationReplyPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.delete_regulation_reply(&payload.actor_id, &payload.reply_id)
 }
 
 #[tauri::command]
@@ -2250,6 +2416,18 @@ fn send_chat_message(payload: SendChatMessagePayload, state: tauri::State<AppSta
         payload.reply_to_id.as_deref(),
     )
     .map(to_chat_message)
+}
+
+#[tauri::command]
+fn edit_chat_message(payload: EditChatMessagePayload, state: tauri::State<AppState>) -> Result<ChatMessage, String> {
+    let db = state.0.lock().unwrap();
+    db.edit_chat_message(&payload.actor_id, &payload.message_id, &payload.content).map(to_chat_message)
+}
+
+#[tauri::command]
+fn delete_chat_message(payload: DeleteChatMessagePayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.delete_chat_message(&payload.actor_id, &payload.message_id)
 }
 
 #[tauri::command]
@@ -2457,10 +2635,14 @@ fn main() {
             transfer_project_ownership,
             list_project_chat,
             send_project_chat_message,
+            edit_project_chat_message,
+            delete_project_chat_message,
             assign_project_chat_message,
             update_project_chat_message_status,
             list_project_chat_replies,
             add_project_chat_reply,
+            edit_project_chat_reply,
+            delete_project_chat_reply,
             list_regulations,
             get_regulation,
             create_regulation,
@@ -2472,10 +2654,14 @@ fn main() {
             list_regulation_entries,
             list_my_open_tasks,
             add_regulation_entry,
+            edit_regulation_entry,
+            delete_regulation_entry,
             assign_regulation_entry,
             update_entry_status,
             list_regulation_replies,
             add_regulation_reply,
+            edit_regulation_reply,
+            delete_regulation_reply,
             add_regulation_reminder,
             list_regulation_reminders,
             update_regulation_entry_deadline,
@@ -2498,6 +2684,8 @@ fn main() {
             remove_chat_group_member,
             join_chat_group_by_invite,
             send_chat_message,
+            edit_chat_message,
+            delete_chat_message,
             mark_chat_channel_read,
             get_server_settings,
             set_server_settings,

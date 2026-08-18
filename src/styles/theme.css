@@ -2545,6 +2545,27 @@ button.employees-add-btn {
 
 .reg-entry-content { font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
 
+/* Инлайн-редактирование своего сообщения/записи/ответа на месте — вместо
+   .reg-entry-content, без завязки на композер внизу (см. IB Чат/Регламенты/
+   Проекты). */
+.reg-inline-edit textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+}
+.reg-inline-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 6px;
+}
+
 .reg-chat-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 .reg-entry-badge-open { background: color-mix(in srgb, var(--color-primary) 20%, transparent); color: var(--color-primary); }
 .reg-entry-badge-done { background: color-mix(in srgb, var(--color-success) 18%, transparent); color: var(--color-success); }

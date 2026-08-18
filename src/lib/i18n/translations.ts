@@ -1,6 +1,10 @@
 export const dictionaries = {
   ru: {
-    common: { loading: 'Загрузка…', cancel: 'Отмена', save: 'Сохранить', close: 'Закрыть', loadError: 'Не удалось загрузить данные. Проверьте соединение и попробуйте ещё раз.', retryBtn: 'Повторить', download: 'Скачать' },
+    common: {
+      loading: 'Загрузка…', cancel: 'Отмена', save: 'Сохранить', close: 'Закрыть', loadError: 'Не удалось загрузить данные. Проверьте соединение и попробуйте ещё раз.', retryBtn: 'Повторить', download: 'Скачать',
+      editBtn: 'Редактировать', deleteBtn: 'Удалить', editedLabel: '(изменено)', messageDeleted: 'Сообщение удалено',
+      editSaveBtn: 'Сохранить', editCancelBtn: 'Отмена', deleteConfirmTitle: 'Удалить сообщение?', deleteConfirmBody: 'Действие необратимо — сообщение нельзя будет восстановить.',
+    },
     firstRun: {
       title: 'Первый запуск IB CRM',
       subtitle:
@@ -713,7 +717,11 @@ export const dictionaries = {
     },
   },
   uz: {
-    common: { loading: 'Yuklanmoqda…', cancel: 'Bekor qilish', save: 'Saqlash', close: 'Yopish', loadError: "Ma'lumotlarni yuklab bo'lmadi. Ulanishni tekshirib, qayta urinib ko'ring.", retryBtn: 'Qayta urinish', download: 'Yuklab olish' },
+    common: {
+      loading: 'Yuklanmoqda…', cancel: 'Bekor qilish', save: 'Saqlash', close: 'Yopish', loadError: "Ma'lumotlarni yuklab bo'lmadi. Ulanishni tekshirib, qayta urinib ko'ring.", retryBtn: 'Qayta urinish', download: 'Yuklab olish',
+      editBtn: 'Tahrirlash', deleteBtn: "O'chirish", editedLabel: '(tahrirlangan)', messageDeleted: "Xabar o'chirildi",
+      editSaveBtn: 'Saqlash', editCancelBtn: 'Bekor qilish', deleteConfirmTitle: "Xabarni o'chirish?", deleteConfirmBody: "Amalni ortga qaytarib bo'lmaydi — xabarni tiklab bo'lmaydi.",
+    },
     firstRun: {
       title: 'IB CRM birinchi ishga tushirish',
       subtitle:
@@ -1427,7 +1435,11 @@ export const dictionaries = {
     },
   },
   'uz-cyrl': {
-    common: { loading: 'Юкланмоқда…', cancel: 'Бекор қилиш', save: 'Сақлаш', close: 'Ёпиш', loadError: "Маълумотларни юклаб бўлмади. Уланишни текшириб, қайта уриниб кўринг.", retryBtn: 'Қайта уриниш', download: 'Юклаб олиш' },
+    common: {
+      loading: 'Юкланмоқда…', cancel: 'Бекор қилиш', save: 'Сақлаш', close: 'Ёпиш', loadError: "Маълумотларни юклаб бўлмади. Уланишни текшириб, қайта уриниб кўринг.", retryBtn: 'Қайта уриниш', download: 'Юклаб олиш',
+      editBtn: 'Таҳрирлаш', deleteBtn: 'Ўчириш', editedLabel: '(таҳрирланган)', messageDeleted: 'Хабар ўчирилди',
+      editSaveBtn: 'Сақлаш', editCancelBtn: 'Бекор қилиш', deleteConfirmTitle: 'Хабарни ўчириш?', deleteConfirmBody: 'Амални ортга қайтариб бўлмайди — хабарни тиклаб бўлмайди.',
+    },
     firstRun: {
       title: 'IB CRM биринчи ишга тушириш',
       subtitle:

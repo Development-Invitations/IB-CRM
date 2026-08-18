@@ -169,6 +169,8 @@ export type ProjectChatMessage = {
   status: RegulationEntryStatus;
   createdAt: string;
   replyCount: number;
+  editedAt: string | null;
+  isDeleted: boolean;
 };
 
 export type ProjectChatReply = {
@@ -178,6 +180,8 @@ export type ProjectChatReply = {
   authorName: string;
   content: string;
   createdAt: string;
+  editedAt: string | null;
+  isDeleted: boolean;
 };
 
 export type RegulationStatus = 'active' | 'closed';
@@ -227,6 +231,8 @@ export type RegulationEntry = {
   createdAt: string;
   updatedAt: string;
   replyCount: number;
+  editedAt: string | null;
+  isDeleted: boolean;
 };
 
 export type MyTask = {
@@ -247,6 +253,8 @@ export type RegulationReply = {
   authorName: string;
   content: string;
   createdAt: string;
+  editedAt: string | null;
+  isDeleted: boolean;
 };
 
 export type RegulationReminder = {
@@ -292,11 +300,14 @@ export type ChatMessage = {
   channel: string;
   senderId: string;
   senderName: string;
+  senderAvatar: string | null;
   content: string;
   attachmentData: string | null;
   attachmentName: string | null;
   replyToId: string | null;
   createdAt: string;
+  editedAt: string | null;
+  isDeleted: boolean;
 };
 
 export type DmChannelSummary = {
@@ -631,6 +642,11 @@ export const api = {
   sendProjectChatMessage: (payload: { actorId: string; projectId: string; targetEmployeeId: string; content: string; attachmentData?: string | null; attachmentName?: string | null; deadline?: string | null }) =>
     invoke<ProjectChatMessage>('send_project_chat_message', { payload }),
 
+  editProjectChatMessage: (payload: { actorId: string; messageId: string; content: string }) =>
+    invoke<ProjectChatMessage>('edit_project_chat_message', { payload }),
+  deleteProjectChatMessage: (payload: { actorId: string; messageId: string }) =>
+    invoke<void>('delete_project_chat_message', { payload }),
+
   assignProjectChatMessage: (payload: { actorId: string; messageId: string; targetEmployeeId: string; deadline?: string | null }) =>
     invoke<void>('assign_project_chat_message', { payload }),
 
@@ -641,6 +657,10 @@ export const api = {
 
   addProjectChatReply: (payload: { actorId: string; messageId: string; content: string }) =>
     invoke<ProjectChatReply>('add_project_chat_reply', { payload }),
+  editProjectChatReply: (payload: { actorId: string; replyId: string; content: string }) =>
+    invoke<ProjectChatReply>('edit_project_chat_reply', { payload }),
+  deleteProjectChatReply: (payload: { actorId: string; replyId: string }) =>
+    invoke<void>('delete_project_chat_reply', { payload }),
 
   listRegulations: () => invoke<Regulation[]>('list_regulations'),
   getRegulation: (id: string) => invoke<Regulation | null>('get_regulation', { id }),
@@ -660,6 +680,10 @@ export const api = {
   listMyOpenTasks: (employeeId: string) => invoke<MyTask[]>('list_my_open_tasks', { employeeId }),
   addRegulationEntry: (payload: { actorId: string; regulationId: string; targetEmployeeId: string; content: string; attachmentData?: string | null; attachmentName?: string | null; deadline?: string | null }) =>
     invoke<RegulationEntry>('add_regulation_entry', { payload }),
+  editRegulationEntry: (payload: { actorId: string; entryId: string; content: string }) =>
+    invoke<RegulationEntry>('edit_regulation_entry', { payload }),
+  deleteRegulationEntry: (payload: { actorId: string; entryId: string }) =>
+    invoke<void>('delete_regulation_entry', { payload }),
   assignRegulationEntry: (payload: { actorId: string; entryId: string; targetEmployeeId: string; deadline?: string | null }) =>
     invoke<void>('assign_regulation_entry', { payload }),
   updateEntryStatus: (payload: { actorId: string; entryId: string; status: RegulationEntryStatus }) =>
@@ -668,6 +692,10 @@ export const api = {
   listRegulationReplies: (entryId: string) => invoke<RegulationReply[]>('list_regulation_replies', { entryId }),
   addRegulationReply: (payload: { actorId: string; entryId: string; content: string }) =>
     invoke<RegulationReply>('add_regulation_reply', { payload }),
+  editRegulationReply: (payload: { actorId: string; replyId: string; content: string }) =>
+    invoke<RegulationReply>('edit_regulation_reply', { payload }),
+  deleteRegulationReply: (payload: { actorId: string; replyId: string }) =>
+    invoke<void>('delete_regulation_reply', { payload }),
 
   addRegulationReminder: (payload: {
     actorId: string;
@@ -706,6 +734,10 @@ export const api = {
     attachmentName?: string | null;
     replyToId?: string | null;
   }) => invoke<ChatMessage>('send_chat_message', { payload }),
+  editChatMessage: (payload: { actorId: string; messageId: string; content: string }) =>
+    invoke<ChatMessage>('edit_chat_message', { payload }),
+  deleteChatMessage: (payload: { actorId: string; messageId: string }) =>
+    invoke<void>('delete_chat_message', { payload }),
   markChatChannelRead: (payload: { employeeId: string; channel: string }) =>
     invoke<void>('mark_chat_channel_read', { payload }),
   listMyDmChannels: (employeeId: string) => invoke<DmChannelSummary[]>('list_my_dm_channels', { employeeId }),

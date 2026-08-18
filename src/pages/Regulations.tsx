@@ -60,6 +60,7 @@ function EntryRow({
   onStatusChange,
   onAddReply,
   onAssign,
+  onEntryChanged,
   t,
 }: {
   entry: RegulationEntry;
@@ -70,9 +71,11 @@ function EntryRow({
   onStatusChange: (entryId: string, status: RegulationEntryStatus) => void;
   onAddReply: (entryId: string, content: string) => Promise<void>;
   onAssign: (entryId: string, targetEmployeeId: string, deadline: string) => Promise<void>;
+  onEntryChanged: () => void;
   t: (k: string) => string;
 }) {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [replies, setReplies] = useState<RegulationReply[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [replyText, setReplyText] = useState('');
@@ -83,6 +86,87 @@ function EntryRow({
   const [assignTo, setAssignTo] = useState('');
   const [assignDeadline, setAssignDeadline] = useState(entry.deadline ?? '');
   const [assignBusy, setAssignBusy] = useState(false);
+
+  const [entryEditing, setEntryEditing] = useState(false);
+  const [entryEditDraft, setEntryEditDraft] = useState('');
+  const [entryEditBusy, setEntryEditBusy] = useState(false);
+  const [entryDeleteConfirm, setEntryDeleteConfirm] = useState(false);
+  const [entryDeleteBusy, setEntryDeleteBusy] = useState(false);
+
+  const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
+  const [replyEditDraft, setReplyEditDraft] = useState('');
+  const [replyEditBusy, setReplyEditBusy] = useState(false);
+  const [deleteReplyConfirmId, setDeleteReplyConfirmId] = useState<string | null>(null);
+  const [deleteReplyBusy, setDeleteReplyBusy] = useState(false);
+
+  const startEditEntry = () => {
+    setEntryEditing(true);
+    setEntryEditDraft(entry.content);
+  };
+  const cancelEditEntry = () => {
+    setEntryEditing(false);
+    setEntryEditDraft('');
+  };
+  const saveEditEntry = async () => {
+    if (!entryEditDraft.trim()) return;
+    setEntryEditBusy(true);
+    try {
+      await api.editRegulationEntry({ actorId: currentEmployee.id, entryId: entry.id, content: entryEditDraft.trim() });
+      setEntryEditing(false);
+      onEntryChanged();
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('regulations.errorGeneric'));
+    } finally {
+      setEntryEditBusy(false);
+    }
+  };
+  const handleDeleteEntry = async () => {
+    setEntryDeleteBusy(true);
+    try {
+      await api.deleteRegulationEntry({ actorId: currentEmployee.id, entryId: entry.id });
+      setEntryDeleteConfirm(false);
+      onEntryChanged();
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('regulations.errorGeneric'));
+    } finally {
+      setEntryDeleteBusy(false);
+    }
+  };
+
+  const startEditReply = (r: RegulationReply) => {
+    setEditingReplyId(r.id);
+    setReplyEditDraft(r.content);
+  };
+  const cancelEditReply = () => {
+    setEditingReplyId(null);
+    setReplyEditDraft('');
+  };
+  const saveEditReply = async () => {
+    if (!editingReplyId || !replyEditDraft.trim()) return;
+    setReplyEditBusy(true);
+    try {
+      await api.editRegulationReply({ actorId: currentEmployee.id, replyId: editingReplyId, content: replyEditDraft.trim() });
+      setEditingReplyId(null);
+      await loadReplies();
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('regulations.errorGeneric'));
+    } finally {
+      setReplyEditBusy(false);
+    }
+  };
+  const handleDeleteReply = async () => {
+    if (!deleteReplyConfirmId) return;
+    setDeleteReplyBusy(true);
+    try {
+      await api.deleteRegulationReply({ actorId: currentEmployee.id, replyId: deleteReplyConfirmId });
+      setDeleteReplyConfirmId(null);
+      await loadReplies();
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('regulations.errorGeneric'));
+    } finally {
+      setDeleteReplyBusy(false);
+    }
+  };
 
   const loadReplies = async () => {
     const data = await api.listRegulationReplies(entry.id);
@@ -142,92 +226,152 @@ function EntryRow({
           <div className="reg-entry-meta">
             <strong>{entry.authorName}</strong>
             <span className="settings-hint">{parseSqliteUtc(entry.createdAt).toLocaleString()}</span>
+            {!entry.isDeleted && entry.editedAt && <span className="settings-hint">{t('common.editedLabel')}</span>}
           </div>
-          <div className="reg-entry-actions">
-            <button className="reg-action-btn" onClick={handleCopyLink} title={t('regulations.copyEntryLink')}>
-              {copiedLink ? <Check size={13} /> : <Link2 size={13} />}
-            </button>
-            {canManage && !isClosed && (
-              <>
-                {entry.status !== 'done' && (
-                  <button className="reg-action-btn done" onClick={() => onStatusChange(entry.id, 'done')} title={t('regulations.markDoneBtn')}>
-                    <CheckSquare size={14} />
+          {!entry.isDeleted && (
+            <div className="reg-entry-actions">
+              <button className="reg-action-btn" onClick={handleCopyLink} title={t('regulations.copyEntryLink')}>
+                {copiedLink ? <Check size={13} /> : <Link2 size={13} />}
+              </button>
+              {isOwn && (
+                <>
+                  <button className="reg-action-btn" onClick={startEditEntry} title={t('common.editBtn')}>
+                    <Pencil size={13} />
                   </button>
-                )}
-                {entry.status === 'open' && (
-                  <button className="reg-action-btn cancel" onClick={() => onStatusChange(entry.id, 'cancelled')} title={t('regulations.markCancelBtn')}>
-                    <XSquare size={14} />
+                  <button className="reg-action-btn" onClick={() => setEntryDeleteConfirm(true)} title={t('common.deleteBtn')}>
+                    <Trash2 size={13} />
                   </button>
-                )}
-                {entry.status !== 'open' && (
-                  <button className="reg-action-btn reopen" onClick={() => onStatusChange(entry.id, 'open')} title={t('regulations.reopenEntryBtn')}>
-                    <RotateCcw size={14} />
+                </>
+              )}
+              {canManage && !isClosed && (
+                <>
+                  {entry.status !== 'done' && (
+                    <button className="reg-action-btn done" onClick={() => onStatusChange(entry.id, 'done')} title={t('regulations.markDoneBtn')}>
+                      <CheckSquare size={14} />
+                    </button>
+                  )}
+                  {entry.status === 'open' && (
+                    <button className="reg-action-btn cancel" onClick={() => onStatusChange(entry.id, 'cancelled')} title={t('regulations.markCancelBtn')}>
+                      <XSquare size={14} />
+                    </button>
+                  )}
+                  {entry.status !== 'open' && (
+                    <button className="reg-action-btn reopen" onClick={() => onStatusChange(entry.id, 'open')} title={t('regulations.reopenEntryBtn')}>
+                      <RotateCcw size={14} />
+                    </button>
+                  )}
+                  <button className="reg-action-btn" onClick={() => { setAssignOpen((v) => !v); setAssignTo(''); }} title={t('regulations.assignBtn')}>
+                    <Forward size={14} />
                   </button>
-                )}
-                <button className="reg-action-btn" onClick={() => { setAssignOpen((v) => !v); setAssignTo(''); }} title={t('regulations.assignBtn')}>
-                  <Forward size={14} />
-                </button>
-              </>
-            )}
-          </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
-        <div className="reg-entry-content">{linkifyEntryContent(entry.content, navigate)}</div>
-
-        <div className="reg-chat-chips">
-          <span className={`absence-status reg-entry-badge-${entry.status}`}>{t(ENTRY_STATUS_KEYS[entry.status])}</span>
-          {entry.deadline && <span className="reg-chip-deadline">📅 {entry.deadline}</span>}
-        </div>
-
-        {entry.attachmentData && (
-          <AttachmentPreview dataUrl={entry.attachmentData} name={entry.attachmentName} onExpand={() => setLightbox(true)} />
-        )}
-
-        {assignOpen && (
-          <div className="reg-assign-form">
-            <SearchableSelect
-              value={assignTo}
-              options={assigneeOptions}
-              onChange={setAssignTo}
-              searchPlaceholder={t('employees.searchPlaceholder')}
-              emptyLabel={t('employees.searchEmpty')}
-            />
-            <input type="date" value={assignDeadline} onChange={(e) => setAssignDeadline(e.target.value)} />
-            <button className="modal-btn" onClick={handleAssignSubmit} disabled={!assignTo || assignBusy}>
-              <Forward size={12} /> {t('regulations.assignConfirmBtn')}
-            </button>
-            <button className="modal-btn" onClick={() => setAssignOpen(false)}><X size={12} /></button>
-          </div>
-        )}
-
-        <button className="link-btn reg-replies-toggle" onClick={toggle}>
-          {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-          {t('regulations.repliesTitle')} {entry.replyCount > 0 ? `(${entry.replyCount})` : ''}
-        </button>
-
-        {expanded && (
-          <div className="reg-replies">
-            {replies.map((r) => (
-              <div key={r.id} className="reg-reply">
-                <div className="reg-reply-meta">
-                  <strong>{r.authorName}</strong>
-                  <span className="settings-hint">{parseSqliteUtc(r.createdAt).toLocaleString()}</span>
+        {entry.isDeleted ? (
+          <p className="settings-hint">{t('common.messageDeleted')}</p>
+        ) : (
+          <>
+            {entryEditing ? (
+              <div className="reg-inline-edit">
+                <textarea value={entryEditDraft} onChange={(e) => setEntryEditDraft(e.target.value)} rows={3} />
+                <div className="reg-inline-edit-actions">
+                  <button className="modal-btn" onClick={cancelEditEntry}>{t('common.editCancelBtn')}</button>
+                  <button className="modal-btn danger" onClick={saveEditEntry} disabled={!entryEditDraft.trim() || entryEditBusy}>
+                    {t('common.editSaveBtn')}
+                  </button>
                 </div>
-                <div>{linkifyEntryContent(r.content, navigate)}</div>
               </div>
-            ))}
-            {!isClosed && (
-              <div className="reg-reply-form">
-                <input
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  placeholder={t('regulations.addReplyPlaceholder')}
-                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleReply()}
+            ) : (
+              <div className="reg-entry-content">{linkifyEntryContent(entry.content, navigate)}</div>
+            )}
+
+            <div className="reg-chat-chips">
+              <span className={`absence-status reg-entry-badge-${entry.status}`}>{t(ENTRY_STATUS_KEYS[entry.status])}</span>
+              {entry.deadline && <span className="reg-chip-deadline">📅 {entry.deadline}</span>}
+            </div>
+
+            {entry.attachmentData && (
+              <AttachmentPreview dataUrl={entry.attachmentData} name={entry.attachmentName} onExpand={() => setLightbox(true)} />
+            )}
+
+            {assignOpen && (
+              <div className="reg-assign-form">
+                <SearchableSelect
+                  value={assignTo}
+                  options={assigneeOptions}
+                  onChange={setAssignTo}
+                  searchPlaceholder={t('employees.searchPlaceholder')}
+                  emptyLabel={t('employees.searchEmpty')}
                 />
-                <button className="modal-btn" onClick={handleReply} disabled={!replyText.trim() || replyBusy}>↵</button>
+                <input type="date" value={assignDeadline} onChange={(e) => setAssignDeadline(e.target.value)} />
+                <button className="modal-btn" onClick={handleAssignSubmit} disabled={!assignTo || assignBusy}>
+                  <Forward size={12} /> {t('regulations.assignConfirmBtn')}
+                </button>
+                <button className="modal-btn" onClick={() => setAssignOpen(false)}><X size={12} /></button>
               </div>
             )}
-          </div>
+
+            <button className="link-btn reg-replies-toggle" onClick={toggle}>
+              {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+              {t('regulations.repliesTitle')} {entry.replyCount > 0 ? `(${entry.replyCount})` : ''}
+            </button>
+
+            {expanded && (
+              <div className="reg-replies">
+                {replies.map((r) => {
+                  const isOwnReply = r.authorId === currentEmployee.id;
+                  const isEditingReply = editingReplyId === r.id;
+                  return (
+                    <div key={r.id} className="reg-reply">
+                      <div className="reg-reply-meta">
+                        <strong>{r.authorName}</strong>
+                        <span className="settings-hint">{parseSqliteUtc(r.createdAt).toLocaleString()}</span>
+                        {!r.isDeleted && r.editedAt && <span className="settings-hint">{t('common.editedLabel')}</span>}
+                        {isOwnReply && !r.isDeleted && (
+                          <div className="reg-entry-actions" style={{ marginLeft: 'auto' }}>
+                            <button className="reg-action-btn" onClick={() => startEditReply(r)} title={t('common.editBtn')}>
+                              <Pencil size={12} />
+                            </button>
+                            <button className="reg-action-btn" onClick={() => setDeleteReplyConfirmId(r.id)} title={t('common.deleteBtn')}>
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {r.isDeleted ? (
+                        <p className="settings-hint">{t('common.messageDeleted')}</p>
+                      ) : isEditingReply ? (
+                        <div className="reg-inline-edit">
+                          <textarea value={replyEditDraft} onChange={(e) => setReplyEditDraft(e.target.value)} rows={2} />
+                          <div className="reg-inline-edit-actions">
+                            <button className="modal-btn" onClick={cancelEditReply}>{t('common.editCancelBtn')}</button>
+                            <button className="modal-btn danger" onClick={saveEditReply} disabled={!replyEditDraft.trim() || replyEditBusy}>
+                              {t('common.editSaveBtn')}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>{linkifyEntryContent(r.content, navigate)}</div>
+                      )}
+                    </div>
+                  );
+                })}
+                {!isClosed && (
+                  <div className="reg-reply-form">
+                    <input
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      placeholder={t('regulations.addReplyPlaceholder')}
+                      onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleReply()}
+                    />
+                    <button className="modal-btn" onClick={handleReply} disabled={!replyText.trim() || replyBusy}>↵</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -237,6 +381,42 @@ function EntryRow({
           <button className="reg-lightbox-close" onClick={() => setLightbox(false)}><X size={20} /></button>
         </div>
       )}
+
+      <Modal
+        open={entryDeleteConfirm}
+        title={t('common.deleteConfirmTitle')}
+        onClose={() => setEntryDeleteConfirm(false)}
+        actions={
+          <>
+            <button className="modal-btn" onClick={() => setEntryDeleteConfirm(false)} disabled={entryDeleteBusy}>
+              {t('common.cancel')}
+            </button>
+            <button className="modal-btn danger" onClick={handleDeleteEntry} disabled={entryDeleteBusy}>
+              {entryDeleteBusy ? t('common.loading') : t('common.deleteBtn')}
+            </button>
+          </>
+        }
+      >
+        {t('common.deleteConfirmBody')}
+      </Modal>
+
+      <Modal
+        open={!!deleteReplyConfirmId}
+        title={t('common.deleteConfirmTitle')}
+        onClose={() => setDeleteReplyConfirmId(null)}
+        actions={
+          <>
+            <button className="modal-btn" onClick={() => setDeleteReplyConfirmId(null)} disabled={deleteReplyBusy}>
+              {t('common.cancel')}
+            </button>
+            <button className="modal-btn danger" onClick={handleDeleteReply} disabled={deleteReplyBusy}>
+              {deleteReplyBusy ? t('common.loading') : t('common.deleteBtn')}
+            </button>
+          </>
+        }
+      >
+        {t('common.deleteConfirmBody')}
+      </Modal>
     </div>
   );
 }
@@ -904,6 +1084,7 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
                           onStatusChange={handleStatusChange}
                           onAddReply={handleAddReply}
                           onAssign={handleAssignEntry}
+                          onEntryChanged={loadDetail}
                           t={t}
                         />
                       ))

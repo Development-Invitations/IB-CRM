@@ -271,6 +271,14 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
             db.send_project_chat_message(&p.actor_id, &p.project_id, &p.target_employee_id, &p.content, p.attachment_data.as_deref(), p.attachment_name.as_deref(), p.deadline.as_deref())
                 .map(crate::to_project_chat_message).map(to_json)
         }
+        "edit_project_chat_message" => {
+            let p: crate::EditProjectChatMessagePayload = from_payload(payload)?;
+            db.edit_project_chat_message(&p.actor_id, &p.message_id, &p.content).map(crate::to_project_chat_message).map(to_json)
+        }
+        "delete_project_chat_message" => {
+            let p: crate::DeleteProjectChatMessagePayload = from_payload(payload)?;
+            db.delete_project_chat_message(&p.actor_id, &p.message_id).map(to_json)
+        }
         "assign_project_chat_message" => {
             let p: crate::AssignProjectChatMessagePayload = from_payload(payload)?;
             db.assign_project_chat_message(&p.actor_id, &p.message_id, &p.target_employee_id, p.deadline.as_deref()).map(to_json)
@@ -286,6 +294,14 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
         "add_project_chat_reply" => {
             let p: crate::AddProjectChatReplyPayload = from_payload(payload)?;
             db.add_project_chat_reply(&p.actor_id, &p.message_id, &p.content).map(crate::to_project_chat_reply).map(to_json)
+        }
+        "edit_project_chat_reply" => {
+            let p: crate::EditProjectChatReplyPayload = from_payload(payload)?;
+            db.edit_project_chat_reply(&p.actor_id, &p.reply_id, &p.content).map(crate::to_project_chat_reply).map(to_json)
+        }
+        "delete_project_chat_reply" => {
+            let p: crate::DeleteProjectChatReplyPayload = from_payload(payload)?;
+            db.delete_project_chat_reply(&p.actor_id, &p.reply_id).map(to_json)
         }
 
         // ---- Регламенты ----
@@ -333,6 +349,14 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
             db.add_regulation_entry(&p.actor_id, &p.regulation_id, &p.target_employee_id, &p.content, p.attachment_data.as_deref(), p.attachment_name.as_deref(), p.deadline.as_deref())
                 .map(crate::to_reg_entry).map(to_json)
         }
+        "edit_regulation_entry" => {
+            let p: crate::EditRegulationEntryPayload = from_payload(payload)?;
+            db.edit_regulation_entry_content(&p.actor_id, &p.entry_id, &p.content).map(crate::to_reg_entry).map(to_json)
+        }
+        "delete_regulation_entry" => {
+            let p: crate::DeleteRegulationEntryPayload = from_payload(payload)?;
+            db.delete_regulation_entry(&p.actor_id, &p.entry_id).map(to_json)
+        }
         "assign_regulation_entry" => {
             let p: crate::AssignRegulationEntryPayload = from_payload(payload)?;
             db.assign_regulation_entry(&p.actor_id, &p.entry_id, &p.target_employee_id, p.deadline.as_deref()).map(to_json)
@@ -348,6 +372,14 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
         "add_regulation_reply" => {
             let p: crate::AddRegulationReplyPayload = from_payload(payload)?;
             db.add_regulation_reply(&p.actor_id, &p.entry_id, &p.content).map(crate::to_reg_reply).map(to_json)
+        }
+        "edit_regulation_reply" => {
+            let p: crate::EditRegulationReplyPayload = from_payload(payload)?;
+            db.edit_regulation_reply(&p.actor_id, &p.reply_id, &p.content).map(crate::to_reg_reply).map(to_json)
+        }
+        "delete_regulation_reply" => {
+            let p: crate::DeleteRegulationReplyPayload = from_payload(payload)?;
+            db.delete_regulation_reply(&p.actor_id, &p.reply_id).map(to_json)
         }
         "add_regulation_reminder" => {
             let p: crate::AddRegulationReminderPayload = from_payload(payload)?;
@@ -461,6 +493,14 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
             )
             .map(crate::to_chat_message)
             .map(to_json)
+        }
+        "edit_chat_message" => {
+            let p: crate::EditChatMessagePayload = from_payload(payload)?;
+            db.edit_chat_message(&p.actor_id, &p.message_id, &p.content).map(crate::to_chat_message).map(to_json)
+        }
+        "delete_chat_message" => {
+            let p: crate::DeleteChatMessagePayload = from_payload(payload)?;
+            db.delete_chat_message(&p.actor_id, &p.message_id).map(to_json)
         }
         "mark_chat_channel_read" => {
             let p: crate::MarkChatChannelReadPayload = from_payload(payload)?;

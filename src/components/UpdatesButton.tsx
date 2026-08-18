@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { RefreshCw, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, ChevronDown } from 'lucide-react';
 import Modal from './Modal';
 import LoadingScreen from './LoadingScreen';
+import UpdateProgressView from './UpdateProgressView';
 import { changelog } from '../lib/changelog';
 import { useLocale } from '../lib/i18n';
 import { checkForAppUpdate, restartApp, quitApp, type UpdateCheckResult, type UpdateProgress } from '../lib/updater';
@@ -75,28 +76,13 @@ export default function UpdatesButton() {
         }
       >
         {installing ? (
-          done ? (
-            <div className="update-progress update-progress-done">
-              <CheckCircle2 size={32} className="update-done-icon" />
-              <div className="update-progress-label">
-                {finishKind === 'restart' ? t('updates.installedRestarting') : t('updates.installedQuitting')}
-              </div>
-            </div>
-          ) : (
-            <div className="update-progress">
-              <div className="update-progress-label">
-                {percent !== null
-                  ? t('updates.downloading', { percent: String(percent) })
-                  : t('updates.downloadingIndeterminate')}
-              </div>
-              <div className="progress-track">
-                <div
-                  className={`progress-fill ${percent === null ? 'indeterminate' : ''}`}
-                  style={percent !== null ? { width: `${percent}%` } : undefined}
-                />
-              </div>
-            </div>
-          )
+          <UpdateProgressView
+            percent={percent}
+            downloaded={progress?.downloaded ?? 0}
+            total={progress?.total ?? null}
+            done={done}
+            isRestart={finishKind === 'restart'}
+          />
         ) : (
           <>
             <div className="updates-online-check">

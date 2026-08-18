@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2 } from 'lucide-react';
 import Modal from './Modal';
+import UpdateProgressView from './UpdateProgressView';
 import { checkForAppUpdate, restartApp, quitApp, type UpdateCheckResult, type UpdateProgress } from '../lib/updater';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
@@ -91,27 +91,14 @@ export default function UpdateNotifier() {
     >
       {!installing ? (
         (result.status === 'available' ? result.notes : undefined) || t(isRestart ? 'updates.availableBody' : 'updates.serverNewerBody')
-      ) : done ? (
-        <div className="update-progress update-progress-done">
-          <CheckCircle2 size={32} className="update-done-icon" />
-          <div className="update-progress-label">
-            {isRestart ? t('updates.installedRestarting') : t('updates.installedQuitting')}
-          </div>
-        </div>
       ) : (
-        <div className="update-progress">
-          <div className="update-progress-label">
-            {percent !== null
-              ? t('updates.downloading', { percent: String(percent) })
-              : t('updates.downloadingIndeterminate')}
-          </div>
-          <div className="progress-track">
-            <div
-              className={`progress-fill ${percent === null ? 'indeterminate' : ''}`}
-              style={percent !== null ? { width: `${percent}%` } : undefined}
-            />
-          </div>
-        </div>
+        <UpdateProgressView
+          percent={percent}
+          downloaded={progress?.downloaded ?? 0}
+          total={progress?.total ?? null}
+          done={done}
+          isRestart={isRestart}
+        />
       )}
     </Modal>
   );

@@ -122,80 +122,117 @@ export default function Topbar({ employee }: { employee: Employee }) {
       .catch(() => {});
   };
 
+  // Создаёт окно 'toast' с нуля и ждёт двух вещей: что нативное окно вообще
+  // появилось (tauri://created) и что его веб-контент домонтировался и
+  // подписался на 'toast-show' (хэндшейк 'toast-ready', см. ToastWindow.tsx) —
+  // без второго ожидания emit() на первом показе уходил в никуда (см. журнал
+  // v0.2.14 в docs/TZ.md).
+  const createToastWindow = async (x: number, y: number) => {
+    const win = new WebviewWindow('toast', {
+      url: 'index.html#/toast',
+      width: TOAST_WIDTH,
+      height: TOAST_HEIGHT,
+      x,
+      y,
+      decorations: false,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      resizable: false,
+      shadow: true,
+      transparent: true,
+      focus: false,
+      visible: false,
+    });
+    await new Promise<void>((resolve) => {
+      win.once('tauri://created', () => resolve());
+      win.once('tauri://error', () => resolve());
+    });
+    await new Promise<void>((resolve) => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        resolve();
+      };
+      const timeoutId = setTimeout(finish, 2000);
+      listen('toast-ready', () => {
+        clearTimeout(timeoutId);
+        finish();
+      }).catch(finish);
+    });
+    return win;
+  };
+
   // Собственное окно-баннер (вместо системного тоста Windows — тот нельзя ни
   // стилизовать под темы приложения, ни заставить висеть до явного закрытия,
   // см. журнал v0.2.6/v0.2.7 в docs/TZ.md). Окно создаётся один раз и
   // переиспользуется — на новое уведомление просто обновляем его содержимое.
-  const showToast = async (n: Notification) => {
-    try {
-      const target = resolveNotificationTarget(n);
-      const payload: ToastPayload = {
-        notificationId: n.id,
-        title: n.title,
-        body: n.body,
-        path: target.kind === 'navigate' ? target.path : `/dashboard/employees/${employee.id}`,
-        navState: target.kind === 'navigate' ? target.state : { reviewKind: target.kind, reviewId: target.id },
-        kind: notificationKind(n),
-      };
+  //
+  // Раньше повторное использование (ветка else — setPosition/show на уже
+  // существующем окне) была одной операцией без собственной обработки ошибок:
+  // если старый хэндл окна оказывался нерабочим (например, после серии
+  // hide()/show() в WebView2), setPosition/show/emit тихо падали — весь catch
+  // был один на всю функцию и просто проглатывал ошибку, так что второе и
+  // последующие уведомления после первого успешного могли молча не
+  // показываться. Теперь ветка переиспользования обёрнута в свой try — при
+  // сбое старое окно закрывается и создаётся заново с нуля (тем же путём,
+  // что и самое первое уведомление после запуска), вместо того чтобы просто
+  // сдаться.
+  const showToastNow = async (n: Notification) => {
+    const target = resolveNotificationTarget(n);
+    const payload: ToastPayload = {
+      notificationId: n.id,
+      title: n.title,
+      body: n.body,
+      path: target.kind === 'navigate' ? target.path : `/dashboard/employees/${employee.id}`,
+      navState: target.kind === 'navigate' ? target.state : { reviewKind: target.kind, reviewId: target.id },
+      kind: notificationKind(n),
+    };
 
-      let win = await WebviewWindow.getByLabel('toast');
+    // Позиция считается каждый показ (не только при создании окна) — иначе
+    // смена угла в Настройках не подействует до перезапуска приложения, ведь
+    // окно 'toast' создаётся один раз и живёт всю сессию.
+    const monitor = await primaryMonitor();
+    const scale = monitor?.scaleFactor ?? 1;
+    const logicalW = monitor ? monitor.size.width / scale : 1920;
+    const logicalH = monitor ? monitor.size.height / scale : 1080;
+    const { x, y } = computeToastPosition(getStoredToastPosition(), logicalW, logicalH);
 
-      // Позиция считается каждый показ (не только при создании окна) —
-      // иначе смена угла в Настройках не подействует до перезапуска
-      // приложения, ведь окно 'toast' создаётся один раз и живёт всю сессию.
-      const monitor = await primaryMonitor();
-      const scale = monitor?.scaleFactor ?? 1;
-      const logicalW = monitor ? monitor.size.width / scale : 1920;
-      const logicalH = monitor ? monitor.size.height / scale : 1080;
-      const { x, y } = computeToastPosition(getStoredToastPosition(), logicalW, logicalH);
+    let win = await WebviewWindow.getByLabel('toast');
 
-      if (!win) {
-        win = new WebviewWindow('toast', {
-          url: 'index.html#/toast',
-          width: TOAST_WIDTH,
-          height: TOAST_HEIGHT,
-          x,
-          y,
-          decorations: false,
-          alwaysOnTop: true,
-          skipTaskbar: true,
-          resizable: false,
-          shadow: true,
-          transparent: true,
-          focus: false,
-          visible: false,
-        });
-        await new Promise<void>((resolve) => {
-          win!.once('tauri://created', () => resolve());
-          win!.once('tauri://error', () => resolve());
-        });
-        // 'tauri://created' значит только что нативное окно существует — не
-        // что его веб-контент (ToastWindow.tsx) уже загрузился и подписался
-        // на 'toast-show'. Без этого ожидания emit() ниже уходил в никуда на
-        // первом уведомлении после запуска — окно показывалось пустым (см.
-        // журнал v0.2.14 в docs/TZ.md). Таймаут — подстраховка, если сигнал
-        // готовности почему-то не придёт.
-        await new Promise<void>((resolve) => {
-          let done = false;
-          const finish = () => {
-            if (done) return;
-            done = true;
-            resolve();
-          };
-          const timeoutId = setTimeout(finish, 2000);
-          listen('toast-ready', () => {
-            clearTimeout(timeoutId);
-            finish();
-          }).catch(finish);
-        });
-      } else {
+    if (win) {
+      try {
         await win.setPosition(new LogicalPosition(x, y));
+        await win.show();
+      } catch (err) {
+        console.error('Toast window stale, recreating', err);
+        await win.close().catch(() => {});
+        win = null;
       }
-      await win.show();
-      await emit('toast-show', payload);
-    } catch {
-      // Тихо игнорируем — например, вне Tauri-контекста или окно не удалось создать.
     }
+
+    if (!win) {
+      win = await createToastWindow(x, y);
+      await win.show();
+    }
+
+    await emit('toast-show', payload);
+  };
+
+  // Последовательный вызов через очередь-промис — без этого два уведомления,
+  // пришедшие почти одновременно (например, две записи в регламент одна за
+  // другой), могли обе увидеть отсутствие окна 'toast' и попытаться создать
+  // ДВА окна с одинаковым label — Tauri такое не разрешает, вторая попытка
+  // падает с ошибкой, которая раньше тихо проглатывалась.
+  const showToastQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const showToast = (n: Notification) => {
+    showToastQueueRef.current = showToastQueueRef.current
+      .catch(() => {})
+      .then(() => showToastNow(n))
+      .catch((err) => {
+        console.error('showToast failed', err);
+      });
+    return showToastQueueRef.current;
   };
 
   // Клик по баннеру (отдельное окно) сообщает сюда, что открыть — этот же

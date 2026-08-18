@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.2.20';
+export const APP_VERSION = '0.2.23';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,26 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.2.23',
+      items: [
+        'Исправлено: имя собеседника и название группы в шапке IB Чата показывались ВСЕМИ ЗАГЛАВНЫМИ буквами, не так, как в остальном приложении — теперь как в карточке сотрудника',
+      ],
+    },
+    {
+      version: '0.2.22',
+      items: [
+        'Экран загрузки обновления стал наряднее и информативнее — крупный процент, реальный размер в мегабайтах, индикатор шагов "Загрузка → Установка → Готово" вместо скромной строки текста и плоской полоски',
+        'Экран загрузки при запуске приложения тоже обновлён — свечение вокруг логотипа, название и бегущие точки вместо простого мигающего значка',
+      ],
+    },
+    {
+      version: '0.2.21',
+      items: [
+        'Исправлена вероятная причина того, что баннер-уведомление показывался только один раз, а дальше переставал появляться — при переиспользовании уже созданного окна баннера ошибки раньше молча проглатывались; теперь при сбое окно пересоздаётся заново, плюс уведомления, пришедшие почти одновременно, больше не мешают друг другу',
+        'В IB Чате теперь сразу прокручивает к новому сообщению — и когда открываете переписку, и когда пишете сами, и когда приходит новое от собеседника',
+      ],
+    },
     {
       version: '0.2.20',
       items: [
@@ -428,6 +448,26 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.2.23',
+      items: [
+        "Tuzatildi: IB Chat sarlavhasida suhbatdosh ismi va guruh nomi HAMMA HARFLARI BOSH holatda ko'rsatilardi, ilovaning qolgan qismidagidek emas — endi xodim kartochkasidagi kabi",
+      ],
+    },
+    {
+      version: '0.2.22',
+      items: [
+        "Yangilanish yuklanish ekrani ko'rkamroq va ma'lumotliroq bo'ldi — katta foiz, megabaytlarda haqiqiy hajm, oddiy matn qatori va tekis chiziq o'rniga \"Yuklash → O'rnatish → Tayyor\" bosqichlar ko'rsatkichi",
+        "Ilova ishga tushirilganda chiqadigan yuklanish ekrani ham yangilandi — oddiy miltillovchi belgi o'rniga logotip atrofida yaltiroq nur, nomi va sakrovchi nuqtalar",
+      ],
+    },
+    {
+      version: '0.2.21',
+      items: [
+        "Banner-bildirishnoma faqat bir marta ko'rsatilib, keyin chiqmay qo'yishining ehtimoliy sababi tuzatildi — avval banner oynasi qayta ishlatilganda xatolar sezilmasdan yutilardi; endi muvaffaqiyatsizlikda oyna qaytadan yaratiladi, shu bilan birga deyarli bir vaqtda kelgan bildirishnomalar endi bir-biriga xalaqit bermaydi",
+        "IB Chatda endi yangi xabarga darhol o'tkazadi — suhbatni ochganingizda ham, o'zingiz yozganingizda ham, suhbatdoshdan yangisi kelganda ham",
+      ],
+    },
+    {
       version: '0.2.20',
       items: [
         "IB Chat, reglamentlar va loyihalarda endi o'z xabarini/yozuvini/javobini tahrirlash va o'chirish mumkin — o'z xabarlaringiz yonida qalam va savat, tahrirlangani \"(tahrirlangan)\" deb belgilanadi, o'chirilgani \"Xabar o'chirildi\" deb ko'rsatiladi",
@@ -839,6 +879,26 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.2.23',
+      items: [
+        "Тузатилди: IB Чат сарлавҳасида суҳбатдош исми ва гуруҳ номи ҲАММА ҲАРФЛАРИ БОШ ҳолатда кўрсатиларди, илованинг қолган қисмидагидек эмас — энди ходим карточкасидагидек",
+      ],
+    },
+    {
+      version: '0.2.22',
+      items: [
+        "Янгиланиш юкланиш экрани кўркамроқ ва маълумотлироқ бўлди — катта фоиз, мегабайтларда ҳақиқий ҳажм, оддий матн қатори ва текис чизиқ ўрнига \"Юклаш → Ўрнатиш → Тайёр\" босқичлар кўрсаткичи",
+        "Илова ишга туширилганда чиқадиган юкланиш экрани ҳам янгиланди — оддий милтилловчи белги ўрнига логотип атрофида ялтироқ нур, номи ва сакровчи нуқталар",
+      ],
+    },
+    {
+      version: '0.2.21',
+      items: [
+        "Баннер-билдиришнома фақат бир марта кўрсатилиб, кейин чиқмай қўйишининг эҳтимолий сабаби тузатилди — аввал баннер ойнаси қайта ишлатилганда хатолар сезилмасдан ютиларди; энди муваффақиятсизликда ойна қайтадан яратилади, шу билан бирга деярли бир вақтда келган билдиришномалар энди бир-бирига халақит бермайди",
+        "IB Чатда энди янги хабарга дарҳол ўтказади — суҳбатни очганингизда ҳам, ўзингиз ёзганингизда ҳам, суҳбатдошдан янгиси келганда ҳам",
+      ],
+    },
     {
       version: '0.2.20',
       items: [

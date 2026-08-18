@@ -111,11 +111,14 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
   const [deleteBusy, setDeleteBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  // true сразу после открытия/смены канала — чтобы проскроллить к последнему
-  // сообщению один раз при заходе в переписку, но не дёргать скролл вниз при
-  // каждом тихом фоновом опросе (POLL_INTERVAL_MS), пока пользователь читает
-  // историю выше.
-  const shouldScrollToBottomRef = useRef(false);
+  // id последнего сообщения в уже отрисованном списке — сравнивается на
+  // каждое обновление messages (и при первом открытии канала, и при новом
+  // сообщении с фонового опроса POLL_INTERVAL_MS, и при собственной
+  // отправке): как только последнее сообщение меняется, скроллим к нему.
+  // Так продолжает работать сценарий "открыл переписку — сразу видно
+  // последнее" и добавляется "написали новое — сразу видно его", без
+  // отдельного стейта на каждый случай.
+  const lastMessageIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     enterFullscreen();
@@ -236,7 +239,7 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
     setMessages([]);
     setReplyTo(null);
     setEmojiOpen(false);
-    shouldScrollToBottomRef.current = true;
+    lastMessageIdRef.current = null;
     loadMessages();
     if (!channel) return;
     const interval = setInterval(() => loadMessages(true), POLL_INTERVAL_MS);
@@ -249,9 +252,11 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
   // первого кадра отрисовки с прокруткой сверху, так что пользователь не
   // видит "прыжок".
   useEffect(() => {
-    if (shouldScrollToBottomRef.current && messages.length > 0) {
+    if (messages.length === 0) return;
+    const lastId = messages[messages.length - 1].id;
+    if (lastId !== lastMessageIdRef.current) {
+      lastMessageIdRef.current = lastId;
       messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
-      shouldScrollToBottomRef.current = false;
     }
   }, [messages]);
 

@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod backup;
 mod db;
 mod dispatch;
 mod server;
@@ -463,6 +464,15 @@ struct Position {
 struct ServerSettings {
     enabled: bool,
     port: u16,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct RadminSettings {
+    #[serde(rename = "networkId")]
+    network_id: String,
+    #[serde(rename = "networkPassword")]
+    network_password: String,
+    note: String,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -1255,6 +1265,35 @@ struct SetServerSettingsPayload {
 }
 
 #[derive(serde::Deserialize)]
+struct SetRadminSettingsPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    #[serde(rename = "networkId")]
+    network_id: String,
+    #[serde(rename = "networkPassword")]
+    network_password: String,
+    note: String,
+}
+
+#[derive(serde::Deserialize)]
+struct ExportBackupPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    password: String,
+    #[serde(rename = "destPath")]
+    dest_path: String,
+}
+
+#[derive(serde::Deserialize)]
+struct RestoreBackupPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    password: String,
+    #[serde(rename = "sourcePath")]
+    source_path: String,
+}
+
+#[derive(serde::Deserialize)]
 struct SetEmployeeSchedulePayload {
     #[serde(rename = "adminId")]
     admin_id: String,
@@ -1650,6 +1689,14 @@ fn to_chat_group_summary(s: db::ChatGroupSummary) -> ChatGroupSummary {
 
 fn to_server_settings(s: db::ServerSettingsRecord) -> ServerSettings {
     ServerSettings { enabled: s.enabled, port: s.port }
+}
+
+fn to_radmin_settings(r: db::RadminSettingsRecord) -> RadminSettings {
+    RadminSettings {
+        network_id: r.network_id,
+        network_password: r.network_password,
+        note: r.note,
+    }
 }
 
 fn to_department(d: db::DepartmentRecord) -> Department {
@@ -2480,6 +2527,19 @@ fn set_server_settings(payload: SetServerSettingsPayload, state: tauri::State<Ap
 }
 
 #[tauri::command]
+fn get_radmin_settings(state: tauri::State<AppState>) -> RadminSettings {
+    let db = state.0.lock().unwrap();
+    to_radmin_settings(db.get_radmin_settings())
+}
+
+#[tauri::command]
+fn set_radmin_settings(payload: SetRadminSettingsPayload, state: tauri::State<AppState>) -> Result<RadminSettings, String> {
+    let db = state.0.lock().unwrap();
+    db.set_radmin_settings(&payload.admin_id, &payload.network_id, &payload.network_password, &payload.note)
+        .map(to_radmin_settings)
+}
+
+#[tauri::command]
 fn record_login(employee_id: String, state: tauri::State<AppState>) -> Result<(), String> {
     let db = state.0.lock().unwrap();
     db.record_login(&employee_id)
@@ -2556,6 +2616,47 @@ fn set_update_installer(
     Ok(())
 }
 
+// Только локально: dest_path — путь на диске ТОГО ЖЕ компьютера, где
+// открылся диалог сохранения (см. Settings.tsx), тем же принципом, что и
+// set_update_installer выше — не регистрируется в dispatch.rs.
+#[tauri::command]
+fn export_backup(
+    payload: ExportBackupPayload,
+    state: tauri::State<AppState>,
+    app_data_dir: tauri::State<AppDataDir>,
+) -> Result<(), String> {
+    if payload.password.trim().chars().count() < 6 {
+        return Err("Пароль резервной копии должен быть не короче 6 символов".into());
+    }
+    let db = state.0.lock().unwrap();
+    if !db.is_admin(&payload.admin_id) {
+        return Err("Недостаточно прав".into());
+    }
+    let plain = db.export_backup_plain(&app_data_dir.0)?;
+    let encrypted = backup::encrypt(&plain, &payload.password)?;
+    std::fs::write(&payload.dest_path, encrypted).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+// Только локально, тем же принципом: source_path имеет смысл только на
+// машине сервера, а восстановление физически подменяет файл базы ЭТОГО
+// процесса — недопустимо проксировать с удалённого клиента.
+#[tauri::command]
+fn restore_backup(
+    payload: RestoreBackupPayload,
+    state: tauri::State<AppState>,
+    app_data_dir: tauri::State<AppDataDir>,
+) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    if !db.is_admin(&payload.admin_id) {
+        return Err("Недостаточно прав".into());
+    }
+    let encrypted = std::fs::read(&payload.source_path).map_err(|e| e.to_string())?;
+    let plain = backup::decrypt(&encrypted, &payload.password)?;
+    std::fs::write(app_data_dir.0.join("pending-restore.db"), plain).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -2573,7 +2674,28 @@ fn main() {
             // туда файл (см. журнал v0.2.9/v0.2.12 в docs/TZ.md — реальная
             // путаница на практике).
             std::fs::create_dir_all(app_data_dir.join("updates")).ok();
-            let db = Arc::new(Mutex::new(Db::init(&app_data_dir.join("ib-crm.db"))));
+
+            // Применение отложенного восстановления из резервной копии (см.
+            // Настройки → Резервные копии). restore_backup() не может
+            // безопасно подменить уже открытое Arc<Mutex<Db>>, поэтому просто
+            // кладёт расшифрованный файл рядом как pending-restore.db и
+            // просит перезапустить приложение — здесь, на самом старте, до
+            // открытия основной базы, подменяем файл и убираем маркер.
+            let db_path = app_data_dir.join("ib-crm.db");
+            let pending_restore = app_data_dir.join("pending-restore.db");
+            if pending_restore.is_file() {
+                if db_path.is_file() {
+                    // Единственная подстраховочная копия "до восстановления",
+                    // перезаписывается при каждом восстановлении — не архив.
+                    let _ = std::fs::rename(&db_path, app_data_dir.join("ib-crm.pre-restore.bak"));
+                }
+                if std::fs::rename(&pending_restore, &db_path).is_err() {
+                    // rename может не сработать между разными томами.
+                    let _ = std::fs::copy(&pending_restore, &db_path);
+                }
+                let _ = std::fs::remove_file(&pending_restore);
+            }
+            let db = Arc::new(Mutex::new(Db::init(&db_path)));
 
             // Если включён режим сервера (настройка в app_meta, см. Settings →
             // "Сервер") — поднимаем фоновый HTTP-сервер на том же Db, без
@@ -2719,6 +2841,10 @@ fn main() {
             mark_chat_channel_read,
             get_server_settings,
             set_server_settings,
+            get_radmin_settings,
+            set_radmin_settings,
+            export_backup,
+            restore_backup,
             get_lan_address,
             get_app_version,
             get_update_installer_info,

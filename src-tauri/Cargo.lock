@@ -1658,10 +1658,11 @@ dependencies = [
 
 [[package]]
 name = "ib-crm"
-version = "0.2.25"
+version = "0.2.26"
 dependencies = [
  "axum",
  "bcrypt",
+ "ring",
  "rusqlite",
  "serde",
  "serde_json",

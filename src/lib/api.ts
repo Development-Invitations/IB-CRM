@@ -411,6 +411,12 @@ export type ServerSettings = {
   port: number;
 };
 
+export type RadminSettings = {
+  networkId: string;
+  networkPassword: string;
+  note: string;
+};
+
 export type UpdateInstallerInfo = {
   available: boolean;
   sizeBytes: number;
@@ -784,6 +790,13 @@ export const api = {
   getServerSettings: () => invoke<ServerSettings>('get_server_settings'),
   setServerSettings: (payload: { adminId: string; enabled: boolean; port: number }) =>
     invoke<ServerSettings>('set_server_settings', { payload }),
+  getRadminSettings: () => invoke<RadminSettings>('get_radmin_settings'),
+  setRadminSettings: (payload: { adminId: string; networkId: string; networkPassword: string; note: string }) =>
+    invoke<RadminSettings>('set_radmin_settings', { payload }),
+  exportBackup: (payload: { adminId: string; password: string; destPath: string }) =>
+    invoke<void>('export_backup', { payload }),
+  restoreBackup: (payload: { adminId: string; password: string; sourcePath: string }) =>
+    invoke<void>('restore_backup', { payload }),
   getLanAddress: () => invoke<string | null>('get_lan_address'),
   getAppVersion: () => invoke<string>('get_app_version'),
   getUpdateInstallerInfo: () => invoke<UpdateInstallerInfo>('get_update_installer_info'),

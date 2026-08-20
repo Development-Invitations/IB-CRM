@@ -523,6 +523,13 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
             let p: crate::SetServerSettingsPayload = from_payload(payload)?;
             db.set_server_settings(&p.admin_id, p.enabled, p.port).map(crate::to_server_settings).map(to_json)
         }
+        "get_radmin_settings" => Ok(to_json(crate::to_radmin_settings(db.get_radmin_settings()))),
+        "set_radmin_settings" => {
+            let p: crate::SetRadminSettingsPayload = from_payload(payload)?;
+            db.set_radmin_settings(&p.admin_id, &p.network_id, &p.network_password, &p.note)
+                .map(crate::to_radmin_settings)
+                .map(to_json)
+        }
 
         other => Err(format!("Неизвестная команда: {other}")),
     }

@@ -4367,10 +4367,75 @@ impl Db {
         ).map_err(|e| e.to_string())?;
         Ok(self.get_server_settings())
     }
+
+    // ---- Резервные копии базы (v0.2.26) ----
+    // Снимаем копию через встроенный SQLite Online Backup API — безопасно
+    // работает на живом, используемом соединении, не блокируя приложение.
+    // Шифрование самих байт — уже на уровне вызывающего кода (backup.rs),
+    // здесь только отдаём чистый снимок базы.
+    pub fn export_backup_plain(&self, app_data_dir: &Path) -> Result<Vec<u8>, String> {
+        let tmp_path = app_data_dir.join(format!("_export-tmp-{}.db", Uuid::new_v4()));
+        {
+            let mut dest = Connection::open(&tmp_path).map_err(|e| e.to_string())?;
+            let backup = rusqlite::backup::Backup::new(&self.conn, &mut dest).map_err(|e| e.to_string())?;
+            backup
+                .run_to_completion(5, std::time::Duration::from_millis(250), None)
+                .map_err(|e| e.to_string())?;
+        }
+        let bytes = std::fs::read(&tmp_path).map_err(|e| e.to_string())?;
+        std::fs::remove_file(&tmp_path).ok();
+        Ok(bytes)
+    }
+
+    // ---- Radmin (справочные данные для удалённого доступа, v0.2.26) ----
+    // Это НЕ функциональная интеграция — у Radmin нет доступного нам API.
+    // Просто храним ID/пароль VPN-сети и заметку админа, чтобы не диктовать
+    // их по памяти удалённому сотруднику каждый раз. Тот же паттерн
+    // key/value в app_meta, что и get_server_settings/set_server_settings.
+    pub fn get_radmin_settings(&self) -> RadminSettingsRecord {
+        let network_id: Option<String> = self.conn
+            .query_row("SELECT value FROM app_meta WHERE key = 'radmin_network_id'", [], |row| row.get(0))
+            .ok();
+        let network_password: Option<String> = self.conn
+            .query_row("SELECT value FROM app_meta WHERE key = 'radmin_network_password'", [], |row| row.get(0))
+            .ok();
+        let note: Option<String> = self.conn
+            .query_row("SELECT value FROM app_meta WHERE key = 'radmin_note'", [], |row| row.get(0))
+            .ok();
+        RadminSettingsRecord {
+            network_id: network_id.unwrap_or_default(),
+            network_password: network_password.unwrap_or_default(),
+            note: note.unwrap_or_default(),
+        }
+    }
+
+    pub fn set_radmin_settings(&self, admin_id: &str, network_id: &str, network_password: &str, note: &str) -> Result<RadminSettingsRecord, String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        for (key, value) in [
+            ("radmin_network_id", network_id),
+            ("radmin_network_password", network_password),
+            ("radmin_note", note),
+        ] {
+            self.conn.execute(
+                "INSERT INTO app_meta (key, value) VALUES (?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params![key, value],
+            ).map_err(|e| e.to_string())?;
+        }
+        Ok(self.get_radmin_settings())
+    }
 }
 
 pub struct ServerSettingsRecord {
     pub enabled: bool,
     pub port: u16,
+}
+
+pub struct RadminSettingsRecord {
+    pub network_id: String,
+    pub network_password: String,
+    pub note: String,
 }
 

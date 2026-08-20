@@ -1,8 +1,10 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { Copy, Check, FolderOpen, Upload } from 'lucide-react';
-import { open as openFileDialog } from '@tauri-apps/plugin-dialog';
+import { Copy, Check, FolderOpen, Upload, Eye, EyeOff, Download, Database } from 'lucide-react';
+import { open as openFileDialog, save as saveFileDialog } from '@tauri-apps/plugin-dialog';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
+import { relaunch } from '@tauri-apps/plugin-process';
 import { api, type Employee, type ServerSettings } from '../lib/api';
+import Modal from '../components/Modal';
 import { useLocale, LOCALE_LABELS, type Locale } from '../lib/i18n';
 import { useTheme, THEME_NAMES } from '../lib/theme';
 import { useToast } from '../lib/toast';
@@ -47,6 +49,28 @@ export default function Settings({ employee }: { employee: Employee }) {
   const [installerAvailable, setInstallerAvailable] = useState<boolean | null>(null);
   const [installerBusy, setInstallerBusy] = useState(false);
 
+  // Резервные копии базы (только локально/сервер — см. docs/TZ.md v0.2.26:
+  // восстановление подменяет файл базы этого процесса, с клиента такое не
+  // проксируется, симметрично set_update_installer выше).
+  const [exportPassword, setExportPassword] = useState('');
+  const [exportPasswordConfirm, setExportPasswordConfirm] = useState('');
+  const [exportBusy, setExportBusy] = useState(false);
+  const [restorePassword, setRestorePassword] = useState('');
+  const [restoreBusy, setRestoreBusy] = useState(false);
+  const [restorePendingPath, setRestorePendingPath] = useState<string | null>(null);
+
+  // Radmin — справочные данные для удалённого доступа (не функциональная
+  // интеграция, у Radmin нет доступного нам API — просто хранилище, чтобы
+  // не диктовать ID/пароль сети по памяти). Видно админу всегда, включая
+  // клиент-режим — это обычные app_meta-данные, идут через тот же invoke.
+  const [radminNetworkId, setRadminNetworkId] = useState('');
+  const [radminNetworkPassword, setRadminNetworkPassword] = useState('');
+  const [radminNote, setRadminNote] = useState('');
+  const [radminShowPassword, setRadminShowPassword] = useState(false);
+  const [radminBusy, setRadminBusy] = useState(false);
+  const [copiedRadminId, setCopiedRadminId] = useState(false);
+  const [copiedRadminPassword, setCopiedRadminPassword] = useState(false);
+
   useEffect(() => {
     if (!employee.isAdmin || isClient) return;
     api.getServerSettings().then((s) => {
@@ -57,6 +81,15 @@ export default function Settings({ employee }: { employee: Employee }) {
     api.getUpdateInstallerPath().then(setInstallerPath).catch(() => {});
     api.getUpdateInstallerInfo().then((info) => setInstallerAvailable(info.available)).catch(() => {});
   }, [employee.isAdmin, isClient]);
+
+  useEffect(() => {
+    if (!employee.isAdmin) return;
+    api.getRadminSettings().then((s) => {
+      setRadminNetworkId(s.networkId);
+      setRadminNetworkPassword(s.networkPassword);
+      setRadminNote(s.note);
+    }).catch(() => {});
+  }, [employee.isAdmin]);
 
   // Диалог выбора файла + прямое копирование на бэкенде — без этого админ
   // должен вручную найти/создать папку в AppData и переименовать файл, что
@@ -93,6 +126,93 @@ export default function Settings({ employee }: { employee: Employee }) {
     if (!installerPath) return;
     const folder = installerPath.replace(/[\\/][^\\/]*$/, '');
     shellOpen(folder).catch(() => showToast('error', t('settings.errorGeneric')));
+  };
+
+  const handleSaveRadmin = async () => {
+    setRadminBusy(true);
+    try {
+      const updated = await api.setRadminSettings({
+        adminId: employee.id,
+        networkId: radminNetworkId.trim(),
+        networkPassword: radminNetworkPassword.trim(),
+        note: radminNote.trim(),
+      });
+      setRadminNetworkId(updated.networkId);
+      setRadminNetworkPassword(updated.networkPassword);
+      setRadminNote(updated.note);
+      showToast('success', t('settings.radmin.saveSuccess'));
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('settings.errorGeneric'));
+    } finally {
+      setRadminBusy(false);
+    }
+  };
+
+  const handleCopyRadminId = () => {
+    if (!radminNetworkId) return;
+    navigator.clipboard.writeText(radminNetworkId).then(() => {
+      setCopiedRadminId(true);
+      setTimeout(() => setCopiedRadminId(false), 2000);
+    });
+  };
+
+  const handleCopyRadminPassword = () => {
+    if (!radminNetworkPassword) return;
+    navigator.clipboard.writeText(radminNetworkPassword).then(() => {
+      setCopiedRadminPassword(true);
+      setTimeout(() => setCopiedRadminPassword(false), 2000);
+    });
+  };
+
+  const handleExportBackup = async () => {
+    if (exportPassword.length < 6) {
+      showToast('error', t('settings.backup.exportErrorShortPassword'));
+      return;
+    }
+    if (exportPassword !== exportPasswordConfirm) {
+      showToast('error', t('settings.backup.exportErrorMismatch'));
+      return;
+    }
+    try {
+      const destPath = await saveFileDialog({
+        defaultPath: 'ib-crm-backup.ibcbak',
+        filters: [{ name: 'IB CRM Backup', extensions: ['ibcbak'] }],
+      });
+      if (!destPath || typeof destPath !== 'string') return;
+      setExportBusy(true);
+      await api.exportBackup({ adminId: employee.id, password: exportPassword, destPath });
+      setExportPassword('');
+      setExportPasswordConfirm('');
+      showToast('success', t('settings.backup.exportSuccess'));
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('settings.errorGeneric'));
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
+  const handlePickRestoreFile = async () => {
+    if (restorePassword.length === 0) {
+      showToast('error', t('settings.backup.restorePasswordRequired'));
+      return;
+    }
+    const selected = await openFileDialog({ multiple: false, filters: [{ name: 'IB CRM Backup', extensions: ['ibcbak'] }] });
+    if (!selected || typeof selected !== 'string') return;
+    setRestorePendingPath(selected);
+  };
+
+  const handleConfirmRestore = async () => {
+    if (!restorePendingPath) return;
+    setRestoreBusy(true);
+    try {
+      await api.restoreBackup({ adminId: employee.id, password: restorePassword, sourcePath: restorePendingPath });
+      setRestorePendingPath(null);
+      showToast('success', t('settings.backup.restoreSuccess'));
+      await relaunch();
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('settings.backup.restoreErrorWrongPassword'));
+      setRestoreBusy(false);
+    }
   };
 
   const handleToggleServer = async () => {
@@ -375,6 +495,96 @@ export default function Settings({ employee }: { employee: Employee }) {
           </div>
         </section>
       )}
+
+      {employee.isAdmin && !isClient && (
+        <section className="settings-section">
+          <h2>{t('settings.backup.title')}</h2>
+          <p className="settings-hint">{t('settings.backup.hint')}</p>
+
+          <h3 className="settings-subheading">{t('settings.backup.exportTitle')}</h3>
+          <div className="field" style={{ maxWidth: 320, marginTop: 8 }}>
+            <label>{t('settings.backup.exportPasswordLabel')}</label>
+            <input type="password" value={exportPassword} onChange={(e) => setExportPassword(e.target.value)} placeholder="••••••••" />
+          </div>
+          <div className="field" style={{ maxWidth: 320 }}>
+            <label>{t('settings.backup.exportConfirmLabel')}</label>
+            <input type="password" value={exportPasswordConfirm} onChange={(e) => setExportPasswordConfirm(e.target.value)} placeholder="••••••••" />
+          </div>
+          <button className="modal-btn" onClick={handleExportBackup} disabled={exportBusy}>
+            <Download size={14} /> {exportBusy ? t('settings.backup.exportBusy') : t('settings.backup.exportBtn')}
+          </button>
+
+          <h3 className="settings-subheading" style={{ marginTop: 20 }}>{t('settings.backup.restoreTitle')}</h3>
+          <div className="field" style={{ maxWidth: 320, marginTop: 8 }}>
+            <label>{t('settings.backup.restorePasswordLabel')}</label>
+            <input type="password" value={restorePassword} onChange={(e) => setRestorePassword(e.target.value)} placeholder="••••••••" />
+          </div>
+          <button className="modal-btn danger" onClick={handlePickRestoreFile} disabled={restoreBusy}>
+            <Database size={14} /> {restoreBusy ? t('settings.backup.restoreBusy') : t('settings.backup.restoreBtn')}
+          </button>
+        </section>
+      )}
+
+      {employee.isAdmin && (
+        <section className="settings-section">
+          <h2>{t('settings.radmin.title')}</h2>
+          <p className="settings-hint">{t('settings.radmin.hint')}</p>
+
+          <div className="field" style={{ maxWidth: 320, marginTop: 8 }}>
+            <label>{t('settings.radmin.networkIdLabel')}</label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input value={radminNetworkId} onChange={(e) => setRadminNetworkId(e.target.value)} />
+              <button className="reg-action-btn" onClick={handleCopyRadminId} title={t('settings.server.copyAddress')}>
+                {copiedRadminId ? <Check size={13} /> : <Copy size={13} />}
+              </button>
+            </div>
+          </div>
+
+          <div className="field" style={{ maxWidth: 320 }}>
+            <label>{t('settings.radmin.networkPasswordLabel')}</label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                type={radminShowPassword ? 'text' : 'password'}
+                value={radminNetworkPassword}
+                onChange={(e) => setRadminNetworkPassword(e.target.value)}
+              />
+              <button className="reg-action-btn" onClick={() => setRadminShowPassword((v) => !v)} title={t('settings.radmin.networkPasswordLabel')}>
+                {radminShowPassword ? <EyeOff size={13} /> : <Eye size={13} />}
+              </button>
+              <button className="reg-action-btn" onClick={handleCopyRadminPassword} title={t('settings.server.copyAddress')}>
+                {copiedRadminPassword ? <Check size={13} /> : <Copy size={13} />}
+              </button>
+            </div>
+          </div>
+
+          <div className="field" style={{ maxWidth: 320 }}>
+            <label>{t('settings.radmin.noteLabel')}</label>
+            <textarea value={radminNote} onChange={(e) => setRadminNote(e.target.value)} rows={3} />
+          </div>
+
+          <button className="modal-btn" onClick={handleSaveRadmin} disabled={radminBusy}>
+            {radminBusy ? t('common.loading') : t('settings.radmin.saveBtn')}
+          </button>
+        </section>
+      )}
+
+      <Modal
+        open={!!restorePendingPath}
+        title={t('settings.backup.restoreConfirmTitle')}
+        onClose={() => setRestorePendingPath(null)}
+        actions={
+          <>
+            <button className="modal-btn" onClick={() => setRestorePendingPath(null)} disabled={restoreBusy}>
+              {t('common.cancel')}
+            </button>
+            <button className="modal-btn danger" onClick={handleConfirmRestore} disabled={restoreBusy}>
+              {restoreBusy ? t('common.loading') : t('settings.backup.restoreBtn')}
+            </button>
+          </>
+        }
+      >
+        {t('settings.backup.restoreConfirmBody')}
+      </Modal>
     </div>
   );
 }

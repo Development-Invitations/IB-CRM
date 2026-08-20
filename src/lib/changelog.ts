@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.2.25';
+export const APP_VERSION = '0.2.26';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.2.26',
+      items: [
+        'Админ теперь может скачать зашифрованную паролем резервную копию базы данных и восстановить её из файла (Настройки → Резервные копии) — восстановление доступно только на компьютере с сервером/локальной базой',
+        'В Настройках появился раздел Radmin — можно сохранить ID и пароль VPN-сети для удалённого доступа, чтобы не диктовать их по памяти удалённым сотрудникам',
+        'При первом запуске добавлен третий вариант подключения — "Удалённо через Radmin VPN" с пошаговой подсказкой, а сам экран первого запуска оформлен наряднее, в едином стиле приложения',
+      ],
+    },
     {
       version: '0.2.25',
       items: [
@@ -462,6 +470,14 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.2.26',
+      items: [
+        "Endi administrator baza ma'lumotlarining parol bilan shifrlangan zaxira nusxasini yuklab olishi va fayldan tiklashi mumkin (Sozlamalar → Zaxira nusxalar) — tiklash faqat server/lokal baza turgan kompyuterda mavjud",
+        "Sozlamalarda Radmin bo'limi paydo bo'ldi — masofaviy kirish uchun VPN tarmoq ID va parolini saqlash mumkin, ularni masofadagi xodimlarga har safar yodda aytib berish shart emas",
+        "Birinchi ishga tushirishda uchinchi ulanish varianti qo'shildi — \"Radmin VPN orqali masofadan\", bosqichma-bosqich yo'riqnoma bilan, birinchi ishga tushirish oynasi esa ilova uslubida chiroyliroq bo'ldi",
+      ],
+    },
+    {
       version: '0.2.25',
       items: [
         "Reglamentlar va loyihalarda yangi yozuv/xabar yuborish endi Enter orqali ishlaydi (Shift+Enter — qator ko'chirish), komposer IB Chat bilan bir xil uslubga o'tkazildi",
@@ -907,6 +923,14 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.2.26',
+      items: [
+        'Энди администратор база маълумотларининг парол билан шифрланган захира нусхасини юклаб олиши ва файлдан тиклаши мумкин (Созламалар → Захира нусхалар) — тиклаш фақат сервер/локал база турган компьютерда мавжуд',
+        'Созламаларда Radmin бўлими пайдо бўлди — масофавий кириш учун VPN тармоқ ID ва паролини сақлаш мумкин, уларни масофадаги ходимларга ҳар сафар ёддан айтиб бериш шарт эмас',
+        'Биринчи ишга туширишда учинчи улаш варианти қўшилди — "Radmin VPN орқали масофадан", босқичма-босқич йўриқнома билан, биринчи ишга тушириш ойнаси эса илова услубида чиройлироқ бўлди',
+      ],
+    },
     {
       version: '0.2.25',
       items: [

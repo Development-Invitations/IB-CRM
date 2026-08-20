@@ -1,6 +1,6 @@
 [package]
 name = "ib-crm"
-version = "0.2.25"
+version = "0.2.26"
 description = "IB CRM — desktop приложение"
 authors = ["IB - Команда"]
 edition = "2021"
@@ -18,9 +18,10 @@ tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-rusqlite = { version = "0.31", features = ["bundled"] }
+rusqlite = { version = "0.31", features = ["bundled", "backup"] }
 bcrypt = "0.15"
 uuid = { version = "1", features = ["v4"] }
 axum = "0.7"
 tokio = { version = "1", features = ["net", "rt-multi-thread", "macros", "fs"] }
 tower-http = { version = "0.5", features = ["cors"] }
+ring = "=0.17.14"

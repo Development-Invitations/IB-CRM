@@ -1,11 +1,26 @@
 import { useState, FormEvent } from 'react';
-import { HardDrive, Server } from 'lucide-react';
+import { HardDrive, Server, Wifi } from 'lucide-react';
 import { api } from '../lib/api';
 import { rememberedLogin } from '../lib/session';
 import { connection } from '../lib/connection';
 import { useLocale } from '../lib/i18n';
 
 type Step = 'choice' | 'connect' | 'admin';
+
+// Оформление первого запуска — тот же приём, что и у полноэкранного
+// LoadingScreen (свечение вокруг логотипа + ворд-марк), но как отдельная
+// шапка над карточкой, а не замена самой карточки — общие .auth-card/
+// .auth-screen (которыми пользуется и Login.tsx) не трогаем.
+function FirstRunBrand() {
+  return (
+    <div className="firstrun-brand">
+      <div className="firstrun-glow">
+        <img src="/brand/logo-mark.png" alt="" className="firstrun-logo" />
+      </div>
+      <div className="firstrun-wordmark">IB CRM</div>
+    </div>
+  );
+}
 
 export default function FirstRunSetup({
   onCreated,
@@ -22,6 +37,10 @@ export default function FirstRunSetup({
   // форму создания админа. Экран выбора режима — только для тех, кто явно
   // хочет присоединиться к уже поднятому серверу (см. Настройки → Сервер).
   const [step, setStep] = useState<Step>('choice');
+  // Технически LAN и Radmin-адрес подключаются абсолютно одинаково (просто
+  // HTTP-URL, см. connection.ts) — connectMode влияет только на подсказку,
+  // которая показывается над полем ввода адреса на шаге 'connect'.
+  const [connectMode, setConnectMode] = useState<'lan' | 'radmin'>('lan');
 
   const [serverUrl, setServerUrl] = useState('');
   const [connectError, setConnectError] = useState('');
@@ -84,8 +103,9 @@ export default function FirstRunSetup({
 
   if (step === 'choice') {
     return (
-      <div className="auth-screen">
-        <div className="auth-card">
+      <div className="auth-screen firstrun-screen">
+        <FirstRunBrand />
+        <div className="auth-card firstrun-card">
           <h1>{t('firstRun.title')}</h1>
           <p className="subtitle">{t('firstRun.modeSubtitle')}</p>
 
@@ -97,11 +117,19 @@ export default function FirstRunSetup({
             </span>
           </button>
 
-          <button type="button" className="firstrun-mode-btn" onClick={() => setStep('connect')}>
+          <button type="button" className="firstrun-mode-btn" onClick={() => { setConnectMode('lan'); setStep('connect'); }}>
             <Server size={20} />
             <span>
               <strong>{t('firstRun.modeClientTitle')}</strong>
               <span className="settings-hint">{t('firstRun.modeClientHint')}</span>
+            </span>
+          </button>
+
+          <button type="button" className="firstrun-mode-btn" onClick={() => { setConnectMode('radmin'); setStep('connect'); }}>
+            <Wifi size={20} />
+            <span>
+              <strong>{t('firstRun.modeRadminTitle')}</strong>
+              <span className="settings-hint">{t('firstRun.modeRadminHint')}</span>
             </span>
           </button>
         </div>
@@ -111,10 +139,19 @@ export default function FirstRunSetup({
 
   if (step === 'connect') {
     return (
-      <div className="auth-screen">
-        <form className="auth-card" onSubmit={handleConnect}>
+      <div className="auth-screen firstrun-screen">
+        <FirstRunBrand />
+        <form className="auth-card firstrun-card" onSubmit={handleConnect}>
           <h1>{t('firstRun.connectTitle')}</h1>
           <p className="subtitle">{t('firstRun.connectSubtitle')}</p>
+
+          {connectMode === 'radmin' && (
+            <div className="firstrun-radmin-hint">
+              <p>{t('firstRun.radminStep1')}</p>
+              <p>{t('firstRun.radminStep2')}</p>
+              <p>{t('firstRun.radminStep3')}</p>
+            </div>
+          )}
 
           {connectError && <div className="error-text">{connectError}</div>}
 
@@ -135,8 +172,9 @@ export default function FirstRunSetup({
   }
 
   return (
-    <div className="auth-screen">
-      <form className="auth-card" onSubmit={handleSubmit}>
+    <div className="auth-screen firstrun-screen">
+      <FirstRunBrand />
+      <form className="auth-card firstrun-card" onSubmit={handleSubmit}>
         <h1>{t('firstRun.title')}</h1>
         <p className="subtitle">{connection.isClient() ? t('firstRun.subtitleRemote') : t('firstRun.subtitle')}</p>
 

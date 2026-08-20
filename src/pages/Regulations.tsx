@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback, useContext } from 'react';
 import { useLocation, useNavigate, type NavigateFunction } from 'react-router-dom';
 import { FullscreenContext } from './Dashboard';
-import { Plus, Pencil, FileText, Trash2, UserPlus, X, Paperclip, CheckSquare, XSquare, RotateCcw, ChevronDown, ChevronRight, Search, Copy, Check, ArrowLeft, Link2, Bell, CalendarClock, MoreVertical, Forward, Download } from 'lucide-react';
+import { Plus, Pencil, FileText, Trash2, UserPlus, X, Paperclip, CheckSquare, XSquare, RotateCcw, ChevronDown, ChevronRight, Search, Copy, Check, ArrowLeft, Link2, Bell, CalendarClock, MoreVertical, Forward, Download, Send } from 'lucide-react';
 import { api, type Employee, type Regulation, type RegulationMember, type RegulationMemberRole, type RegulationEntry, type RegulationReply, type RegulationStatus, type RegulationEntryStatus, type Client } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
@@ -1091,23 +1091,45 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
                     )}
                   </div>
 
-                  {/* Форма добавления записи — внизу */}
+                  {/* Форма добавления записи — внизу, оформлена под единый стиль
+                      композера IB Чата (см. .chat-composer-bar в theme.css) — та же
+                      пилюля с иконками, дедлайн вынесен отдельной компактной
+                      плашкой над ней, т.к. в чате такого поля нет. */}
                   {canPost ? (
                     <div className="reg-add-entry">
-                      <textarea rows={3} value={newEntry} onChange={(e) => setNewEntry(e.target.value)} placeholder={t('regulations.addEntryPlaceholder')} />
-                      <div className="reg-add-entry-row">
-                        <label className="reg-deadline-field">
-                          <CalendarClock size={14} />
-                          <span>{t('regulations.addEntryDeadlineLabel')}</span>
-                          <input type="date" value={newEntryDeadline} onChange={(e) => setNewEntryDeadline(e.target.value)} />
-                        </label>
-                        <button className="modal-btn" onClick={() => fileInputRef.current?.click()} title={t('regulations.attachBtn')} disabled={attachBusy}>
-                          <Paperclip size={14} />
-                          {attachName && <span style={{ maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachName}</span>}
+                      {attachName && (
+                        <div className="chat-composer-attach-chip">
+                          <Paperclip size={12} />
+                          <span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachName}</span>
+                          <button onClick={() => { setAttachData(null); setAttachName(null); }}><X size={12} /></button>
+                        </div>
+                      )}
+                      <label className="reg-deadline-field">
+                        <CalendarClock size={14} />
+                        <span>{t('regulations.addEntryDeadlineLabel')}</span>
+                        <input type="date" value={newEntryDeadline} onChange={(e) => setNewEntryDeadline(e.target.value)} />
+                      </label>
+                      <div className="chat-composer-bar">
+                        <button type="button" className="chat-composer-icon-btn" onClick={() => fileInputRef.current?.click()} title={t('regulations.attachBtn')} disabled={attachBusy}>
+                          <Paperclip size={18} />
                         </button>
                         <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleFileAttach} accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" />
-                        {attachName && <button className="regulation-remove-attach" onClick={() => { setAttachData(null); setAttachName(null); }}><X size={12} /></button>}
-                        <button className="modal-btn danger" onClick={handleAddEntry} disabled={!newEntry.trim() || entryBusy}><Plus size={14} /></button>
+                        <textarea
+                          rows={1}
+                          className="chat-composer-input"
+                          value={newEntry}
+                          onChange={(e) => setNewEntry(e.target.value)}
+                          placeholder={t('regulations.addEntryPlaceholder')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleAddEntry();
+                            }
+                          }}
+                        />
+                        <button type="button" className="chat-composer-send-btn" onClick={handleAddEntry} disabled={!newEntry.trim() || entryBusy}>
+                          <Send size={16} />
+                        </button>
                       </div>
                     </div>
                   ) : !isClosed && !isParticipant ? (

@@ -397,6 +397,22 @@ struct MyTask {
 }
 
 #[derive(Clone, serde::Serialize)]
+struct MyProjectTask {
+    #[serde(rename = "messageId")]
+    message_id: String,
+    #[serde(rename = "projectId")]
+    project_id: String,
+    #[serde(rename = "projectNumber")]
+    project_number: String,
+    #[serde(rename = "projectName")]
+    project_name: String,
+    content: String,
+    deadline: Option<String>,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+}
+
+#[derive(Clone, serde::Serialize)]
 struct RegulationReply {
     id: String,
     #[serde(rename = "entryId")]
@@ -1521,6 +1537,13 @@ fn to_my_task(t: db::MyTaskRecord) -> MyTask {
     }
 }
 
+fn to_my_project_task(t: db::MyProjectTaskRecord) -> MyProjectTask {
+    MyProjectTask {
+        message_id: t.message_id, project_id: t.project_id, project_number: t.project_number,
+        project_name: t.project_name, content: t.content, deadline: t.deadline, created_at: t.created_at,
+    }
+}
+
 fn to_reg_reply(r: db::RegulationReplyRecord) -> RegulationReply {
     RegulationReply {
         id: r.id, entry_id: r.entry_id, author_id: r.author_id, author_name: r.author_name, content: r.content, created_at: r.created_at,
@@ -2197,6 +2220,12 @@ fn list_my_open_tasks(employee_id: String, state: tauri::State<AppState>) -> Vec
 }
 
 #[tauri::command]
+fn list_my_open_project_tasks(employee_id: String, state: tauri::State<AppState>) -> Vec<MyProjectTask> {
+    let db = state.0.lock().unwrap();
+    db.list_my_open_project_tasks(&employee_id).into_iter().map(to_my_project_task).collect()
+}
+
+#[tauri::command]
 fn add_regulation_entry(payload: AddRegulationEntryPayload, state: tauri::State<AppState>) -> Result<RegulationEntry, String> {
     let db = state.0.lock().unwrap();
     db.add_regulation_entry(&payload.actor_id, &payload.regulation_id, &payload.target_employee_id, &payload.content, payload.attachment_data.as_deref(), payload.attachment_name.as_deref(), payload.deadline.as_deref())
@@ -2653,6 +2682,7 @@ fn main() {
             remove_regulation_member,
             list_regulation_entries,
             list_my_open_tasks,
+            list_my_open_project_tasks,
             add_regulation_entry,
             edit_regulation_entry,
             delete_regulation_entry,

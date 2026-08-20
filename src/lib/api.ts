@@ -246,6 +246,16 @@ export type MyTask = {
   createdAt: string;
 };
 
+export type MyProjectTask = {
+  messageId: string;
+  projectId: string;
+  projectNumber: string;
+  projectName: string;
+  content: string;
+  deadline: string | null;
+  createdAt: string;
+};
+
 export type RegulationReply = {
   id: string;
   entryId: string;
@@ -678,6 +688,7 @@ export const api = {
 
   listRegulationEntries: (regulationId: string) => invoke<RegulationEntry[]>('list_regulation_entries', { regulationId }),
   listMyOpenTasks: (employeeId: string) => invoke<MyTask[]>('list_my_open_tasks', { employeeId }),
+  listMyOpenProjectTasks: (employeeId: string) => invoke<MyProjectTask[]>('list_my_open_project_tasks', { employeeId }),
   addRegulationEntry: (payload: { actorId: string; regulationId: string; targetEmployeeId: string; content: string; attachmentData?: string | null; attachmentName?: string | null; deadline?: string | null }) =>
     invoke<RegulationEntry>('add_regulation_entry', { payload }),
   editRegulationEntry: (payload: { actorId: string; entryId: string; content: string }) =>

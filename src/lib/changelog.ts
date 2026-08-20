@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.2.24';
+export const APP_VERSION = '0.2.25';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.2.25',
+      items: [
+        'В регламентах и проектах отправка новой записи/сообщения теперь работает по Enter (Shift+Enter — перенос строки), композер переоформлен под единый стиль IB Чата',
+        'Задача, порученная коллеге в регламенте или проекте, после выполнения теперь автоматически возвращается в ваш собственный тред — вместе со всеми ответами/комментариями, а не остаётся навсегда в чужой переписке',
+        'На главной странице "Мои задачи" теперь показывает задачи не только из регламентов, но и из проектов — все вместе, просроченные и близкие к сроку по-прежнему первыми в списке',
+      ],
+    },
     {
       version: '0.2.24',
       items: [
@@ -454,6 +462,14 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.2.25',
+      items: [
+        "Reglamentlar va loyihalarda yangi yozuv/xabar yuborish endi Enter orqali ishlaydi (Shift+Enter — qator ko'chirish), komposer IB Chat bilan bir xil uslubga o'tkazildi",
+        "Reglament yoki loyihada hamkasbga topshirilgan vazifa bajarilgandan so'ng endi avtomatik ravishda o'zingizning tredingizga qaytadi — barcha javoblar/izohlar bilan birga, boshqa birovning yozishmasida abadiy qolmaydi",
+        "Bosh sahifadagi \"Mening vazifalarim\" endi nafaqat reglamentlardagi, balki loyihalardagi vazifalarni ham ko'rsatadi — barchasi birga, muddati o'tgan va yaqinlashganlari ro'yxat boshida",
+      ],
+    },
+    {
       version: '0.2.24',
       items: [
         "Chatdagi bildirishnomalar faqat bir marta kelib, keyingilari kelmasligining haqiqiy sababi tuzatildi — yozishma ochiq turganda chat uni har 4 soniyada o'qilgan deb belgilardi, shu sababli banner ulgurmasdi. Endi faqat yozishmani ongli ravishda ochganda o'qilgan deb belgilanadi, har bir fon so'rovida emas — endi har bir yangi xabarga bildirishnoma keladi",
@@ -891,6 +907,14 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.2.25',
+      items: [
+        "Регламентлар ва лойиҳаларда янги ёзув/хабар юбориш энди Enter орқали ишлайди (Shift+Enter — қатор кўчириш), композер IB Чат билан бир хил услубга ўтказилди",
+        "Регламент ёки лойиҳада ҳамкасбга топширилган вазифа бажарилгандан сўнг энди автоматик равишда ўзингизнинг тредингизга қайтади — барча жавоблар/изоҳлар билан бирга, бошқа бировнинг ёзишмасида абадий қолмайди",
+        "Бош саҳифадаги \"Менинг вазифаларим\" энди нафақат регламентлардаги, балки лойиҳалардаги вазифаларни ҳам кўрсатади — барчаси бирга, муддати ўтган ва яқинлашганлари рўйхат бошида",
+      ],
+    },
     {
       version: '0.2.24',
       items: [

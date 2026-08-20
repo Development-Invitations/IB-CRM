@@ -891,21 +891,38 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
 
                   {canPost ? (
                     <div className="reg-add-entry">
-                      <textarea rows={2} value={chatText} onChange={(e) => setChatText(e.target.value)} placeholder={t('projects.chatPlaceholder')} />
-                      <div className="reg-add-entry-row">
-                        <label className="reg-deadline-field">
-                          <CalendarClock size={14} />
-                          <span>{t('projects.deadlineLabel')}</span>
-                          <input type="date" value={chatDeadline} onChange={(e) => setChatDeadline(e.target.value)} />
-                        </label>
-                        <button className="modal-btn" onClick={() => fileInputRef.current?.click()} title={t('projects.attachBtn')} disabled={attachBusy}>
-                          <Paperclip size={14} />
-                          {attachName && <span style={{ maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachName}</span>}
+                      {attachName && (
+                        <div className="chat-composer-attach-chip">
+                          <Paperclip size={12} />
+                          <span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachName}</span>
+                          <button onClick={() => { setAttachData(null); setAttachName(null); }}><X size={12} /></button>
+                        </div>
+                      )}
+                      <label className="reg-deadline-field">
+                        <CalendarClock size={14} />
+                        <span>{t('projects.deadlineLabel')}</span>
+                        <input type="date" value={chatDeadline} onChange={(e) => setChatDeadline(e.target.value)} />
+                      </label>
+                      <div className="chat-composer-bar">
+                        <button type="button" className="chat-composer-icon-btn" onClick={() => fileInputRef.current?.click()} title={t('projects.attachBtn')} disabled={attachBusy}>
+                          <Paperclip size={18} />
                         </button>
                         <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleFileAttach} accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" />
-                        {attachName && <button className="regulation-remove-attach" onClick={() => { setAttachData(null); setAttachName(null); }}><X size={12} /></button>}
-                        <button className="modal-btn" onClick={handleSendChat} disabled={!chatText.trim() || chatBusy}>
-                          <Send size={14} /> {t('projects.chatSendBtn')}
+                        <textarea
+                          rows={1}
+                          className="chat-composer-input"
+                          value={chatText}
+                          onChange={(e) => setChatText(e.target.value)}
+                          placeholder={t('projects.chatPlaceholder')}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleSendChat();
+                            }
+                          }}
+                        />
+                        <button type="button" className="chat-composer-send-btn" onClick={handleSendChat} disabled={!chatText.trim() || chatBusy}>
+                          <Send size={16} />
                         </button>
                       </div>
                     </div>

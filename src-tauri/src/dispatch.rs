@@ -344,6 +344,10 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
             let employee_id = field(&payload, "employeeId")?;
             Ok(to_json(db.list_my_open_tasks(&employee_id).into_iter().map(crate::to_my_task).collect::<Vec<_>>()))
         }
+        "list_my_open_project_tasks" => {
+            let employee_id = field(&payload, "employeeId")?;
+            Ok(to_json(db.list_my_open_project_tasks(&employee_id).into_iter().map(crate::to_my_project_task).collect::<Vec<_>>()))
+        }
         "add_regulation_entry" => {
             let p: crate::AddRegulationEntryPayload = from_payload(payload)?;
             db.add_regulation_entry(&p.actor_id, &p.regulation_id, &p.target_employee_id, &p.content, p.attachment_data.as_deref(), p.attachment_name.as_deref(), p.deadline.as_deref())

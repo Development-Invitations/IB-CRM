@@ -3330,6 +3330,7 @@ button.employees-add-btn {
   color: var(--color-text-muted);
   flex-shrink: 0;
   transition: border-color 0.15s;
+  margin-bottom: 8px;
 }
 .reg-deadline-field:focus-within { border-color: var(--color-accent); }
 .reg-deadline-field svg { flex-shrink: 0; color: var(--color-accent); }

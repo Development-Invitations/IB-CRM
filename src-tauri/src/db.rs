@@ -299,6 +299,16 @@ pub struct MyTaskRecord {
     pub created_at: String,
 }
 
+pub struct MyProjectTaskRecord {
+    pub message_id: String,
+    pub project_id: String,
+    pub project_number: String,
+    pub project_name: String,
+    pub content: String,
+    pub deadline: Option<String>,
+    pub created_at: String,
+}
+
 pub struct RegulationReplyRecord {
     pub id: String,
     pub entry_id: String,
@@ -3250,15 +3260,40 @@ impl Db {
         if !["open", "done", "cancelled"].contains(&new_status) {
             return Err("Некорректный статус задачи".into());
         }
-        let (project_id, sender_id): (String, String) = self.conn
-            .query_row("SELECT project_id, sender_id FROM project_chat_messages WHERE id = ?1", params![message_id], |row| Ok((row.get(0)?, row.get(1)?)))
+        let (project_id, sender_id, target_employee_id): (String, String, String) = self.conn
+            .query_row(
+                "SELECT project_id, sender_id, target_employee_id FROM project_chat_messages WHERE id = ?1",
+                params![message_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
             .map_err(|_| "Сообщение не найдено".to_string())?;
         let project = self.get_project(&project_id).ok_or_else(|| "Проект не найден".to_string())?;
         if !self.can_manage_project(actor_id, &project.owner_id) && sender_id != actor_id {
             return Err("Недостаточно прав".into());
         }
-        self.conn.execute("UPDATE project_chat_messages SET status = ?1 WHERE id = ?2", params![new_status, message_id])
-            .map_err(|e| e.to_string())?;
+        // Задачу, порученную коллеге (target_employee_id != sender_id), после
+        // выполнения возвращаем обратно в тред того, кто её поставил — иначе
+        // она навсегда остаётся в треде исполнителя, и постановщик никак не
+        // узнаёт о завершении, кроме как вручную заходя в чужой тред (см.
+        // журнал v0.2.25 в docs/TZ.md). Ответы/комментарии никуда переносить
+        // не нужно — они привязаны к message_id, а не к target_employee_id, и
+        // "переезжают" вместе с записью автоматически.
+        if new_status == "done" && target_employee_id != sender_id {
+            self.conn
+                .execute(
+                    "UPDATE project_chat_messages SET status = ?1, target_employee_id = ?2 WHERE id = ?3",
+                    params![new_status, sender_id, message_id],
+                )
+                .map_err(|e| e.to_string())?;
+            if sender_id != actor_id {
+                let title = format!("Задача выполнена и возвращена вам в проекте «{}»", project.name);
+                self.notify(&sender_id, "project_message_assigned", &title, None, Some("project"), Some(&project_id));
+            }
+        } else {
+            self.conn
+                .execute("UPDATE project_chat_messages SET status = ?1 WHERE id = ?2", params![new_status, message_id])
+                .map_err(|e| e.to_string())?;
+        }
         Ok(())
     }
 
@@ -3686,6 +3721,36 @@ impl Db {
         .unwrap_or_default()
     }
 
+    // Тот же виджет "Мои задачи" на дашборде — теперь и по проектам, не
+    // только по регламентам (раньше проектные задачи там вообще не
+    // учитывались, хотя модель "target_employee_id + deadline + status"
+    // у project_chat_messages зеркальна regulation_entries).
+    pub fn list_my_open_project_tasks(&self, employee_id: &str) -> Vec<MyProjectTaskRecord> {
+        let mut stmt = match self.conn.prepare(
+            "SELECT m.id, m.project_id, p.project_number, p.name, m.content, m.deadline, m.created_at
+             FROM project_chat_messages m
+             JOIN projects p ON p.id = m.project_id
+             WHERE m.target_employee_id = ?1 AND m.status = 'open' AND p.status = 'active' AND m.is_deleted = 0
+             ORDER BY CASE WHEN m.deadline IS NULL THEN 1 ELSE 0 END, m.deadline ASC, m.created_at ASC",
+        ) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map(params![employee_id], |row| {
+            Ok(MyProjectTaskRecord {
+                message_id: row.get(0)?,
+                project_id: row.get(1)?,
+                project_number: row.get(2)?,
+                project_name: row.get(3)?,
+                content: row.get(4)?,
+                deadline: row.get(5)?,
+                created_at: row.get(6)?,
+            })
+        })
+        .map(|rows| rows.filter_map(|r| r.ok()).collect())
+        .unwrap_or_default()
+    }
+
     pub fn add_regulation_entry(
         &self,
         actor_id: &str,
@@ -3836,15 +3901,40 @@ impl Db {
         if !["open", "done", "cancelled"].contains(&new_status) {
             return Err("Некорректный статус задачи".into());
         }
-        let (regulation_id, author_id): (String, String) = self.conn
-            .query_row("SELECT regulation_id, author_id FROM regulation_entries WHERE id = ?1", params![entry_id], |row| Ok((row.get(0)?, row.get(1)?)))
+        let (regulation_id, author_id, target_employee_id): (String, String, String) = self.conn
+            .query_row(
+                "SELECT regulation_id, author_id, target_employee_id FROM regulation_entries WHERE id = ?1",
+                params![entry_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
             .map_err(|_| "Запись не найдена".to_string())?;
         let reg = self.get_regulation(&regulation_id).ok_or_else(|| "Регламент не найден".to_string())?;
         if !self.is_admin(actor_id) && reg.owner_id != actor_id && author_id != actor_id {
             return Err("Недостаточно прав".into());
         }
-        self.conn.execute("UPDATE regulation_entries SET status = ?1, updated_at = datetime('now') WHERE id = ?2", params![new_status, entry_id])
-            .map_err(|e| e.to_string())?;
+        // Задачу, порученную коллеге (target_employee_id != author_id), после
+        // выполнения возвращаем обратно в тред автора — иначе она навсегда
+        // остаётся в треде исполнителя, и постановщик никак не узнаёт о
+        // завершении, кроме как вручную заходя в чужой тред (пользователь
+        // явно жаловался на это — см. журнал v0.2.25 в docs/TZ.md). Ответы
+        // никуда переносить не нужно — привязаны к entry_id, "переезжают"
+        // вместе с записью автоматически.
+        if new_status == "done" && target_employee_id != author_id {
+            self.conn
+                .execute(
+                    "UPDATE regulation_entries SET status = ?1, target_employee_id = ?2, updated_at = datetime('now') WHERE id = ?3",
+                    params![new_status, author_id, entry_id],
+                )
+                .map_err(|e| e.to_string())?;
+            if author_id != actor_id {
+                let title = format!("Задача выполнена и возвращена вам в регламенте «{}»", reg.title);
+                self.notify(&author_id, "regulation_entry_assigned", &title, None, Some("regulation"), Some(&regulation_id));
+            }
+        } else {
+            self.conn
+                .execute("UPDATE regulation_entries SET status = ?1, updated_at = datetime('now') WHERE id = ?2", params![new_status, entry_id])
+                .map_err(|e| e.to_string())?;
+        }
         Ok(())
     }
 

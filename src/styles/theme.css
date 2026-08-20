@@ -301,24 +301,40 @@ html.toast-window-root, html.toast-window-root body, html.toast-window-root #roo
 .firstrun-mode-btn {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
   width: 100%;
-  padding: 16px;
-  margin-bottom: 12px;
+  padding: 18px 20px;
+  margin-bottom: 14px;
   border-radius: var(--radius);
   border: 1px solid var(--color-border);
   background: var(--color-surface-2);
   color: var(--color-text);
   text-align: left;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
-.firstrun-mode-btn:hover { background: var(--color-border); }
+.firstrun-mode-btn:hover { background: var(--color-border); transform: translateY(-1px); }
 .firstrun-mode-btn.primary {
   background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface-2));
   border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
 }
-.firstrun-mode-btn span { display: flex; flex-direction: column; gap: 2px; }
-.firstrun-mode-btn strong { font-size: 14px; }
+.firstrun-mode-btn > span { display: flex; flex-direction: column; gap: 3px; }
+.firstrun-mode-btn strong { font-size: 15px; }
+
+.firstrun-mode-icon {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--color-accent) 16%, var(--color-surface));
+  color: var(--color-accent);
+}
+.firstrun-mode-btn.primary .firstrun-mode-icon {
+  background: color-mix(in srgb, var(--color-accent) 28%, var(--color-surface));
+}
 
 .firstrun-screen {
   flex-direction: column;

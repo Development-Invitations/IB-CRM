@@ -31,11 +31,17 @@ export default function RichEditor({
   onChange,
   resetKey,
   placeholder,
+  onSubmitEnter,
 }: {
   value: string;
   onChange: (html: string) => void;
   resetKey: string;
   placeholder?: string;
+  // Только для короткоформенных мест (комментарии) — Enter отправляет,
+  // Shift+Enter переносит строку, как в остальных композерах приложения.
+  // Не передаётся в композер создания/редактирования темы — там Enter
+  // должен оставаться переносом строки/абзаца для многострочного контента.
+  onSubmitEnter?: () => void;
 }) {
   const { t } = useLocale();
   const { showToast } = useToast();
@@ -192,6 +198,11 @@ export default function RichEditor({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (onSubmitEnter && e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      onSubmitEnter();
+      return;
+    }
     const key = e.key.toLowerCase();
     const mod = e.ctrlKey || e.metaKey;
     if (!mod || key !== 'z' && key !== 'y') return;

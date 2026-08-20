@@ -13,6 +13,7 @@ import { session } from './lib/session';
 import { useLocale } from './lib/i18n';
 import { onSessionExpired } from './lib/sessionExpiry';
 import { saveReturnPath, consumeReturnPath } from './lib/returnPath';
+import { applyRuntimeIcon } from './lib/appLogo';
 
 export default function App() {
   const { t } = useLocale();
@@ -86,6 +87,11 @@ export default function App() {
       setAdminExists(res);
       setLoading(false);
     });
+    // Если админ заменил логотип (см. Настройки → Логотип) — применяем его
+    // к окну/панели задач сразу при запуске, не дожидаясь входа. Тихо
+    // игнорируем ошибку — свежая база без заданного лого вернёт null, а
+    // окружения без поддержки set_icon не должны ронять загрузку приложения.
+    api.getAppLogo().then((logo) => { if (logo) applyRuntimeIcon(logo).catch(() => {}); }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isToastWindow]);
 

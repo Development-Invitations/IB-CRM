@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Settings as SettingsIcon, User, Home, MessageCircle } from 'lucide-react';
+import { Bell, Settings as SettingsIcon, User, Home, MessageCircle, Handshake } from 'lucide-react';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { primaryMonitor, LogicalPosition } from '@tauri-apps/api/window';
 import { emit, listen } from '@tauri-apps/api/event';
@@ -311,6 +311,12 @@ export default function Topbar({ employee }: { employee: Employee }) {
       <div className="topbar-title">{t('topbar.welcome', { name: employee.fullName || employee.login })}</div>
 
       <div className="topbar-actions">
+        {employee.isAdmin && (
+          <button className="icon-btn" onClick={() => navigate('/dashboard/partners')} aria-label={t('topbar.partners')}>
+            <Handshake size={20} />
+          </button>
+        )}
+
         <button className="icon-btn" onClick={() => navigate('/dashboard/chat')} aria-label={t('topbar.chat')}>
           <MessageCircle size={20} />
         </button>

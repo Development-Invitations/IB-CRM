@@ -1,21 +1,27 @@
 import { useEffect, useState, FormEvent } from 'react';
-import { api, type Client } from '../lib/api';
+import { api, type Client, type Employee, type Partner } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
 import { formatUzPhone } from '../lib/phone';
 import Modal from './Modal';
+import Select from './Select';
 
 export default function ClientFormModal({
   open,
   onClose,
   client,
-  currentEmployeeId,
+  currentEmployee,
+  lockedPartnerId,
   onSaved,
 }: {
   open: boolean;
   onClose: () => void;
   client?: Client;
-  currentEmployeeId: string;
+  currentEmployee: Employee;
+  // undefined — обычная неограниченная страница CRM, выбор партнёра свободный;
+  // строка/null — форма открыта в контексте конкретного партнёра (его панель
+  // или админский просмотр), селект партнёра скрыт/зафиксирован.
+  lockedPartnerId?: string | null;
   onSaved: () => void;
 }) {
   const { t } = useLocale();
@@ -27,8 +33,18 @@ export default function ClientFormModal({
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
+  const [dealValue, setDealValue] = useState('');
+  const [partnerId, setPartnerId] = useState('');
+  const [partners, setPartners] = useState<Partner[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const showPartnerSelect = !currentEmployee.isPartner && lockedPartnerId === undefined;
+
+  useEffect(() => {
+    if (!showPartnerSelect) return;
+    api.listPartners().then(setPartners).catch(() => {});
+  }, [showPartnerSelect]);
 
   useEffect(() => {
     if (!open) return;
@@ -39,8 +55,10 @@ export default function ClientFormModal({
     setEmail(client?.email ?? '');
     setAddress(client?.address ?? '');
     setNotes(client?.notes ?? '');
+    setDealValue(client?.dealValue ?? '');
+    setPartnerId(lockedPartnerId !== undefined ? (lockedPartnerId ?? '') : (client?.partnerId ?? ''));
     setError('');
-  }, [open, client]);
+  }, [open, client, lockedPartnerId]);
 
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault();
@@ -59,12 +77,14 @@ export default function ClientFormModal({
         email: email.trim() || null,
         address: address.trim() || null,
         notes: notes.trim() || null,
+        partnerId: lockedPartnerId !== undefined ? lockedPartnerId : (partnerId || null),
+        dealValue: dealValue.trim() || null,
       };
       if (client) {
-        await api.updateClient({ id: client.id, ...shared });
+        await api.updateClient({ actorId: currentEmployee.id, id: client.id, ...shared });
         showToast('success', t('clients.updated'));
       } else {
-        await api.createClient({ actorId: currentEmployeeId, ...shared });
+        await api.createClient({ actorId: currentEmployee.id, ...shared });
         showToast('success', t('clients.added'));
       }
       onSaved();
@@ -130,6 +150,22 @@ export default function ClientFormModal({
           <label>{t('clients.notesLabel')}</label>
           <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('clients.notesPlaceholder')} />
         </div>
+
+        <div className="field">
+          <label>{t('clients.dealValueLabel')}</label>
+          <input value={dealValue} onChange={(e) => setDealValue(e.target.value)} placeholder={t('clients.dealValuePlaceholder')} />
+        </div>
+
+        {showPartnerSelect && (
+          <div className="field">
+            <label>{t('clients.partnerLabel')}</label>
+            <Select
+              value={partnerId}
+              options={[{ value: '', label: t('clients.originCrm') }, ...partners.map((p) => ({ value: p.id, label: p.name }))]}
+              onChange={setPartnerId}
+            />
+          </div>
+        )}
       </form>
     </Modal>
   );

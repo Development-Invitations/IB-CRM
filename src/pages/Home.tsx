@@ -23,7 +23,7 @@ export default function Home({ employee }: { employee: Employee }) {
       api.listEmployees(),
       api.listRegulations(),
       api.listProjects(),
-      api.listClients(),
+      api.listClients({ actorId: employee.id }),
       api.listMyOpenTasks(employee.id),
       api.listMyOpenProjectTasks(employee.id),
     ])

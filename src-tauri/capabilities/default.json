@@ -25,6 +25,8 @@
     "core:window:allow-set-fullscreen",
     "core:window:allow-maximize",
     "core:window:allow-unmaximize",
+    "core:window:allow-set-icon",
+    "core:image:allow-new",
     "core:event:allow-emit",
     "core:event:allow-emit-to",
     "core:event:allow-listen",

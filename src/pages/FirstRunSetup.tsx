@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { rememberedLogin } from '../lib/session';
 import { connection } from '../lib/connection';
 import { useLocale } from '../lib/i18n';
+import { useAppLogo } from '../lib/appLogo';
 
 type Step = 'choice' | 'connect' | 'admin';
 
@@ -12,10 +13,11 @@ type Step = 'choice' | 'connect' | 'admin';
 // шапка над карточкой, а не замена самой карточки — общие .auth-card/
 // .auth-screen (которыми пользуется и Login.tsx) не трогаем.
 function FirstRunBrand() {
+  const logo = useAppLogo();
   return (
     <div className="firstrun-brand">
       <div className="firstrun-glow">
-        <img src="/brand/logo-mark.png" alt="" className="firstrun-logo" />
+        <img src={logo} alt="" className="firstrun-logo" />
       </div>
       <div className="firstrun-wordmark">IB CRM</div>
     </div>
@@ -110,7 +112,7 @@ export default function FirstRunSetup({
           <p className="subtitle">{t('firstRun.modeSubtitle')}</p>
 
           <button type="button" className="firstrun-mode-btn primary" onClick={() => setStep('admin')}>
-            <HardDrive size={20} />
+            <span className="firstrun-mode-icon"><HardDrive size={22} /></span>
             <span>
               <strong>{t('firstRun.modeLocalTitle')}</strong>
               <span className="settings-hint">{t('firstRun.modeLocalHint')}</span>
@@ -118,7 +120,7 @@ export default function FirstRunSetup({
           </button>
 
           <button type="button" className="firstrun-mode-btn" onClick={() => { setConnectMode('lan'); setStep('connect'); }}>
-            <Server size={20} />
+            <span className="firstrun-mode-icon"><Server size={22} /></span>
             <span>
               <strong>{t('firstRun.modeClientTitle')}</strong>
               <span className="settings-hint">{t('firstRun.modeClientHint')}</span>
@@ -126,7 +128,7 @@ export default function FirstRunSetup({
           </button>
 
           <button type="button" className="firstrun-mode-btn" onClick={() => { setConnectMode('radmin'); setStep('connect'); }}>
-            <Wifi size={20} />
+            <span className="firstrun-mode-icon"><Wifi size={22} /></span>
             <span>
               <strong>{t('firstRun.modeRadminTitle')}</strong>
               <span className="settings-hint">{t('firstRun.modeRadminHint')}</span>

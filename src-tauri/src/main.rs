@@ -196,6 +196,12 @@ struct Client {
     created_by_name: Option<String>,
     #[serde(rename = "createdAt")]
     created_at: String,
+    #[serde(rename = "partnerId")]
+    partner_id: Option<String>,
+    #[serde(rename = "partnerName")]
+    partner_name: Option<String>,
+    #[serde(rename = "dealValue")]
+    deal_value: Option<String>,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -431,6 +437,84 @@ struct RegulationReply {
     is_deleted: bool,
 }
 
+// ---- Регламенты между админом и конкретным партнёром (v0.3.0) ----
+#[derive(Clone, serde::Serialize)]
+struct PartnerRegulation {
+    id: String,
+    #[serde(rename = "regNumber")]
+    reg_number: String,
+    #[serde(rename = "partnerId")]
+    partner_id: String,
+    #[serde(rename = "partnerName")]
+    partner_name: String,
+    #[serde(rename = "clientId")]
+    client_id: Option<String>,
+    #[serde(rename = "clientName")]
+    client_name: Option<String>,
+    title: String,
+    description: Option<String>,
+    status: String,
+    deadline: Option<String>,
+    #[serde(rename = "closedAt")]
+    closed_at: Option<String>,
+    #[serde(rename = "createdBy")]
+    created_by: Option<String>,
+    #[serde(rename = "createdByName")]
+    created_by_name: Option<String>,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+    #[serde(rename = "updatedAt")]
+    updated_at: String,
+    #[serde(rename = "entryCount")]
+    entry_count: i64,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct PartnerRegulationEntry {
+    id: String,
+    #[serde(rename = "partnerRegulationId")]
+    partner_regulation_id: String,
+    #[serde(rename = "authorId")]
+    author_id: String,
+    #[serde(rename = "authorName")]
+    author_name: String,
+    content: String,
+    #[serde(rename = "attachmentData")]
+    attachment_data: Option<String>,
+    #[serde(rename = "attachmentName")]
+    attachment_name: Option<String>,
+    deadline: Option<String>,
+    status: String,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+    #[serde(rename = "updatedAt")]
+    updated_at: String,
+    #[serde(rename = "replyCount")]
+    reply_count: i64,
+    #[serde(rename = "editedAt")]
+    edited_at: Option<String>,
+    #[serde(rename = "isDeleted")]
+    is_deleted: bool,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct PartnerRegulationReply {
+    id: String,
+    #[serde(rename = "entryId")]
+    entry_id: String,
+    #[serde(rename = "authorId")]
+    author_id: String,
+    #[serde(rename = "authorName")]
+    author_name: String,
+    content: String,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+    #[serde(rename = "editedAt")]
+    edited_at: Option<String>,
+    #[serde(rename = "isDeleted")]
+    is_deleted: bool,
+}
+
 #[derive(Clone, serde::Serialize)]
 struct RegulationReminder {
     id: String,
@@ -490,6 +574,8 @@ struct BlogTopic {
     created_at: String,
     #[serde(rename = "commentCount")]
     comment_count: i64,
+    #[serde(rename = "partnerAudience")]
+    partner_audience: Option<String>,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -826,6 +912,21 @@ struct ResolveAbsenceRequestPayload {
 }
 
 #[derive(serde::Deserialize)]
+struct ListClientsPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "partnerId")]
+    partner_id: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct GetClientPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    id: String,
+}
+
+#[derive(serde::Deserialize)]
 struct CreateClientPayload {
     #[serde(rename = "actorId")]
     actor_id: String,
@@ -838,10 +939,16 @@ struct CreateClientPayload {
     email: Option<String>,
     address: Option<String>,
     notes: Option<String>,
+    #[serde(rename = "partnerId")]
+    partner_id: Option<String>,
+    #[serde(rename = "dealValue")]
+    deal_value: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
 struct UpdateClientPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
     id: String,
     name: String,
     #[serde(rename = "contactPerson")]
@@ -852,6 +959,10 @@ struct UpdateClientPayload {
     email: Option<String>,
     address: Option<String>,
     notes: Option<String>,
+    #[serde(rename = "partnerId")]
+    partner_id: Option<String>,
+    #[serde(rename = "dealValue")]
+    deal_value: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -859,6 +970,14 @@ struct DeleteClientPayload {
     #[serde(rename = "adminId")]
     admin_id: String,
     id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct ListClientHistoryPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "clientId")]
+    client_id: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -1073,6 +1192,130 @@ struct AddRegulationReplyPayload {
     content: String,
 }
 
+// ---- Регламенты между админом и конкретным партнёром (v0.3.0) ----
+#[derive(serde::Deserialize)]
+struct ListPartnerRegulationsPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "partnerId")]
+    partner_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct CreatePartnerRegulationPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "partnerId")]
+    partner_id: String,
+    title: String,
+    description: Option<String>,
+    #[serde(rename = "clientId")]
+    client_id: Option<String>,
+    deadline: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct UpdatePartnerRegulationPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    id: String,
+    title: String,
+    description: Option<String>,
+    #[serde(rename = "clientId")]
+    client_id: Option<String>,
+    deadline: Option<String>,
+    status: String,
+}
+
+#[derive(serde::Deserialize)]
+struct DeletePartnerRegulationPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct ListPartnerRegulationEntriesPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "partnerRegulationId")]
+    partner_regulation_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct AddPartnerRegulationEntryPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "partnerRegulationId")]
+    partner_regulation_id: String,
+    content: String,
+    #[serde(rename = "attachmentData")]
+    attachment_data: Option<String>,
+    #[serde(rename = "attachmentName")]
+    attachment_name: Option<String>,
+    deadline: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct EditPartnerRegulationEntryPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "entryId")]
+    entry_id: String,
+    content: String,
+}
+
+#[derive(serde::Deserialize)]
+struct DeletePartnerRegulationEntryPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "entryId")]
+    entry_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct UpdatePartnerRegulationEntryStatusPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "entryId")]
+    entry_id: String,
+    status: String,
+}
+
+#[derive(serde::Deserialize)]
+struct ListPartnerRegulationRepliesPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "entryId")]
+    entry_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct AddPartnerRegulationReplyPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "entryId")]
+    entry_id: String,
+    content: String,
+}
+
+#[derive(serde::Deserialize)]
+struct EditPartnerRegulationReplyPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "replyId")]
+    reply_id: String,
+    content: String,
+}
+
+#[derive(serde::Deserialize)]
+struct DeletePartnerRegulationReplyPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "replyId")]
+    reply_id: String,
+}
+
 #[derive(serde::Deserialize)]
 struct AddRegulationReminderPayload {
     #[serde(rename = "actorId")]
@@ -1112,6 +1355,8 @@ struct CreateBlogTopicPayload {
     category: String,
     title: String,
     content: Option<String>,
+    #[serde(rename = "partnerAudience")]
+    partner_audience: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -1122,6 +1367,8 @@ struct UpdateBlogTopicPayload {
     category: String,
     title: String,
     content: Option<String>,
+    #[serde(rename = "partnerAudience")]
+    partner_audience: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -1273,6 +1520,14 @@ struct SetRadminSettingsPayload {
     #[serde(rename = "networkPassword")]
     network_password: String,
     note: String,
+}
+
+#[derive(serde::Deserialize)]
+struct SetAppLogoPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    #[serde(rename = "logoData")]
+    logo_data: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -1466,6 +1721,9 @@ fn to_client(c: db::ClientRecord) -> Client {
         created_by: c.created_by,
         created_by_name: c.created_by_name,
         created_at: c.created_at,
+        partner_id: c.partner_id,
+        partner_name: c.partner_name,
+        deal_value: c.deal_value,
     }
 }
 
@@ -1590,6 +1848,53 @@ fn to_reg_reply(r: db::RegulationReplyRecord) -> RegulationReply {
     }
 }
 
+fn to_partner_regulation(r: db::PartnerRegulationRecord) -> PartnerRegulation {
+    PartnerRegulation {
+        id: r.id,
+        reg_number: r.reg_number,
+        partner_id: r.partner_id,
+        partner_name: r.partner_name,
+        client_id: r.client_id,
+        client_name: r.client_name,
+        title: r.title,
+        description: r.description,
+        status: r.status,
+        deadline: r.deadline,
+        closed_at: r.closed_at,
+        created_by: r.created_by,
+        created_by_name: r.created_by_name,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+        entry_count: r.entry_count,
+    }
+}
+
+fn to_partner_regulation_entry(e: db::PartnerRegulationEntryRecord) -> PartnerRegulationEntry {
+    PartnerRegulationEntry {
+        id: e.id,
+        partner_regulation_id: e.partner_regulation_id,
+        author_id: e.author_id,
+        author_name: e.author_name,
+        content: e.content,
+        attachment_data: e.attachment_data,
+        attachment_name: e.attachment_name,
+        deadline: e.deadline,
+        status: e.status,
+        created_at: e.created_at,
+        updated_at: e.updated_at,
+        reply_count: e.reply_count,
+        edited_at: e.edited_at,
+        is_deleted: e.is_deleted,
+    }
+}
+
+fn to_partner_regulation_reply(r: db::PartnerRegulationReplyRecord) -> PartnerRegulationReply {
+    PartnerRegulationReply {
+        id: r.id, entry_id: r.entry_id, author_id: r.author_id, author_name: r.author_name, content: r.content, created_at: r.created_at,
+        edited_at: r.edited_at, is_deleted: r.is_deleted,
+    }
+}
+
 fn to_reg_reminder(r: db::RegulationReminderRecord) -> RegulationReminder {
     RegulationReminder {
         id: r.id,
@@ -1615,6 +1920,7 @@ fn to_blog_topic(t: db::BlogTopicRecord) -> BlogTopic {
         id: t.id, category: t.category, title: t.title, content: t.content,
         created_by: t.created_by, created_by_name: t.created_by_name,
         pinned: t.pinned, created_at: t.created_at, comment_count: t.comment_count,
+        partner_audience: t.partner_audience,
     }
 }
 
@@ -2010,15 +2316,15 @@ fn resolve_absence_request(payload: ResolveAbsenceRequestPayload, state: tauri::
 }
 
 #[tauri::command]
-fn list_clients(state: tauri::State<AppState>) -> Vec<Client> {
+fn list_clients(payload: ListClientsPayload, state: tauri::State<AppState>) -> Vec<Client> {
     let db = state.0.lock().unwrap();
-    db.list_clients().into_iter().map(to_client).collect()
+    db.list_clients(&payload.actor_id, payload.partner_id.as_deref()).into_iter().map(to_client).collect()
 }
 
 #[tauri::command]
-fn get_client(id: String, state: tauri::State<AppState>) -> Option<Client> {
+fn get_client(payload: GetClientPayload, state: tauri::State<AppState>) -> Option<Client> {
     let db = state.0.lock().unwrap();
-    db.get_client(&id).map(to_client)
+    db.get_client(&payload.actor_id, &payload.id).map(to_client)
 }
 
 #[tauri::command]
@@ -2033,6 +2339,8 @@ fn create_client(payload: CreateClientPayload, state: tauri::State<AppState>) ->
         payload.email.as_deref(),
         payload.address.as_deref(),
         payload.notes.as_deref(),
+        payload.partner_id.as_deref(),
+        payload.deal_value.as_deref(),
     )
     .map(to_client)
 }
@@ -2041,6 +2349,7 @@ fn create_client(payload: CreateClientPayload, state: tauri::State<AppState>) ->
 fn update_client(payload: UpdateClientPayload, state: tauri::State<AppState>) -> Result<Client, String> {
     let db = state.0.lock().unwrap();
     db.update_client(
+        &payload.actor_id,
         &payload.id,
         &payload.name,
         payload.contact_person.as_deref(),
@@ -2049,6 +2358,8 @@ fn update_client(payload: UpdateClientPayload, state: tauri::State<AppState>) ->
         payload.email.as_deref(),
         payload.address.as_deref(),
         payload.notes.as_deref(),
+        payload.partner_id.as_deref(),
+        payload.deal_value.as_deref(),
     )
     .map(to_client)
 }
@@ -2060,9 +2371,9 @@ fn delete_client(payload: DeleteClientPayload, state: tauri::State<AppState>) ->
 }
 
 #[tauri::command]
-fn list_client_history(client_id: String, state: tauri::State<AppState>) -> Vec<ClientHistoryEntry> {
+fn list_client_history(payload: ListClientHistoryPayload, state: tauri::State<AppState>) -> Vec<ClientHistoryEntry> {
     let db = state.0.lock().unwrap();
-    db.list_client_history(&client_id).into_iter().map(to_client_history).collect()
+    db.list_client_history(&payload.actor_id, &payload.client_id).into_iter().map(to_client_history).collect()
 }
 
 #[tauri::command]
@@ -2328,6 +2639,95 @@ fn delete_regulation_reply(payload: DeleteRegulationReplyPayload, state: tauri::
     db.delete_regulation_reply(&payload.actor_id, &payload.reply_id)
 }
 
+// ---- Регламенты между админом и конкретным партнёром (v0.3.0) ----
+
+#[tauri::command]
+fn list_partner_regulations(payload: ListPartnerRegulationsPayload, state: tauri::State<AppState>) -> Result<Vec<PartnerRegulation>, String> {
+    let db = state.0.lock().unwrap();
+    db.list_partner_regulations(&payload.actor_id, &payload.partner_id).map(|rows| rows.into_iter().map(to_partner_regulation).collect())
+}
+
+#[tauri::command]
+fn get_partner_regulation(id: String, state: tauri::State<AppState>) -> Option<PartnerRegulation> {
+    let db = state.0.lock().unwrap();
+    db.get_partner_regulation(&id).map(to_partner_regulation)
+}
+
+#[tauri::command]
+fn create_partner_regulation(payload: CreatePartnerRegulationPayload, state: tauri::State<AppState>) -> Result<PartnerRegulation, String> {
+    let db = state.0.lock().unwrap();
+    db.create_partner_regulation(&payload.actor_id, &payload.partner_id, &payload.title, payload.description.as_deref(), payload.client_id.as_deref(), payload.deadline.as_deref())
+        .map(to_partner_regulation)
+}
+
+#[tauri::command]
+fn update_partner_regulation(payload: UpdatePartnerRegulationPayload, state: tauri::State<AppState>) -> Result<PartnerRegulation, String> {
+    let db = state.0.lock().unwrap();
+    db.update_partner_regulation(&payload.actor_id, &payload.id, &payload.title, payload.description.as_deref(), payload.client_id.as_deref(), payload.deadline.as_deref(), &payload.status)
+        .map(to_partner_regulation)
+}
+
+#[tauri::command]
+fn delete_partner_regulation(payload: DeletePartnerRegulationPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.delete_partner_regulation(&payload.admin_id, &payload.id)
+}
+
+#[tauri::command]
+fn list_partner_regulation_entries(payload: ListPartnerRegulationEntriesPayload, state: tauri::State<AppState>) -> Result<Vec<PartnerRegulationEntry>, String> {
+    let db = state.0.lock().unwrap();
+    db.list_partner_regulation_entries(&payload.actor_id, &payload.partner_regulation_id).map(|rows| rows.into_iter().map(to_partner_regulation_entry).collect())
+}
+
+#[tauri::command]
+fn add_partner_regulation_entry(payload: AddPartnerRegulationEntryPayload, state: tauri::State<AppState>) -> Result<PartnerRegulationEntry, String> {
+    let db = state.0.lock().unwrap();
+    db.add_partner_regulation_entry(&payload.actor_id, &payload.partner_regulation_id, &payload.content, payload.attachment_data.as_deref(), payload.attachment_name.as_deref(), payload.deadline.as_deref())
+        .map(to_partner_regulation_entry)
+}
+
+#[tauri::command]
+fn edit_partner_regulation_entry(payload: EditPartnerRegulationEntryPayload, state: tauri::State<AppState>) -> Result<PartnerRegulationEntry, String> {
+    let db = state.0.lock().unwrap();
+    db.edit_partner_regulation_entry(&payload.actor_id, &payload.entry_id, &payload.content).map(to_partner_regulation_entry)
+}
+
+#[tauri::command]
+fn delete_partner_regulation_entry(payload: DeletePartnerRegulationEntryPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.delete_partner_regulation_entry(&payload.actor_id, &payload.entry_id)
+}
+
+#[tauri::command]
+fn update_partner_regulation_entry_status(payload: UpdatePartnerRegulationEntryStatusPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.update_partner_regulation_entry_status(&payload.actor_id, &payload.entry_id, &payload.status)
+}
+
+#[tauri::command]
+fn list_partner_regulation_replies(payload: ListPartnerRegulationRepliesPayload, state: tauri::State<AppState>) -> Result<Vec<PartnerRegulationReply>, String> {
+    let db = state.0.lock().unwrap();
+    db.list_partner_regulation_replies(&payload.actor_id, &payload.entry_id).map(|rows| rows.into_iter().map(to_partner_regulation_reply).collect())
+}
+
+#[tauri::command]
+fn add_partner_regulation_reply(payload: AddPartnerRegulationReplyPayload, state: tauri::State<AppState>) -> Result<PartnerRegulationReply, String> {
+    let db = state.0.lock().unwrap();
+    db.add_partner_regulation_reply(&payload.actor_id, &payload.entry_id, &payload.content).map(to_partner_regulation_reply)
+}
+
+#[tauri::command]
+fn edit_partner_regulation_reply(payload: EditPartnerRegulationReplyPayload, state: tauri::State<AppState>) -> Result<PartnerRegulationReply, String> {
+    let db = state.0.lock().unwrap();
+    db.edit_partner_regulation_reply(&payload.actor_id, &payload.reply_id, &payload.content).map(to_partner_regulation_reply)
+}
+
+#[tauri::command]
+fn delete_partner_regulation_reply(payload: DeletePartnerRegulationReplyPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.delete_partner_regulation_reply(&payload.actor_id, &payload.reply_id)
+}
+
 #[tauri::command]
 fn add_regulation_reminder(payload: AddRegulationReminderPayload, state: tauri::State<AppState>) -> Result<RegulationReminder, String> {
     let db = state.0.lock().unwrap();
@@ -2358,22 +2758,22 @@ fn update_regulation_entry_deadline(payload: UpdateEntryDeadlinePayload, state: 
 }
 
 #[tauri::command]
-fn list_blog_topics(state: tauri::State<AppState>) -> Vec<BlogTopic> {
+fn list_blog_topics(actor_id: String, state: tauri::State<AppState>) -> Vec<BlogTopic> {
     let db = state.0.lock().unwrap();
-    db.list_blog_topics().into_iter().map(to_blog_topic).collect()
+    db.list_blog_topics(&actor_id).into_iter().map(to_blog_topic).collect()
 }
 
 #[tauri::command]
 fn create_blog_topic(payload: CreateBlogTopicPayload, state: tauri::State<AppState>) -> Result<BlogTopic, String> {
     let db = state.0.lock().unwrap();
-    db.create_blog_topic(&payload.actor_id, &payload.category, &payload.title, payload.content.as_deref())
+    db.create_blog_topic(&payload.actor_id, &payload.category, &payload.title, payload.content.as_deref(), payload.partner_audience.as_deref())
         .map(to_blog_topic)
 }
 
 #[tauri::command]
 fn update_blog_topic(payload: UpdateBlogTopicPayload, state: tauri::State<AppState>) -> Result<BlogTopic, String> {
     let db = state.0.lock().unwrap();
-    db.update_blog_topic(&payload.actor_id, &payload.id, &payload.category, &payload.title, payload.content.as_deref())
+    db.update_blog_topic(&payload.actor_id, &payload.id, &payload.category, &payload.title, payload.content.as_deref(), payload.partner_audience.as_deref())
         .map(to_blog_topic)
 }
 
@@ -2537,6 +2937,20 @@ fn set_radmin_settings(payload: SetRadminSettingsPayload, state: tauri::State<Ap
     let db = state.0.lock().unwrap();
     db.set_radmin_settings(&payload.admin_id, &payload.network_id, &payload.network_password, &payload.note)
         .map(to_radmin_settings)
+}
+
+// Без авторизации — логотип нужен уже на экране входа/первого запуска, до
+// того, как известен actor_id.
+#[tauri::command]
+fn get_app_logo(state: tauri::State<AppState>) -> Option<String> {
+    let db = state.0.lock().unwrap();
+    db.get_app_logo()
+}
+
+#[tauri::command]
+fn set_app_logo(payload: SetAppLogoPayload, state: tauri::State<AppState>) -> Result<Option<String>, String> {
+    let db = state.0.lock().unwrap();
+    db.set_app_logo(&payload.admin_id, payload.logo_data.as_deref())
 }
 
 #[tauri::command]
@@ -2814,6 +3228,20 @@ fn main() {
             add_regulation_reply,
             edit_regulation_reply,
             delete_regulation_reply,
+            list_partner_regulations,
+            get_partner_regulation,
+            create_partner_regulation,
+            update_partner_regulation,
+            delete_partner_regulation,
+            list_partner_regulation_entries,
+            add_partner_regulation_entry,
+            edit_partner_regulation_entry,
+            delete_partner_regulation_entry,
+            update_partner_regulation_entry_status,
+            list_partner_regulation_replies,
+            add_partner_regulation_reply,
+            edit_partner_regulation_reply,
+            delete_partner_regulation_reply,
             add_regulation_reminder,
             list_regulation_reminders,
             update_regulation_entry_deadline,
@@ -2843,6 +3271,8 @@ fn main() {
             set_server_settings,
             get_radmin_settings,
             set_radmin_settings,
+            get_app_logo,
+            set_app_logo,
             export_backup,
             restore_backup,
             get_lan_address,

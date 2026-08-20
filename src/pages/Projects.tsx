@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useContext } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Plus, Search, Pencil, Trash2, Send, UserPlus, X, Repeat, CheckSquare, XSquare, RotateCcw, ChevronDown, ChevronRight, ArrowLeft, Link2, Check, Paperclip, Forward, CalendarClock, Download } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Send, UserPlus, X, Repeat, CheckSquare, XSquare, RotateCcw, ChevronDown, ChevronRight, ArrowLeft, Link2, Check, Paperclip, Forward, CalendarClock } from 'lucide-react';
 import { api, type Employee, type Project, type ProjectMember, type ProjectChatMessage, type ProjectChatReply, type Client, type ProjectMemberRole, type RegulationEntryStatus } from '../lib/api';
 import { FullscreenContext } from './Dashboard';
 import { useLocale } from '../lib/i18n';
@@ -13,44 +13,13 @@ import Select from '../components/Select';
 import SearchableSelect from '../components/SearchableSelect';
 import ProjectFormModal from '../components/ProjectFormModal';
 import LoadingScreen from '../components/LoadingScreen';
+import AttachmentPreview from '../components/AttachmentPreview';
 
 const MSG_STATUS_KEYS: Record<RegulationEntryStatus, string> = {
   open: 'projects.entryStatusOpen',
   done: 'projects.entryStatusDone',
   cancelled: 'projects.entryStatusCancelled',
 };
-
-function AttachmentPreview({ dataUrl, name, onExpand }: { dataUrl: string; name: string | null; onExpand: () => void }) {
-  const { t } = useLocale();
-  const kind = classifyAttachment(dataUrl);
-  if (kind === 'image') {
-    return (
-      <div className="reg-attachment-media-wrap">
-        <button type="button" className="reg-attachment-image-btn" onClick={onExpand} title={name ?? undefined}>
-          <img className="reg-attachment-image" src={dataUrl} alt={name ?? ''} />
-        </button>
-        <a className="reg-attachment-download-btn" href={dataUrl} download={name ?? undefined} title={t('common.download')}>
-          <Download size={13} />
-        </a>
-      </div>
-    );
-  }
-  if (kind === 'video') {
-    return (
-      <div className="reg-attachment-media-wrap">
-        <video className="reg-attachment-video" src={dataUrl} controls preload="metadata" />
-        <a className="reg-attachment-download-link" href={dataUrl} download={name ?? undefined}>
-          <Download size={13} /> {t('common.download')}
-        </a>
-      </div>
-    );
-  }
-  return (
-    <a className="reg-entry-attachment" href={dataUrl} target="_blank" rel="noreferrer" download={name ?? undefined}>
-      <Paperclip size={13} /> <span>{name}</span>
-    </a>
-  );
-}
 
 // Компонент одного сообщения чата — отдельно, чтобы useState работал корректно
 function ChatMessage({
@@ -470,7 +439,7 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
 
   const load = () => {
     setLoading(true);
-    Promise.all([api.listProjects(), api.listClients(), api.listEmployees()])
+    Promise.all([api.listProjects(), api.listClients({ actorId: currentEmployee.id }), api.listEmployees()])
       .then(([p, c, e]) => {
         setProjects(p);
         setClients(c);

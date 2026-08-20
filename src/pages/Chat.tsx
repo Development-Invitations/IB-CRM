@@ -110,6 +110,7 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const composerInputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // id последнего сообщения в уже отрисованном списке — сравнивается на
   // каждое обновление messages (и при первом открытии канала, и при новом
@@ -725,7 +726,11 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
                         </div>
                         {!m.isDeleted && (
                           <div className="reg-entry-actions">
-                            <button className="reg-action-btn" onClick={() => setReplyTo(m)} title={t('chat.replyBtn')}>
+                            <button
+                              className="reg-action-btn"
+                              onClick={() => { setReplyTo(m); composerInputRef.current?.focus(); }}
+                              title={t('chat.replyBtn')}
+                            >
                               <Reply size={13} />
                             </button>
                             {isOwn && (
@@ -808,6 +813,7 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
               </button>
               <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleFileAttach} accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" />
               <textarea
+                ref={composerInputRef}
                 rows={1}
                 className="chat-composer-input"
                 value={text}

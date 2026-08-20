@@ -194,23 +194,28 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
         }
 
         // ---- Клиенты ----
-        "list_clients" => Ok(to_json(db.list_clients().into_iter().map(crate::to_client).collect::<Vec<_>>())),
+        "list_clients" => {
+            let p: crate::ListClientsPayload = from_payload(payload)?;
+            Ok(to_json(db.list_clients(&p.actor_id, p.partner_id.as_deref()).into_iter().map(crate::to_client).collect::<Vec<_>>()))
+        }
         "get_client" => {
-            let id = field(&payload, "id")?;
-            Ok(to_json(db.get_client(&id).map(crate::to_client)))
+            let p: crate::GetClientPayload = from_payload(payload)?;
+            Ok(to_json(db.get_client(&p.actor_id, &p.id).map(crate::to_client)))
         }
         "create_client" => {
             let p: crate::CreateClientPayload = from_payload(payload)?;
             db.create_client(
                 &p.actor_id, &p.name, p.contact_person.as_deref(), p.contact_position.as_deref(),
                 p.phone.as_deref(), p.email.as_deref(), p.address.as_deref(), p.notes.as_deref(),
+                p.partner_id.as_deref(), p.deal_value.as_deref(),
             ).map(crate::to_client).map(to_json)
         }
         "update_client" => {
             let p: crate::UpdateClientPayload = from_payload(payload)?;
             db.update_client(
-                &p.id, &p.name, p.contact_person.as_deref(), p.contact_position.as_deref(),
+                &p.actor_id, &p.id, &p.name, p.contact_person.as_deref(), p.contact_position.as_deref(),
                 p.phone.as_deref(), p.email.as_deref(), p.address.as_deref(), p.notes.as_deref(),
+                p.partner_id.as_deref(), p.deal_value.as_deref(),
             ).map(crate::to_client).map(to_json)
         }
         "delete_client" => {
@@ -218,8 +223,8 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
             db.delete_client(&p.admin_id, &p.id).map(to_json)
         }
         "list_client_history" => {
-            let client_id = field(&payload, "clientId")?;
-            Ok(to_json(db.list_client_history(&client_id).into_iter().map(crate::to_client_history).collect::<Vec<_>>()))
+            let p: crate::ListClientHistoryPayload = from_payload(payload)?;
+            Ok(to_json(db.list_client_history(&p.actor_id, &p.client_id).into_iter().map(crate::to_client_history).collect::<Vec<_>>()))
         }
         "add_client_history" => {
             let p: crate::AddClientHistoryPayload = from_payload(payload)?;
@@ -385,6 +390,68 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
             let p: crate::DeleteRegulationReplyPayload = from_payload(payload)?;
             db.delete_regulation_reply(&p.actor_id, &p.reply_id).map(to_json)
         }
+
+        // ---- Регламенты между админом и конкретным партнёром (v0.3.0) ----
+        "list_partner_regulations" => {
+            let p: crate::ListPartnerRegulationsPayload = from_payload(payload)?;
+            db.list_partner_regulations(&p.actor_id, &p.partner_id).map(|rows| rows.into_iter().map(crate::to_partner_regulation).collect::<Vec<_>>()).map(to_json)
+        }
+        "get_partner_regulation" => {
+            let id = field(&payload, "id")?;
+            Ok(to_json(db.get_partner_regulation(&id).map(crate::to_partner_regulation)))
+        }
+        "create_partner_regulation" => {
+            let p: crate::CreatePartnerRegulationPayload = from_payload(payload)?;
+            db.create_partner_regulation(&p.actor_id, &p.partner_id, &p.title, p.description.as_deref(), p.client_id.as_deref(), p.deadline.as_deref())
+                .map(crate::to_partner_regulation).map(to_json)
+        }
+        "update_partner_regulation" => {
+            let p: crate::UpdatePartnerRegulationPayload = from_payload(payload)?;
+            db.update_partner_regulation(&p.actor_id, &p.id, &p.title, p.description.as_deref(), p.client_id.as_deref(), p.deadline.as_deref(), &p.status)
+                .map(crate::to_partner_regulation).map(to_json)
+        }
+        "delete_partner_regulation" => {
+            let p: crate::DeletePartnerRegulationPayload = from_payload(payload)?;
+            db.delete_partner_regulation(&p.admin_id, &p.id).map(to_json)
+        }
+        "list_partner_regulation_entries" => {
+            let p: crate::ListPartnerRegulationEntriesPayload = from_payload(payload)?;
+            db.list_partner_regulation_entries(&p.actor_id, &p.partner_regulation_id).map(|rows| rows.into_iter().map(crate::to_partner_regulation_entry).collect::<Vec<_>>()).map(to_json)
+        }
+        "add_partner_regulation_entry" => {
+            let p: crate::AddPartnerRegulationEntryPayload = from_payload(payload)?;
+            db.add_partner_regulation_entry(&p.actor_id, &p.partner_regulation_id, &p.content, p.attachment_data.as_deref(), p.attachment_name.as_deref(), p.deadline.as_deref())
+                .map(crate::to_partner_regulation_entry).map(to_json)
+        }
+        "edit_partner_regulation_entry" => {
+            let p: crate::EditPartnerRegulationEntryPayload = from_payload(payload)?;
+            db.edit_partner_regulation_entry(&p.actor_id, &p.entry_id, &p.content).map(crate::to_partner_regulation_entry).map(to_json)
+        }
+        "delete_partner_regulation_entry" => {
+            let p: crate::DeletePartnerRegulationEntryPayload = from_payload(payload)?;
+            db.delete_partner_regulation_entry(&p.actor_id, &p.entry_id).map(to_json)
+        }
+        "update_partner_regulation_entry_status" => {
+            let p: crate::UpdatePartnerRegulationEntryStatusPayload = from_payload(payload)?;
+            db.update_partner_regulation_entry_status(&p.actor_id, &p.entry_id, &p.status).map(to_json)
+        }
+        "list_partner_regulation_replies" => {
+            let p: crate::ListPartnerRegulationRepliesPayload = from_payload(payload)?;
+            db.list_partner_regulation_replies(&p.actor_id, &p.entry_id).map(|rows| rows.into_iter().map(crate::to_partner_regulation_reply).collect::<Vec<_>>()).map(to_json)
+        }
+        "add_partner_regulation_reply" => {
+            let p: crate::AddPartnerRegulationReplyPayload = from_payload(payload)?;
+            db.add_partner_regulation_reply(&p.actor_id, &p.entry_id, &p.content).map(crate::to_partner_regulation_reply).map(to_json)
+        }
+        "edit_partner_regulation_reply" => {
+            let p: crate::EditPartnerRegulationReplyPayload = from_payload(payload)?;
+            db.edit_partner_regulation_reply(&p.actor_id, &p.reply_id, &p.content).map(crate::to_partner_regulation_reply).map(to_json)
+        }
+        "delete_partner_regulation_reply" => {
+            let p: crate::DeletePartnerRegulationReplyPayload = from_payload(payload)?;
+            db.delete_partner_regulation_reply(&p.actor_id, &p.reply_id).map(to_json)
+        }
+
         "add_regulation_reminder" => {
             let p: crate::AddRegulationReminderPayload = from_payload(payload)?;
             db.add_regulation_reminder(&p.actor_id, &p.regulation_id, p.entry_id.as_deref(), &p.target_employee_id, &p.remind_at, &p.note)
@@ -400,14 +467,17 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
         }
 
         // ---- Блог ----
-        "list_blog_topics" => Ok(to_json(db.list_blog_topics().into_iter().map(crate::to_blog_topic).collect::<Vec<_>>())),
+        "list_blog_topics" => {
+            let actor_id = field(&payload, "actorId")?;
+            Ok(to_json(db.list_blog_topics(&actor_id).into_iter().map(crate::to_blog_topic).collect::<Vec<_>>()))
+        }
         "create_blog_topic" => {
             let p: crate::CreateBlogTopicPayload = from_payload(payload)?;
-            db.create_blog_topic(&p.actor_id, &p.category, &p.title, p.content.as_deref()).map(crate::to_blog_topic).map(to_json)
+            db.create_blog_topic(&p.actor_id, &p.category, &p.title, p.content.as_deref(), p.partner_audience.as_deref()).map(crate::to_blog_topic).map(to_json)
         }
         "update_blog_topic" => {
             let p: crate::UpdateBlogTopicPayload = from_payload(payload)?;
-            db.update_blog_topic(&p.actor_id, &p.id, &p.category, &p.title, p.content.as_deref()).map(crate::to_blog_topic).map(to_json)
+            db.update_blog_topic(&p.actor_id, &p.id, &p.category, &p.title, p.content.as_deref(), p.partner_audience.as_deref()).map(crate::to_blog_topic).map(to_json)
         }
         "set_blog_topic_pinned" => {
             let p: crate::SetBlogTopicPinnedPayload = from_payload(payload)?;
@@ -529,6 +599,11 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
             db.set_radmin_settings(&p.admin_id, &p.network_id, &p.network_password, &p.note)
                 .map(crate::to_radmin_settings)
                 .map(to_json)
+        }
+        "get_app_logo" => Ok(to_json(db.get_app_logo())),
+        "set_app_logo" => {
+            let p: crate::SetAppLogoPayload = from_payload(payload)?;
+            db.set_app_logo(&p.admin_id, p.logo_data.as_deref()).map(to_json)
         }
 
         other => Err(format!("Неизвестная команда: {other}")),

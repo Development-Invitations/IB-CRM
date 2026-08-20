@@ -176,6 +176,9 @@ pub struct ClientRecord {
     pub created_by: Option<String>,
     pub created_by_name: Option<String>,
     pub created_at: String,
+    pub partner_id: Option<String>,
+    pub partner_name: Option<String>,
+    pub deal_value: Option<String>,
 }
 
 pub struct ClientHistoryRecord {
@@ -334,6 +337,57 @@ pub struct RegulationReminderRecord {
     pub created_at: String,
 }
 
+// ---- Регламенты между админом и конкретным партнёром (v0.3.0) ----
+// Плоский тред без regulation_members/target_employee_id — в отличие от
+// обычных регламентов (компания-широкая multi-member модель), это ровно
+// "любой аккаунт этого партнёра" + "любой админ", без под-тредов.
+pub struct PartnerRegulationRecord {
+    pub id: String,
+    pub reg_number: String,
+    pub partner_id: String,
+    pub partner_name: String,
+    pub client_id: Option<String>,
+    pub client_name: Option<String>,
+    pub title: String,
+    pub description: Option<String>,
+    pub status: String,
+    pub deadline: Option<String>,
+    pub closed_at: Option<String>,
+    pub created_by: Option<String>,
+    pub created_by_name: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub entry_count: i64,
+}
+
+pub struct PartnerRegulationEntryRecord {
+    pub id: String,
+    pub partner_regulation_id: String,
+    pub author_id: String,
+    pub author_name: String,
+    pub content: String,
+    pub attachment_data: Option<String>,
+    pub attachment_name: Option<String>,
+    pub deadline: Option<String>,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub reply_count: i64,
+    pub edited_at: Option<String>,
+    pub is_deleted: bool,
+}
+
+pub struct PartnerRegulationReplyRecord {
+    pub id: String,
+    pub entry_id: String,
+    pub author_id: String,
+    pub author_name: String,
+    pub content: String,
+    pub created_at: String,
+    pub edited_at: Option<String>,
+    pub is_deleted: bool,
+}
+
 pub struct PositionRecord {
     pub id: String,
     pub title: String,
@@ -349,6 +403,7 @@ pub struct BlogTopicRecord {
     pub pinned: bool,
     pub created_at: String,
     pub comment_count: i64,
+    pub partner_audience: Option<String>,
 }
 
 pub struct BlogCommentRecord {
@@ -590,6 +645,54 @@ impl Db {
             );"
         );
 
+        // Регламенты между админом и конкретным партнёром (v0.3.0) — плоский
+        // тред без members/target_employee_id, в отдельных таблицах, а не
+        // добавлением partner_id в обычные regulations: у обычных регламентов
+        // сегодня вообще нет проверки доступа на чтение (list_regulations и
+        // т.п. открыты всем), ретрофитить туда приватность партнёра рискованно.
+        let _ = conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS partner_regulations (
+                id TEXT PRIMARY KEY,
+                reg_number TEXT UNIQUE NOT NULL,
+                partner_id TEXT NOT NULL REFERENCES partners(id),
+                client_id TEXT REFERENCES clients(id),
+                title TEXT NOT NULL,
+                description TEXT,
+                status TEXT NOT NULL DEFAULT 'active',
+                deadline TEXT,
+                closed_at TEXT,
+                created_by TEXT REFERENCES employees(id),
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS partner_regulation_entries (
+                id TEXT PRIMARY KEY,
+                partner_regulation_id TEXT NOT NULL REFERENCES partner_regulations(id),
+                author_id TEXT NOT NULL REFERENCES employees(id),
+                content TEXT NOT NULL,
+                attachment_data TEXT,
+                attachment_name TEXT,
+                deadline TEXT,
+                status TEXT NOT NULL DEFAULT 'open',
+                edited_at TEXT,
+                is_deleted INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS partner_regulation_replies (
+                id TEXT PRIMARY KEY,
+                entry_id TEXT NOT NULL REFERENCES partner_regulation_entries(id),
+                author_id TEXT NOT NULL REFERENCES employees(id),
+                content TEXT NOT NULL,
+                edited_at TEXT,
+                is_deleted INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_partner_regs_partner ON partner_regulations(partner_id);
+            CREATE INDEX IF NOT EXISTS idx_partner_reg_entries_reg ON partner_regulation_entries(partner_regulation_id);
+            CREATE INDEX IF NOT EXISTS idx_partner_reg_replies_entry ON partner_regulation_replies(entry_id);"
+        );
+
         // Миграции для баз, созданных более ранними версиями.
         add_column_if_missing(&conn, "employees", "phone TEXT");
         add_column_if_missing(&conn, "employees", "position_id TEXT REFERENCES positions(id)");
@@ -618,6 +721,14 @@ impl Db {
         add_column_if_missing(&conn, "absence_requests", "makeup_slots TEXT");
         add_column_if_missing(&conn, "clients", "contact_person TEXT");
         add_column_if_missing(&conn, "clients", "contact_position TEXT");
+        // NULL = клиент CRM; иначе — клиент партнёра (виден и в основной CRM
+        // всем сотрудникам, и в панели именно этого партнёра), см. v0.3.0.
+        add_column_if_missing(&conn, "clients", "partner_id TEXT REFERENCES partners(id)");
+        add_column_if_missing(&conn, "clients", "deal_value TEXT");
+        let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_clients_partner_id ON clients(partner_id)", []);
+        // NULL = тема видна только сотрудникам (как раньше); '*' = всем
+        // партнёрам; иначе — id конкретного партнёра, см. v0.3.0.
+        add_column_if_missing(&conn, "blog_topics", "partner_audience TEXT");
         add_column_if_missing(&conn, "departments", "deputy_employee_id TEXT REFERENCES employees(id)");
         // Запись регламента теперь принадлежит чьему-то персональному треду — по
         // умолчанию треду автора, а при передаче задачи коллеге переставляется на
@@ -2657,9 +2768,11 @@ impl Db {
     const CLIENT_SELECT: &'static str = "SELECT
             c.id, c.client_number, c.name, c.contact_person, c.contact_position,
             c.phone, c.email, c.address, c.notes,
-            c.created_by, e.full_name, c.created_at
+            c.created_by, e.full_name, c.created_at,
+            c.partner_id, p.name, c.deal_value
         FROM clients c
-        LEFT JOIN employees e ON e.id = c.created_by";
+        LEFT JOIN employees e ON e.id = c.created_by
+        LEFT JOIN partners p ON p.id = c.partner_id";
 
     fn map_client_row(row: &rusqlite::Row) -> rusqlite::Result<ClientRecord> {
         Ok(ClientRecord {
@@ -2675,6 +2788,9 @@ impl Db {
             created_by: row.get(9)?,
             created_by_name: row.get(10)?,
             created_at: row.get(11)?,
+            partner_id: row.get(12)?,
+            partner_name: row.get(13)?,
+            deal_value: row.get(14)?,
         })
     }
 
@@ -2683,20 +2799,49 @@ impl Db {
         format!("CLI-{:05}", count + 1)
     }
 
-    pub fn list_clients(&self) -> Vec<ClientRecord> {
-        let sql = format!("{} ORDER BY c.created_at DESC", Self::CLIENT_SELECT);
+    // actor — партнёр: всегда только свои клиенты (partner_filter игнорируется,
+    // подсунуть чужой id и увидеть чужих клиентов нельзя). actor — админ и
+    // partner_filter задан: клиенты конкретного партнёра (просмотр из его
+    // рабочего пространства). actor — рядовой сотрудник и partner_filter задан:
+    // пусто (тихий отказ, как у list_my_partner_chats). Иначе — весь список без
+    // фильтра, ровно как было раньше для обычной страницы Клиентов.
+    pub fn list_clients(&self, actor_id: &str, partner_filter: Option<&str>) -> Vec<ClientRecord> {
+        let employee = match self.get_employee(actor_id) {
+            Some(e) => e,
+            None => return Vec::new(),
+        };
+        let (sql, scoped_id): (String, Option<String>) = if employee.is_partner {
+            match employee.partner_id.clone() {
+                Some(pid) => (format!("{} WHERE c.partner_id = ?1 ORDER BY c.created_at DESC", Self::CLIENT_SELECT), Some(pid)),
+                None => return Vec::new(),
+            }
+        } else if let Some(pid) = partner_filter {
+            if !self.is_admin(actor_id) {
+                return Vec::new();
+            }
+            (format!("{} WHERE c.partner_id = ?1 ORDER BY c.created_at DESC", Self::CLIENT_SELECT), Some(pid.to_string()))
+        } else {
+            (format!("{} ORDER BY c.created_at DESC", Self::CLIENT_SELECT), None)
+        };
         let mut stmt = match self.conn.prepare(&sql) {
             Ok(s) => s,
             Err(_) => return Vec::new(),
         };
-        stmt.query_map([], Self::map_client_row)
-            .map(|rows| rows.filter_map(|r| r.ok()).collect())
-            .unwrap_or_default()
+        let rows = match scoped_id {
+            Some(pid) => stmt.query_map(params![pid], Self::map_client_row),
+            None => stmt.query_map([], Self::map_client_row),
+        };
+        rows.map(|r| r.filter_map(|x| x.ok()).collect()).unwrap_or_default()
     }
 
-    pub fn get_client(&self, id: &str) -> Option<ClientRecord> {
+    pub fn get_client(&self, actor_id: &str, id: &str) -> Option<ClientRecord> {
+        let employee = self.get_employee(actor_id)?;
         let sql = format!("{} WHERE c.id = ?1", Self::CLIENT_SELECT);
-        self.conn.query_row(&sql, params![id], Self::map_client_row).ok()
+        let client = self.conn.query_row(&sql, params![id], Self::map_client_row).ok()?;
+        if employee.is_partner && client.partner_id != employee.partner_id {
+            return None;
+        }
+        Some(client)
     }
 
     pub fn create_client(
@@ -2709,24 +2854,36 @@ impl Db {
         email: Option<&str>,
         address: Option<&str>,
         notes: Option<&str>,
+        partner_id: Option<&str>,
+        deal_value: Option<&str>,
     ) -> Result<ClientRecord, String> {
         if name.trim().is_empty() {
             return Err("Укажите название/имя клиента".into());
         }
+        let employee = self.get_employee(actor_id).ok_or_else(|| "Сотрудник не найден".to_string())?;
+        // Партнёр не может выбрать чужого/пустого владельца — сервер сам
+        // проставляет его собственную организацию, чем бы ни был передан
+        // partner_id с фронта.
+        let effective_partner_id: Option<String> = if employee.is_partner {
+            Some(employee.partner_id.clone().ok_or_else(|| "У партнёра не задана организация".to_string())?)
+        } else {
+            partner_id.map(str::to_string)
+        };
         let id = Uuid::new_v4().to_string();
         let client_number = self.next_client_number();
         self.conn
             .execute(
-                "INSERT INTO clients (id, client_number, name, contact_person, contact_position, phone, email, address, notes, created_by)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-                params![id, client_number, name.trim(), contact_person, contact_position, phone, email, address, notes, actor_id],
+                "INSERT INTO clients (id, client_number, name, contact_person, contact_position, phone, email, address, notes, created_by, partner_id, deal_value)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                params![id, client_number, name.trim(), contact_person, contact_position, phone, email, address, notes, actor_id, effective_partner_id, deal_value],
             )
             .map_err(|e| e.to_string())?;
-        self.get_client(&id).ok_or_else(|| "Клиент не найден".to_string())
+        self.get_client(actor_id, &id).ok_or_else(|| "Клиент не найден".to_string())
     }
 
     pub fn update_client(
         &self,
+        actor_id: &str,
         id: &str,
         name: &str,
         contact_person: Option<&str>,
@@ -2735,17 +2892,29 @@ impl Db {
         email: Option<&str>,
         address: Option<&str>,
         notes: Option<&str>,
+        partner_id: Option<&str>,
+        deal_value: Option<&str>,
     ) -> Result<ClientRecord, String> {
         if name.trim().is_empty() {
             return Err("Укажите название/имя клиента".into());
         }
+        let employee = self.get_employee(actor_id).ok_or_else(|| "Сотрудник не найден".to_string())?;
+        let existing = self.get_client(actor_id, id).ok_or_else(|| "Клиент не найден или недоступен".to_string())?;
+        let effective_partner_id: Option<String> = if employee.is_partner {
+            if existing.partner_id != employee.partner_id {
+                return Err("Недостаточно прав".into());
+            }
+            existing.partner_id.clone()
+        } else {
+            partner_id.map(str::to_string)
+        };
         self.conn
             .execute(
-                "UPDATE clients SET name = ?1, contact_person = ?2, contact_position = ?3, phone = ?4, email = ?5, address = ?6, notes = ?7 WHERE id = ?8",
-                params![name.trim(), contact_person, contact_position, phone, email, address, notes, id],
+                "UPDATE clients SET name = ?1, contact_person = ?2, contact_position = ?3, phone = ?4, email = ?5, address = ?6, notes = ?7, partner_id = ?8, deal_value = ?9 WHERE id = ?10",
+                params![name.trim(), contact_person, contact_position, phone, email, address, notes, effective_partner_id, deal_value, id],
             )
             .map_err(|e| e.to_string())?;
-        self.get_client(id).ok_or_else(|| "Клиент не найден".to_string())
+        self.get_client(actor_id, id).ok_or_else(|| "Клиент не найден".to_string())
     }
 
     pub fn delete_client(&self, admin_id: &str, id: &str) -> Result<(), String> {
@@ -2757,7 +2926,10 @@ impl Db {
         Ok(())
     }
 
-    pub fn list_client_history(&self, client_id: &str) -> Vec<ClientHistoryRecord> {
+    pub fn list_client_history(&self, actor_id: &str, client_id: &str) -> Vec<ClientHistoryRecord> {
+        if self.get_client(actor_id, client_id).is_none() {
+            return Vec::new();
+        }
         let mut stmt = match self.conn.prepare(
             "SELECT h.id, h.client_id, h.description, h.created_by, e.full_name, h.created_at
              FROM client_history h
@@ -2783,6 +2955,7 @@ impl Db {
     }
 
     pub fn add_client_history(&self, client_id: &str, actor_id: &str, description: &str) -> Result<ClientHistoryRecord, String> {
+        self.get_client(actor_id, client_id).ok_or_else(|| "Клиент не найден или недоступен".to_string())?;
         if description.trim().is_empty() {
             return Err("Пустая запись".into());
         }
@@ -4053,6 +4226,374 @@ impl Db {
         Ok(())
     }
 
+    // ---- Регламенты между админом и конкретным партнёром (v0.3.0) ----
+    // Плоский тред — ровно "любой аккаунт этого партнёра" + "любой админ",
+    // без regulation_members/target_employee_id (в отличие от обычных
+    // регламентов). Доступ проверяется через can_access_partner_regulation
+    // на каждый читающий/пишущий вызов — у обычных регламентов такой
+    // проверки нет вовсе, поэтому это отдельные таблицы, а не общий партнёр
+    // на существующих (см. docs/TZ.md, журнал v0.3.0).
+
+    const PARTNER_REGULATION_SELECT: &'static str = "SELECT
+            pr.id, pr.reg_number, pr.partner_id, p.name,
+            pr.client_id, c.name,
+            pr.title, pr.description, pr.status, pr.deadline, pr.closed_at,
+            pr.created_by, cb.full_name,
+            pr.created_at, pr.updated_at,
+            (SELECT COUNT(*) FROM partner_regulation_entries pe WHERE pe.partner_regulation_id = pr.id)
+        FROM partner_regulations pr
+        JOIN partners p ON p.id = pr.partner_id
+        LEFT JOIN clients c ON c.id = pr.client_id
+        LEFT JOIN employees cb ON cb.id = pr.created_by";
+
+    fn map_partner_regulation_row(row: &rusqlite::Row) -> rusqlite::Result<PartnerRegulationRecord> {
+        Ok(PartnerRegulationRecord {
+            id: row.get(0)?,
+            reg_number: row.get(1)?,
+            partner_id: row.get(2)?,
+            partner_name: row.get(3)?,
+            client_id: row.get(4)?,
+            client_name: row.get(5)?,
+            title: row.get(6)?,
+            description: row.get(7)?,
+            status: row.get(8)?,
+            deadline: row.get(9)?,
+            closed_at: row.get(10)?,
+            created_by: row.get(11)?,
+            created_by_name: row.get(12)?,
+            created_at: row.get(13)?,
+            updated_at: row.get(14)?,
+            entry_count: row.get(15)?,
+        })
+    }
+
+    fn next_partner_reg_number(&self) -> String {
+        let count: i64 = self.conn.query_row("SELECT COUNT(*) FROM partner_regulations", [], |row| row.get(0)).unwrap_or(0);
+        format!("PREG-{:05}", count + 1)
+    }
+
+    pub fn get_partner_regulation(&self, id: &str) -> Option<PartnerRegulationRecord> {
+        let sql = format!("{} WHERE pr.id = ?1", Self::PARTNER_REGULATION_SELECT);
+        self.conn.query_row(&sql, params![id], Self::map_partner_regulation_row).ok()
+    }
+
+    // is_admin ИЛИ сотрудник этого же партнёра — единственная проверка
+    // доступа для всей фичи, зеркало can_access_chat_channel'а для
+    // партнёрского канала чата.
+    fn can_access_partner_regulation(&self, actor_id: &str, partner_regulation_id: &str) -> Result<PartnerRegulationRecord, String> {
+        let reg = self.get_partner_regulation(partner_regulation_id).ok_or_else(|| "Регламент не найден".to_string())?;
+        let employee = self.get_employee(actor_id).ok_or_else(|| "Сотрудник не найден".to_string())?;
+        if employee.is_partner {
+            if employee.partner_id.as_deref() != Some(reg.partner_id.as_str()) {
+                return Err("Недостаточно прав".into());
+            }
+        } else if !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        Ok(reg)
+    }
+
+    fn can_access_partner_org(&self, actor_id: &str, partner_id: &str) -> Result<(), String> {
+        let employee = self.get_employee(actor_id).ok_or_else(|| "Сотрудник не найден".to_string())?;
+        if employee.is_partner {
+            if employee.partner_id.as_deref() != Some(partner_id) {
+                return Err("Недостаточно прав".into());
+            }
+        } else if !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        Ok(())
+    }
+
+    pub fn list_partner_regulations(&self, actor_id: &str, partner_id: &str) -> Result<Vec<PartnerRegulationRecord>, String> {
+        self.can_access_partner_org(actor_id, partner_id)?;
+        let sql = format!("{} WHERE pr.partner_id = ?1 ORDER BY pr.updated_at DESC", Self::PARTNER_REGULATION_SELECT);
+        let mut stmt = self.conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let rows = stmt.query_map(params![partner_id], Self::map_partner_regulation_row).map_err(|e| e.to_string())?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    pub fn create_partner_regulation(
+        &self,
+        actor_id: &str,
+        partner_id: &str,
+        title: &str,
+        description: Option<&str>,
+        client_id: Option<&str>,
+        deadline: Option<&str>,
+    ) -> Result<PartnerRegulationRecord, String> {
+        self.can_access_partner_org(actor_id, partner_id)?;
+        if title.trim().is_empty() {
+            return Err("Укажите название регламента".into());
+        }
+        let id = Uuid::new_v4().to_string();
+        let reg_number = self.next_partner_reg_number();
+        self.conn
+            .execute(
+                "INSERT INTO partner_regulations (id, reg_number, partner_id, client_id, title, description, deadline, created_by)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![id, reg_number, partner_id, client_id, title.trim(), description, deadline, actor_id],
+            )
+            .map_err(|e| e.to_string())?;
+        self.get_partner_regulation(&id).ok_or_else(|| "Регламент не найден".to_string())
+    }
+
+    pub fn update_partner_regulation(
+        &self,
+        actor_id: &str,
+        id: &str,
+        title: &str,
+        description: Option<&str>,
+        client_id: Option<&str>,
+        deadline: Option<&str>,
+        status: &str,
+    ) -> Result<PartnerRegulationRecord, String> {
+        let reg = self.can_access_partner_regulation(actor_id, id)?;
+        if title.trim().is_empty() {
+            return Err("Укажите название регламента".into());
+        }
+        if !["active", "closed"].contains(&status) {
+            return Err("Некорректный статус".into());
+        }
+        let closed_at = if status == "closed" && reg.status != "closed" {
+            "datetime('now')"
+        } else if status == "active" {
+            "NULL"
+        } else {
+            "closed_at"
+        };
+        let sql = format!(
+            "UPDATE partner_regulations SET title = ?1, description = ?2, client_id = ?3, deadline = ?4, status = ?5, closed_at = {}, updated_at = datetime('now') WHERE id = ?6",
+            closed_at
+        );
+        self.conn.execute(&sql, params![title.trim(), description, client_id, deadline, status, id])
+            .map_err(|e| e.to_string())?;
+        self.get_partner_regulation(id).ok_or_else(|| "Регламент не найден".to_string())
+    }
+
+    pub fn delete_partner_regulation(&self, admin_id: &str, id: &str) -> Result<(), String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn.execute("DELETE FROM partner_regulation_replies WHERE entry_id IN (SELECT id FROM partner_regulation_entries WHERE partner_regulation_id = ?1)", params![id]).ok();
+        self.conn.execute("DELETE FROM partner_regulation_entries WHERE partner_regulation_id = ?1", params![id]).ok();
+        self.conn.execute("DELETE FROM partner_regulations WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn list_partner_regulation_entries(&self, actor_id: &str, partner_regulation_id: &str) -> Result<Vec<PartnerRegulationEntryRecord>, String> {
+        self.can_access_partner_regulation(actor_id, partner_regulation_id)?;
+        let mut stmt = self.conn.prepare(
+            "SELECT e.id, e.partner_regulation_id, e.author_id, a.full_name,
+                    e.content, e.attachment_data, e.attachment_name, e.deadline, e.status,
+                    e.created_at, e.updated_at,
+                    (SELECT COUNT(*) FROM partner_regulation_replies pr WHERE pr.entry_id = e.id),
+                    e.edited_at, e.is_deleted
+             FROM partner_regulation_entries e
+             JOIN employees a ON a.id = e.author_id
+             WHERE e.partner_regulation_id = ?1 ORDER BY e.created_at ASC",
+        ).map_err(|e| e.to_string())?;
+        let rows = stmt.query_map(params![partner_regulation_id], |row| {
+            let is_deleted: bool = row.get(12)?;
+            Ok(PartnerRegulationEntryRecord {
+                id: row.get(0)?,
+                partner_regulation_id: row.get(1)?,
+                author_id: row.get(2)?,
+                author_name: row.get(3)?,
+                content: if is_deleted { String::new() } else { row.get(4)? },
+                attachment_data: if is_deleted { None } else { row.get(5)? },
+                attachment_name: if is_deleted { None } else { row.get(6)? },
+                deadline: row.get(7)?,
+                status: row.get(8)?,
+                created_at: row.get(9)?,
+                updated_at: row.get(10)?,
+                reply_count: row.get(11)?,
+                edited_at: row.get(13)?,
+                is_deleted,
+            })
+        }).map_err(|e| e.to_string())?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    pub fn add_partner_regulation_entry(
+        &self,
+        actor_id: &str,
+        partner_regulation_id: &str,
+        content: &str,
+        attachment_data: Option<&str>,
+        attachment_name: Option<&str>,
+        deadline: Option<&str>,
+    ) -> Result<PartnerRegulationEntryRecord, String> {
+        let reg = self.can_access_partner_regulation(actor_id, partner_regulation_id)?;
+        if reg.status == "closed" {
+            return Err("Регламент закрыт — новые записи нельзя добавлять".into());
+        }
+        if content.trim().is_empty() {
+            return Err("Запись не может быть пустой".into());
+        }
+        let id = Uuid::new_v4().to_string();
+        self.conn
+            .execute(
+                "INSERT INTO partner_regulation_entries (id, partner_regulation_id, author_id, content, attachment_data, attachment_name, deadline) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![id, partner_regulation_id, actor_id, content.trim(), attachment_data, attachment_name, deadline],
+            )
+            .map_err(|e| e.to_string())?;
+        self.conn.execute("UPDATE partner_regulations SET updated_at = datetime('now') WHERE id = ?1", params![partner_regulation_id]).ok();
+        self.list_partner_regulation_entries(actor_id, partner_regulation_id)?
+            .into_iter()
+            .find(|e| e.id == id)
+            .ok_or_else(|| "Запись не найдена".to_string())
+    }
+
+    pub fn edit_partner_regulation_entry(&self, actor_id: &str, entry_id: &str, content: &str) -> Result<PartnerRegulationEntryRecord, String> {
+        let (author_id, partner_regulation_id, is_deleted): (String, String, bool) = self
+            .conn
+            .query_row(
+                "SELECT author_id, partner_regulation_id, is_deleted FROM partner_regulation_entries WHERE id = ?1",
+                params![entry_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .map_err(|_| "Запись не найдена".to_string())?;
+        if author_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        if is_deleted {
+            return Err("Запись удалена".into());
+        }
+        let content = content.trim();
+        if content.is_empty() {
+            return Err("Запись не может быть пустой".into());
+        }
+        self.conn
+            .execute("UPDATE partner_regulation_entries SET content = ?1, edited_at = datetime('now') WHERE id = ?2", params![content, entry_id])
+            .map_err(|e| e.to_string())?;
+        self.list_partner_regulation_entries(actor_id, &partner_regulation_id)?
+            .into_iter()
+            .find(|e| e.id == entry_id)
+            .ok_or_else(|| "Запись не найдена".to_string())
+    }
+
+    pub fn delete_partner_regulation_entry(&self, actor_id: &str, entry_id: &str) -> Result<(), String> {
+        let author_id: String = self
+            .conn
+            .query_row("SELECT author_id FROM partner_regulation_entries WHERE id = ?1", params![entry_id], |row| row.get(0))
+            .map_err(|_| "Запись не найдена".to_string())?;
+        if author_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn
+            .execute("UPDATE partner_regulation_entries SET is_deleted = 1 WHERE id = ?1", params![entry_id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    // Нет отдельной роли "автор/владелец" — регламент партнёра это плоский
+    // тред без per-member ролей, поэтому статус меняет любой админ или любой
+    // аккаунт этого же партнёра (а не только автор записи).
+    pub fn update_partner_regulation_entry_status(&self, actor_id: &str, entry_id: &str, new_status: &str) -> Result<(), String> {
+        if !["open", "done", "cancelled"].contains(&new_status) {
+            return Err("Некорректный статус задачи".into());
+        }
+        let partner_regulation_id: String = self.conn
+            .query_row("SELECT partner_regulation_id FROM partner_regulation_entries WHERE id = ?1", params![entry_id], |row| row.get(0))
+            .map_err(|_| "Запись не найдена".to_string())?;
+        self.can_access_partner_regulation(actor_id, &partner_regulation_id)?;
+        self.conn
+            .execute("UPDATE partner_regulation_entries SET status = ?1, updated_at = datetime('now') WHERE id = ?2", params![new_status, entry_id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn list_partner_regulation_replies(&self, actor_id: &str, entry_id: &str) -> Result<Vec<PartnerRegulationReplyRecord>, String> {
+        let partner_regulation_id: String = self.conn
+            .query_row("SELECT partner_regulation_id FROM partner_regulation_entries WHERE id = ?1", params![entry_id], |row| row.get(0))
+            .map_err(|_| "Запись не найдена".to_string())?;
+        self.can_access_partner_regulation(actor_id, &partner_regulation_id)?;
+        let mut stmt = self.conn.prepare(
+            "SELECT rr.id, rr.entry_id, rr.author_id, e.full_name, rr.content, rr.created_at, rr.edited_at, rr.is_deleted
+             FROM partner_regulation_replies rr JOIN employees e ON e.id = rr.author_id
+             WHERE rr.entry_id = ?1 ORDER BY rr.created_at ASC",
+        ).map_err(|e| e.to_string())?;
+        let rows = stmt.query_map(params![entry_id], |row| {
+            let is_deleted: bool = row.get(7)?;
+            Ok(PartnerRegulationReplyRecord {
+                id: row.get(0)?,
+                entry_id: row.get(1)?,
+                author_id: row.get(2)?,
+                author_name: row.get(3)?,
+                content: if is_deleted { String::new() } else { row.get(4)? },
+                created_at: row.get(5)?,
+                edited_at: row.get(6)?,
+                is_deleted,
+            })
+        }).map_err(|e| e.to_string())?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    pub fn add_partner_regulation_reply(&self, actor_id: &str, entry_id: &str, content: &str) -> Result<PartnerRegulationReplyRecord, String> {
+        if content.trim().is_empty() {
+            return Err("Ответ не может быть пустым".into());
+        }
+        let partner_regulation_id: String = self.conn
+            .query_row("SELECT partner_regulation_id FROM partner_regulation_entries WHERE id = ?1", params![entry_id], |row| row.get(0))
+            .map_err(|_| "Запись не найдена".to_string())?;
+        let reg = self.can_access_partner_regulation(actor_id, &partner_regulation_id)?;
+        if reg.status == "closed" {
+            return Err("Регламент закрыт — новые ответы нельзя добавлять".into());
+        }
+        let id = Uuid::new_v4().to_string();
+        self.conn
+            .execute("INSERT INTO partner_regulation_replies (id, entry_id, author_id, content) VALUES (?1, ?2, ?3, ?4)", params![id, entry_id, actor_id, content.trim()])
+            .map_err(|e| e.to_string())?;
+        self.conn.execute("UPDATE partner_regulations SET updated_at = datetime('now') WHERE id = ?1", params![partner_regulation_id]).ok();
+        self.list_partner_regulation_replies(actor_id, entry_id)?
+            .into_iter()
+            .find(|r| r.id == id)
+            .ok_or_else(|| "Ответ не найден".to_string())
+    }
+
+    pub fn edit_partner_regulation_reply(&self, actor_id: &str, reply_id: &str, content: &str) -> Result<PartnerRegulationReplyRecord, String> {
+        let (author_id, entry_id, is_deleted): (String, String, bool) = self
+            .conn
+            .query_row(
+                "SELECT author_id, entry_id, is_deleted FROM partner_regulation_replies WHERE id = ?1",
+                params![reply_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .map_err(|_| "Ответ не найден".to_string())?;
+        if author_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        if is_deleted {
+            return Err("Ответ удалён".into());
+        }
+        let content = content.trim();
+        if content.is_empty() {
+            return Err("Ответ не может быть пустым".into());
+        }
+        self.conn
+            .execute("UPDATE partner_regulation_replies SET content = ?1, edited_at = datetime('now') WHERE id = ?2", params![content, reply_id])
+            .map_err(|e| e.to_string())?;
+        self.list_partner_regulation_replies(actor_id, &entry_id)?
+            .into_iter()
+            .find(|r| r.id == reply_id)
+            .ok_or_else(|| "Ответ не найден".to_string())
+    }
+
+    pub fn delete_partner_regulation_reply(&self, actor_id: &str, reply_id: &str) -> Result<(), String> {
+        let author_id: String = self
+            .conn
+            .query_row("SELECT author_id FROM partner_regulation_replies WHERE id = ?1", params![reply_id], |row| row.get(0))
+            .map_err(|_| "Ответ не найден".to_string())?;
+        if author_id != actor_id {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn
+            .execute("UPDATE partner_regulation_replies SET is_deleted = 1 WHERE id = ?1", params![reply_id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
     // ---- Напоминания по задачам регламента ----
 
     pub fn add_regulation_reminder(
@@ -4171,57 +4712,72 @@ impl Db {
 
     const BLOG_CATEGORIES: [&'static str; 5] = ["announcement", "discussion", "useful", "qna", "custom"];
 
-    pub fn list_blog_topics(&self) -> Vec<BlogTopicRecord> {
-        let mut stmt = match self.conn.prepare(
-            "SELECT t.id, t.category, t.title, t.content, t.created_by, e.full_name, t.pinned, t.created_at,
-                    (SELECT COUNT(*) FROM blog_comments c WHERE c.topic_id = t.id)
-             FROM blog_topics t JOIN employees e ON e.id = t.created_by
-             ORDER BY t.pinned DESC, t.created_at DESC",
-        ) {
+    const BLOG_TOPIC_SELECT: &'static str = "SELECT t.id, t.category, t.title, t.content, t.created_by, e.full_name, t.pinned, t.created_at,
+            (SELECT COUNT(*) FROM blog_comments c WHERE c.topic_id = t.id),
+            t.partner_audience
+        FROM blog_topics t JOIN employees e ON e.id = t.created_by";
+
+    fn map_blog_topic_row(row: &rusqlite::Row) -> rusqlite::Result<BlogTopicRecord> {
+        Ok(BlogTopicRecord {
+            id: row.get(0)?,
+            category: row.get(1)?,
+            title: row.get(2)?,
+            content: row.get(3)?,
+            created_by: row.get(4)?,
+            created_by_name: row.get(5)?,
+            pinned: row.get::<_, i64>(6)? != 0,
+            created_at: row.get(7)?,
+            comment_count: row.get(8)?,
+            partner_audience: row.get(9)?,
+        })
+    }
+
+    // Сотрудник/админ — видит все темы без изменений (как и раньше). Партнёр
+    // — только темы, адресованные ему: всем партнёрам ('*') или именно его
+    // организации. Темы без аудитории (NULL, по умолчанию) партнёру не видны
+    // вовсе — ровно поведение "если не выбрано, тема только для сотрудников".
+    pub fn list_blog_topics(&self, actor_id: &str) -> Vec<BlogTopicRecord> {
+        let employee = match self.get_employee(actor_id) {
+            Some(e) => e,
+            None => return Vec::new(),
+        };
+        if employee.is_partner {
+            let Some(pid) = employee.partner_id else { return Vec::new(); };
+            let sql = format!("{} WHERE t.partner_audience = '*' OR t.partner_audience = ?1 ORDER BY t.pinned DESC, t.created_at DESC", Self::BLOG_TOPIC_SELECT);
+            let mut stmt = match self.conn.prepare(&sql) {
+                Ok(s) => s,
+                Err(_) => return Vec::new(),
+            };
+            return stmt.query_map(params![pid], Self::map_blog_topic_row)
+                .map(|rows| rows.filter_map(|r| r.ok()).collect())
+                .unwrap_or_default();
+        }
+        let sql = format!("{} ORDER BY t.pinned DESC, t.created_at DESC", Self::BLOG_TOPIC_SELECT);
+        let mut stmt = match self.conn.prepare(&sql) {
             Ok(s) => s,
             Err(_) => return Vec::new(),
         };
-        stmt.query_map([], |row| {
-            Ok(BlogTopicRecord {
-                id: row.get(0)?,
-                category: row.get(1)?,
-                title: row.get(2)?,
-                content: row.get(3)?,
-                created_by: row.get(4)?,
-                created_by_name: row.get(5)?,
-                pinned: row.get::<_, i64>(6)? != 0,
-                created_at: row.get(7)?,
-                comment_count: row.get(8)?,
-            })
-        })
-        .map(|rows| rows.filter_map(|r| r.ok()).collect())
-        .unwrap_or_default()
+        stmt.query_map([], Self::map_blog_topic_row)
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default()
     }
 
     fn get_blog_topic(&self, id: &str) -> Option<BlogTopicRecord> {
-        self.conn.query_row(
-            "SELECT t.id, t.category, t.title, t.content, t.created_by, e.full_name, t.pinned, t.created_at,
-                    (SELECT COUNT(*) FROM blog_comments c WHERE c.topic_id = t.id)
-             FROM blog_topics t JOIN employees e ON e.id = t.created_by
-             WHERE t.id = ?1",
-            params![id],
-            |row| {
-                Ok(BlogTopicRecord {
-                    id: row.get(0)?,
-                    category: row.get(1)?,
-                    title: row.get(2)?,
-                    content: row.get(3)?,
-                    created_by: row.get(4)?,
-                    created_by_name: row.get(5)?,
-                    pinned: row.get::<_, i64>(6)? != 0,
-                    created_at: row.get(7)?,
-                    comment_count: row.get(8)?,
-                })
-            },
-        ).ok()
+        let sql = format!("{} WHERE t.id = ?1", Self::BLOG_TOPIC_SELECT);
+        self.conn.query_row(&sql, params![id], Self::map_blog_topic_row).ok()
     }
 
-    pub fn create_blog_topic(&self, actor_id: &str, category: &str, title: &str, content: Option<&str>) -> Result<BlogTopicRecord, String> {
+    pub fn create_blog_topic(&self, actor_id: &str, category: &str, title: &str, content: Option<&str>, partner_audience: Option<&str>) -> Result<BlogTopicRecord, String> {
+        let employee = self.get_employee(actor_id).ok_or_else(|| "Сотрудник не найден".to_string())?;
+        // Партнёр не создаёт и не редактирует темы блога — раздел "Блог" в
+        // его панели только для чтения (жёстко на бэкенде, а не только
+        // скрытием кнопки в UI).
+        if employee.is_partner {
+            return Err("Недостаточно прав".into());
+        }
+        // Адресовать тему партнёрам может только админ — обычный сотрудник
+        // продолжает создавать темы как раньше, всегда только для сотрудников.
+        let effective_audience = if employee.is_admin { partner_audience } else { None };
         if title.trim().is_empty() {
             return Err("Укажите заголовок темы".into());
         }
@@ -4230,13 +4786,17 @@ impl Db {
         }
         let id = Uuid::new_v4().to_string();
         self.conn.execute(
-            "INSERT INTO blog_topics (id, category, title, content, created_by) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![id, category, title.trim(), content, actor_id],
+            "INSERT INTO blog_topics (id, category, title, content, created_by, partner_audience) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![id, category, title.trim(), content, actor_id, effective_audience],
         ).map_err(|e| e.to_string())?;
         self.get_blog_topic(&id).ok_or_else(|| "Тема не найдена".to_string())
     }
 
-    pub fn update_blog_topic(&self, actor_id: &str, id: &str, category: &str, title: &str, content: Option<&str>) -> Result<BlogTopicRecord, String> {
+    pub fn update_blog_topic(&self, actor_id: &str, id: &str, category: &str, title: &str, content: Option<&str>, partner_audience: Option<&str>) -> Result<BlogTopicRecord, String> {
+        let employee = self.get_employee(actor_id).ok_or_else(|| "Сотрудник не найден".to_string())?;
+        if employee.is_partner {
+            return Err("Недостаточно прав".into());
+        }
         let topic = self.get_blog_topic(id).ok_or_else(|| "Тема не найдена".to_string())?;
         // Редактировать тему может только её создатель — даже админ не может
         // менять чужой текст (в отличие от закрепления/удаления, это осталось
@@ -4250,9 +4810,10 @@ impl Db {
         if !Self::BLOG_CATEGORIES.contains(&category) {
             return Err("Некорректная категория".into());
         }
+        let effective_audience = if employee.is_admin { partner_audience } else { None };
         self.conn.execute(
-            "UPDATE blog_topics SET category = ?1, title = ?2, content = ?3 WHERE id = ?4",
-            params![category, title.trim(), content, id],
+            "UPDATE blog_topics SET category = ?1, title = ?2, content = ?3, partner_audience = ?4 WHERE id = ?5",
+            params![category, title.trim(), content, effective_audience, id],
         ).map_err(|e| e.to_string())?;
         self.get_blog_topic(id).ok_or_else(|| "Тема не найдена".to_string())
     }
@@ -4425,6 +4986,38 @@ impl Db {
             ).map_err(|e| e.to_string())?;
         }
         Ok(self.get_radmin_settings())
+    }
+
+    // ---- Логотип приложения (v0.3.1) ----
+    // Позволяет любому другому пользователю CRM (другая компания, ставящая
+    // это же приложение под своим брендом) заменить логотип во всём
+    // интерфейсе одним действием — тот же app_meta key/value, что и у
+    // Radmin/сервера выше. Храним как base64 data URL, тем же способом, что
+    // и фото сотрудника (см. avatar_data) — для локального офлайн-режима
+    // этого достаточно, отдельное файловое хранилище не нужно.
+    pub fn get_app_logo(&self) -> Option<String> {
+        self.conn
+            .query_row("SELECT value FROM app_meta WHERE key = 'app_logo'", [], |row| row.get(0))
+            .ok()
+    }
+
+    pub fn set_app_logo(&self, admin_id: &str, logo_data: Option<&str>) -> Result<Option<String>, String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        match logo_data {
+            Some(data) => {
+                self.conn.execute(
+                    "INSERT INTO app_meta (key, value) VALUES ('app_logo', ?1)
+                     ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                    params![data],
+                ).map_err(|e| e.to_string())?;
+            }
+            None => {
+                self.conn.execute("DELETE FROM app_meta WHERE key = 'app_logo'", []).map_err(|e| e.to_string())?;
+            }
+        }
+        Ok(self.get_app_logo())
     }
 }
 

@@ -34,6 +34,8 @@ import RegulationsPage from './Regulations';
 import BlogPage from './Blog';
 import BirthdaysPage from './Birthdays';
 import ChatPage from './Chat';
+import AdminPartners from './AdminPartners';
+import AdminPartnerWorkspace from './AdminPartnerWorkspace';
 import type { Employee } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { APP_VERSION } from '../lib/changelog';
@@ -107,6 +109,9 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
             <Route path="regulations" element={<RegulationsPage currentEmployee={employee} />} />
             <Route path="blog" element={<BlogPage currentEmployee={employee} />} />
             <Route path="chat" element={<ChatPage currentEmployee={employee} />} />
+            <Route path="partners" element={<AdminPartners />} />
+            <Route path="partners/:partnerId/clients" element={<AdminPartnerWorkspace employee={employee} tab="clients" />} />
+            <Route path="partners/:partnerId/regulations" element={<AdminPartnerWorkspace employee={employee} tab="regulations" />} />
             <Route path="birthdays" element={<BirthdaysPage />} />
             <Route path="absence-requests" element={<AbsenceRequestsPage currentEmployee={employee} />} />
             <Route path="settings" element={<SettingsPage employee={employee} />} />

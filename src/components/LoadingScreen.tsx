@@ -1,8 +1,12 @@
+import { useAppLogo } from '../lib/appLogo';
+
 export default function LoadingScreen({ compact }: { compact?: boolean }) {
+  const logo = useAppLogo();
+
   if (compact) {
     return (
       <div className="loading-inline">
-        <img src="/brand/logo-mark.png" alt="" className="loading-logo-sm" />
+        <img src={logo} alt="" className="loading-logo-sm" />
       </div>
     );
   }
@@ -14,7 +18,7 @@ export default function LoadingScreen({ compact }: { compact?: boolean }) {
     <div className="loading-screen">
       <div className="loading-screen-content">
         <div className="loading-glow">
-          <img src="/brand/logo-mark.png" alt="" className="loading-logo" />
+          <img src={logo} alt="" className="loading-logo" />
         </div>
         <div className="loading-screen-brand">IB CRM</div>
         <div className="loading-dots">

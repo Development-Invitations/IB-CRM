@@ -460,20 +460,24 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
               <StatusBadge status={selected.manualStatus} until={selected.manualStatusUntil} size="sm" />
             </div>
 
-            <div className="department-members-title">{t('absence.myTitle')}</div>
-            {selectedAbsences.length === 0 ? (
-              <p className="settings-hint">{t('absence.empty')}</p>
-            ) : (
-              <ul className="department-members-list">
-                {selectedAbsences.map((r) => (
-                  <li key={r.id}>
-                    {t(ABSENCE_TYPE_LABEL_KEYS[r.type])} · {formatDate(r.startDate)} – {formatDate(r.endDate)}{' '}
-                    <span className={`absence-status absence-status-${r.status}`}>
-                      {t(r.status === 'pending' ? 'absence.statusPending' : r.status === 'approved' ? 'absence.statusApproved' : 'absence.statusRejected')}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+            {!selected.isPartner && (
+              <>
+                <div className="department-members-title">{t('absence.myTitle')}</div>
+                {selectedAbsences.length === 0 ? (
+                  <p className="settings-hint">{t('absence.empty')}</p>
+                ) : (
+                  <ul className="department-members-list">
+                    {selectedAbsences.map((r) => (
+                      <li key={r.id}>
+                        {t(ABSENCE_TYPE_LABEL_KEYS[r.type])} · {formatDate(r.startDate)} – {formatDate(r.endDate)}{' '}
+                        <span className={`absence-status absence-status-${r.status}`}>
+                          {t(r.status === 'pending' ? 'absence.statusPending' : r.status === 'approved' ? 'absence.statusApproved' : 'absence.statusRejected')}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
             )}
 
             {empRegs.length > 0 && (

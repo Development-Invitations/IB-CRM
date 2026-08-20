@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.2.26';
+export const APP_VERSION = '0.3.1';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,22 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.3.1',
+      items: [
+        'В Настройках у админа появился раздел "Логотип" — можно загрузить свой логотип вместо стандартного IB CRM, он сразу применяется во всём интерфейсе (экран загрузки, первый запуск) и на значке окна/панели задач, для всех пользователей этой установки',
+      ],
+    },
+    {
+      version: '0.3.0',
+      items: [
+        'Новая панель партнёра — теперь настоящий раздел с сайдбаром, как в основной CRM: свои клиенты, свои регламенты с администратором, смена пароля. Чат из панели партнёра убран — его роль теперь выполняют регламенты',
+        'Клиент, добавленный партнёром, виден и в основной CRM (с пометкой, чей он); клиент, отмеченный админом как партнёрский — виден в панели этого партнёра. Также добавлено поле "Стоимость" на карточке клиента',
+        'У каждого партнёра теперь может быть несколько отдельных регламентов с администратором — строго приватных, другие партнёры их не видят',
+        'В топбаре у админа появилась кнопка "Партнёры" — список партнёров и переход к работе с клиентами/регламентами конкретного партнёра',
+        'В блоге при создании темы админ может выбрать аудиторию — сотрудники (как раньше), все партнёры или конкретный партнёр; партнёр видит в своей панели адресованные ему темы (только чтение)',
+      ],
+    },
     {
       version: '0.2.26',
       items: [
@@ -470,6 +486,22 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.3.1',
+      items: [
+        "Sozlamalarda admin uchun \"Logotip\" bo'limi paydo bo'ldi — standart IB CRM o'rniga o'z logotipingizni yuklash mumkin, u darhol butun interfeysda (yuklanish ekrani, birinchi ishga tushirish) va oyna/vazifalar paneli belgisida, ushbu o'rnatishning barcha foydalanuvchilari uchun qo'llaniladi",
+      ],
+    },
+    {
+      version: '0.3.0',
+      items: [
+        "Yangi hamkor paneli — endi asosiy CRM'dagidek haqiqiy sайдбар bilan bo'lim: o'z mijozlari, administrator bilan o'z reglamentlari, parolni almashtirish. Hamkor panelidan chat olib tashlandi — endi uning vazifasini reglamentlar bajaradi",
+        "Hamkor qo'shgan mijoz asosiy CRM'da ham ko'rinadi (kimniki ekani bilan); admin hamkorga tegishli deb belgilagan mijoz shu hamkor panelida ko'rinadi. Mijoz kartochkasiga \"Qiymati\" maydoni ham qo'shildi",
+        "Endi har bir hamkorning administrator bilan bir nechta alohida reglamentlari bo'lishi mumkin — qat'iy maxfiy, boshqa hamkorlar ularni ko'rmaydi",
+        "Admin uchun topbarda \"Hamkorlar\" tugmasi paydo bo'ldi — hamkorlar ro'yxati va muayyan hamkorning mijozlari/reglamentlari bilan ishlashga o'tish",
+        "Blogda mavzu yaratishda admin auditoriyani tanlashi mumkin — xodimlar (avvalgidek), barcha hamkorlar yoki muayyan hamkor; hamkor o'z panelida unga mo'ljallangan mavzularni ko'radi (faqat o'qish)",
+      ],
+    },
+    {
       version: '0.2.26',
       items: [
         "Endi administrator baza ma'lumotlarining parol bilan shifrlangan zaxira nusxasini yuklab olishi va fayldan tiklashi mumkin (Sozlamalar → Zaxira nusxalar) — tiklash faqat server/lokal baza turgan kompyuterda mavjud",
@@ -923,6 +955,22 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.3.1',
+      items: [
+        'Созламаларда админ учун "Логотип" бўлими пайдо бўлди — стандарт IB CRM ўрнига ўз логотипингизни юклаш мумкин, у дарҳол бутун интерфейсда (юкланиш экрани, биринчи ишга тушириш) ва ойна/вазифалар панели белгисида, ушбу ўрнатишнинг барча фойдаланувчилари учун қўлланилади',
+      ],
+    },
+    {
+      version: '0.3.0',
+      items: [
+        'Янги ҳамкор панели — энди асосий CRM\'дагидек ҳақиқий сайдбар билан бўлим: ўз мижозлари, администратор билан ўз регламентлари, паролни алмаштириш. Ҳамкор панелидан чат олиб ташланди — энди унинг вазифасини регламентлар бажаради',
+        'Ҳамкор қўшган мижоз асосий CRM\'да ҳам кўринади (кимники экани билан); админ ҳамкорга тегишли деб белгилаган мижоз шу ҳамкор панелида кўринади. Мижоз карточкасига "Қиймати" майдони ҳам қўшилди',
+        'Энди ҳар бир ҳамкорнинг администратор билан бир нечта алоҳида регламентлари бўлиши мумкин — қатъий махфий, бошқа ҳамкорлар уларни кўрмайди',
+        'Админ учун топбарда "Ҳамкорлар" тугмаси пайдо бўлди — ҳамкорлар рўйхати ва муайян ҳамкорнинг мижозлари/регламентлари билан ишлашга ўтиш',
+        'Блогда мавзу яратишда админ аудиторияни танлаши мумкин — ходимлар (аввалгидек), барча ҳамкорлар ёки муайян ҳамкор; ҳамкор ўз панелида унга мўлжалланган мавзуларни кўради (фақат ўқиш)',
+      ],
+    },
     {
       version: '0.2.26',
       items: [

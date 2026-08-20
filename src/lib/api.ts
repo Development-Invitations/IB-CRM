@@ -115,6 +115,9 @@ export type Client = {
   createdBy: string | null;
   createdByName: string | null;
   createdAt: string;
+  partnerId: string | null;
+  partnerName: string | null;
+  dealValue: string | null;
 };
 
 export type ClientHistoryEntry = {
@@ -267,6 +270,55 @@ export type RegulationReply = {
   isDeleted: boolean;
 };
 
+export type PartnerRegulationStatus = 'active' | 'closed';
+
+export type PartnerRegulation = {
+  id: string;
+  regNumber: string;
+  partnerId: string;
+  partnerName: string;
+  clientId: string | null;
+  clientName: string | null;
+  title: string;
+  description: string | null;
+  status: PartnerRegulationStatus;
+  deadline: string | null;
+  closedAt: string | null;
+  createdBy: string | null;
+  createdByName: string | null;
+  createdAt: string;
+  updatedAt: string;
+  entryCount: number;
+};
+
+export type PartnerRegulationEntry = {
+  id: string;
+  partnerRegulationId: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  attachmentData: string | null;
+  attachmentName: string | null;
+  deadline: string | null;
+  status: RegulationEntryStatus;
+  createdAt: string;
+  updatedAt: string;
+  replyCount: number;
+  editedAt: string | null;
+  isDeleted: boolean;
+};
+
+export type PartnerRegulationReply = {
+  id: string;
+  entryId: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  createdAt: string;
+  editedAt: string | null;
+  isDeleted: boolean;
+};
+
 export type RegulationReminder = {
   id: string;
   regulationId: string;
@@ -293,6 +345,7 @@ export type BlogTopic = {
   pinned: boolean;
   createdAt: string;
   commentCount: number;
+  partnerAudience: string | null;
 };
 
 export type BlogComment = {
@@ -586,9 +639,9 @@ export const api = {
   resolveAbsenceRequest: (payload: { actorId: string; requestId: string; approve: boolean }) =>
     invoke<void>('resolve_absence_request', { payload }),
 
-  listClients: () => invoke<Client[]>('list_clients'),
+  listClients: (payload: { actorId: string; partnerId?: string | null }) => invoke<Client[]>('list_clients', { payload }),
 
-  getClient: (id: string) => invoke<Client | null>('get_client', { id }),
+  getClient: (payload: { actorId: string; id: string }) => invoke<Client | null>('get_client', { payload }),
 
   createClient: (payload: {
     actorId: string;
@@ -599,9 +652,12 @@ export const api = {
     email?: string | null;
     address?: string | null;
     notes?: string | null;
+    partnerId?: string | null;
+    dealValue?: string | null;
   }) => invoke<Client>('create_client', { payload }),
 
   updateClient: (payload: {
+    actorId: string;
     id: string;
     name: string;
     contactPerson?: string | null;
@@ -610,14 +666,54 @@ export const api = {
     email?: string | null;
     address?: string | null;
     notes?: string | null;
+    partnerId?: string | null;
+    dealValue?: string | null;
   }) => invoke<Client>('update_client', { payload }),
 
   deleteClient: (payload: { adminId: string; id: string }) => invoke<void>('delete_client', { payload }),
 
-  listClientHistory: (clientId: string) => invoke<ClientHistoryEntry[]>('list_client_history', { clientId }),
+  listClientHistory: (payload: { actorId: string; clientId: string }) => invoke<ClientHistoryEntry[]>('list_client_history', { payload }),
 
   addClientHistory: (payload: { clientId: string; actorId: string; description: string }) =>
     invoke<ClientHistoryEntry>('add_client_history', { payload }),
+
+  listPartnerRegulations: (payload: { actorId: string; partnerId: string }) =>
+    invoke<PartnerRegulation[]>('list_partner_regulations', { payload }),
+
+  getPartnerRegulation: (id: string) => invoke<PartnerRegulation | null>('get_partner_regulation', { id }),
+
+  createPartnerRegulation: (payload: { actorId: string; partnerId: string; title: string; description?: string | null; clientId?: string | null; deadline?: string | null }) =>
+    invoke<PartnerRegulation>('create_partner_regulation', { payload }),
+
+  updatePartnerRegulation: (payload: { actorId: string; id: string; title: string; description?: string | null; clientId?: string | null; deadline?: string | null; status: PartnerRegulationStatus }) =>
+    invoke<PartnerRegulation>('update_partner_regulation', { payload }),
+
+  deletePartnerRegulation: (payload: { adminId: string; id: string }) => invoke<void>('delete_partner_regulation', { payload }),
+
+  listPartnerRegulationEntries: (payload: { actorId: string; partnerRegulationId: string }) =>
+    invoke<PartnerRegulationEntry[]>('list_partner_regulation_entries', { payload }),
+
+  addPartnerRegulationEntry: (payload: { actorId: string; partnerRegulationId: string; content: string; attachmentData?: string | null; attachmentName?: string | null; deadline?: string | null }) =>
+    invoke<PartnerRegulationEntry>('add_partner_regulation_entry', { payload }),
+
+  editPartnerRegulationEntry: (payload: { actorId: string; entryId: string; content: string }) =>
+    invoke<PartnerRegulationEntry>('edit_partner_regulation_entry', { payload }),
+
+  deletePartnerRegulationEntry: (payload: { actorId: string; entryId: string }) => invoke<void>('delete_partner_regulation_entry', { payload }),
+
+  updatePartnerRegulationEntryStatus: (payload: { actorId: string; entryId: string; status: RegulationEntryStatus }) =>
+    invoke<void>('update_partner_regulation_entry_status', { payload }),
+
+  listPartnerRegulationReplies: (payload: { actorId: string; entryId: string }) =>
+    invoke<PartnerRegulationReply[]>('list_partner_regulation_replies', { payload }),
+
+  addPartnerRegulationReply: (payload: { actorId: string; entryId: string; content: string }) =>
+    invoke<PartnerRegulationReply>('add_partner_regulation_reply', { payload }),
+
+  editPartnerRegulationReply: (payload: { actorId: string; replyId: string; content: string }) =>
+    invoke<PartnerRegulationReply>('edit_partner_regulation_reply', { payload }),
+
+  deletePartnerRegulationReply: (payload: { actorId: string; replyId: string }) => invoke<void>('delete_partner_regulation_reply', { payload }),
 
   listProjects: () => invoke<Project[]>('list_projects'),
 
@@ -729,10 +825,10 @@ export const api = {
   updateRegulationEntryDeadline: (payload: { actorId: string; entryId: string; deadline: string | null }) =>
     invoke<void>('update_regulation_entry_deadline', { payload }),
 
-  listBlogTopics: () => invoke<BlogTopic[]>('list_blog_topics'),
-  createBlogTopic: (payload: { actorId: string; category: BlogCategory; title: string; content?: string | null }) =>
+  listBlogTopics: (actorId: string) => invoke<BlogTopic[]>('list_blog_topics', { actorId }),
+  createBlogTopic: (payload: { actorId: string; category: BlogCategory; title: string; content?: string | null; partnerAudience?: string | null }) =>
     invoke<BlogTopic>('create_blog_topic', { payload }),
-  updateBlogTopic: (payload: { actorId: string; id: string; category: BlogCategory; title: string; content?: string | null }) =>
+  updateBlogTopic: (payload: { actorId: string; id: string; category: BlogCategory; title: string; content?: string | null; partnerAudience?: string | null }) =>
     invoke<BlogTopic>('update_blog_topic', { payload }),
   setBlogTopicPinned: (payload: { adminId: string; id: string; pinned: boolean }) =>
     invoke<void>('set_blog_topic_pinned', { payload }),
@@ -793,6 +889,9 @@ export const api = {
   getRadminSettings: () => invoke<RadminSettings>('get_radmin_settings'),
   setRadminSettings: (payload: { adminId: string; networkId: string; networkPassword: string; note: string }) =>
     invoke<RadminSettings>('set_radmin_settings', { payload }),
+  getAppLogo: () => invoke<string | null>('get_app_logo'),
+  setAppLogo: (payload: { adminId: string; logoData: string | null }) =>
+    invoke<string | null>('set_app_logo', { payload }),
   exportBackup: (payload: { adminId: string; password: string; destPath: string }) =>
     invoke<void>('export_backup', { payload }),
   restoreBackup: (payload: { adminId: string; password: string; sourcePath: string }) =>

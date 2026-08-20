@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Search, Pencil, Contact, Trash2, Send, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { api, type Employee, type Client, type ClientHistoryEntry, type Regulation } from '../lib/api';
+import { api, type Employee, type Client, type ClientHistoryEntry, type Regulation, type PartnerRegulation, type Partner } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
 import { parseSqliteUtc } from '../lib/date';
@@ -9,18 +9,34 @@ import Drawer from '../components/Drawer';
 import Modal from '../components/Modal';
 import ClientFormModal from '../components/ClientFormModal';
 import LoadingScreen from '../components/LoadingScreen';
+import Select from '../components/Select';
 
-export default function Clients({ currentEmployee }: { currentEmployee: Employee }) {
+export default function Clients({
+  currentEmployee,
+  scopedPartnerId,
+  regulationsBasePath = '../regulations',
+}: {
+  currentEmployee: Employee;
+  // undefined — обычная неограниченная страница CRM (видит и создаёт клиентов
+  // без ограничения по партнёру); строка — вид одного партнёра (его панель
+  // или админский просмотр конкретного партнёра): список клиентов сервер сам
+  // ограничивает этим партнёром, колонка/фильтр "Партнёр" не нужны.
+  scopedPartnerId?: string;
+  regulationsBasePath?: string;
+}) {
   const { t } = useLocale();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [originFilter, setOriginFilter] = useState('');
+  const [partners, setPartners] = useState<Partner[]>([]);
 
   const [selected, setSelected] = useState<Client | null>(null);
   const [history, setHistory] = useState<ClientHistoryEntry[]>([]);
   const [clientRegs, setClientRegs] = useState<Regulation[]>([]);
+  const [clientPartnerRegs, setClientPartnerRegs] = useState<PartnerRegulation[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [noteBusy, setNoteBusy] = useState(false);
@@ -32,7 +48,7 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
 
   const load = () => {
     setLoading(true);
-    api.listClients()
+    api.listClients({ actorId: currentEmployee.id, partnerId: scopedPartnerId })
       .then((list) => {
         setClients(list);
         setLoading(false);
@@ -46,22 +62,33 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
 
   useEffect(() => {
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopedPartnerId]);
+
+  useEffect(() => {
+    if (scopedPartnerId !== undefined) return;
+    api.listPartners().then(setPartners).catch(() => {});
+  }, [scopedPartnerId]);
 
   useEffect(() => {
     if (!selected) {
       setHistory([]);
       setClientRegs([]);
+      setClientPartnerRegs([]);
       return;
     }
     setHistoryLoading(true);
     Promise.all([
-      api.listClientHistory(selected.id),
+      api.listClientHistory({ actorId: currentEmployee.id, clientId: selected.id }),
       api.listRegulations(),
+      selected.partnerId && (currentEmployee.isAdmin || currentEmployee.isPartner)
+        ? api.listPartnerRegulations({ actorId: currentEmployee.id, partnerId: selected.partnerId }).catch(() => [])
+        : Promise.resolve([]),
     ])
-      .then(([entries, allRegs]) => {
+      .then(([entries, allRegs, partnerRegs]) => {
         setHistory(entries);
         setClientRegs(allRegs.filter((r) => r.clientId === selected.id));
+        setClientPartnerRegs(partnerRegs.filter((r) => r.clientId === selected.id));
         setHistoryLoading(false);
       })
       .catch(() => {
@@ -102,7 +129,7 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
     try {
       await api.addClientHistory({ clientId: selected.id, actorId: currentEmployee.id, description: newNote.trim() });
       setNewNote('');
-      const entries = await api.listClientHistory(selected.id);
+      const entries = await api.listClientHistory({ actorId: currentEmployee.id, clientId: selected.id });
       setHistory(entries);
     } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('clients.errorGeneric'));
@@ -111,17 +138,18 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
     }
   };
 
-  const filteredClients = search.trim()
-    ? clients.filter((c) => {
-        const q = search.trim().toLowerCase();
-        return (
-          c.clientNumber.toLowerCase().includes(q) ||
-          c.name.toLowerCase().includes(q) ||
-          (c.phone || '').toLowerCase().includes(q) ||
-          (c.email || '').toLowerCase().includes(q)
-        );
-      })
-    : clients;
+  const filteredClients = clients.filter((c) => {
+    if (originFilter === 'crm' && c.partnerId) return false;
+    if (originFilter && originFilter !== 'crm' && c.partnerId !== originFilter) return false;
+    if (!search.trim()) return true;
+    const q = search.trim().toLowerCase();
+    return (
+      c.clientNumber.toLowerCase().includes(q) ||
+      c.name.toLowerCase().includes(q) ||
+      (c.phone || '').toLowerCase().includes(q) ||
+      (c.email || '').toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="employees-page">
@@ -135,6 +163,17 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
       <div className="employees-search-row">
         <Search size={15} className="employees-search-icon" />
         <input className="employees-search-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('clients.searchPlaceholder')} />
+        {scopedPartnerId === undefined && partners.length > 0 && (
+          <Select
+            value={originFilter}
+            options={[
+              { value: '', label: t('common.all') },
+              { value: 'crm', label: t('clients.originCrm') },
+              ...partners.map((p) => ({ value: p.id, label: p.name })),
+            ]}
+            onChange={setOriginFilter}
+          />
+        )}
       </div>
 
       {loading ? (
@@ -149,6 +188,7 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
               <th>{t('clients.colName')}</th>
               <th>{t('clients.colPhone')}</th>
               <th>{t('clients.colEmail')}</th>
+              {scopedPartnerId === undefined && <th>{t('clients.colOrigin')}</th>}
               <th>{t('clients.colCreated')}</th>
             </tr>
           </thead>
@@ -159,6 +199,11 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
                 <td>{c.name}</td>
                 <td>{c.phone || '—'}</td>
                 <td>{c.email || '—'}</td>
+                {scopedPartnerId === undefined && (
+                  <td>
+                    {c.partnerId ? <span className="absence-status">{c.partnerName}</span> : <span className="settings-hint">{t('clients.originCrm')}</span>}
+                  </td>
+                )}
                 <td>{parseSqliteUtc(c.createdAt).toLocaleDateString()}</td>
               </tr>
             ))}
@@ -224,6 +269,18 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
                 <span>{selected.notes}</span>
               </div>
             )}
+            {selected.dealValue && (
+              <div className="employee-card-row">
+                <span className="settings-hint">{t('clients.dealValueLabel')}</span>
+                <span>{selected.dealValue}</span>
+              </div>
+            )}
+            {scopedPartnerId === undefined && (
+              <div className="employee-card-row">
+                <span className="settings-hint">{t('clients.originLabel')}</span>
+                <span>{selected.partnerId ? selected.partnerName : t('clients.originCrm')}</span>
+              </div>
+            )}
             <div className="employee-card-row">
               <span className="settings-hint">{t('clients.colCreated')}</span>
               <span>
@@ -231,8 +288,6 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
                 {selected.createdByName ? ` · ${selected.createdByName}` : ''}
               </span>
             </div>
-
-            <div className="department-members-title">{t('clients.historyTitle')}</div>
 
             {clientRegs.length > 0 && (
               <>
@@ -254,6 +309,33 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
                       </div>
                       <span className={`absence-status reg-status-${r.status}`} style={{ flexShrink: 0 }}>
                         {t(r.status === 'active' ? 'regulations.statusActive' : 'regulations.statusClosed')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+
+            {clientPartnerRegs.length > 0 && (
+              <>
+                <div className="department-members-title">{t('clients.partnerRegulationsTitle')}</div>
+                <ul className="client-history-list">
+                  {clientPartnerRegs.map((r) => (
+                    <li
+                      key={r.id}
+                      className="client-reg-item"
+                      onClick={() => navigate(regulationsBasePath, { state: { openPartnerRegId: r.id } })}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div>
+                        <div className="client-reg-name">
+                          <ExternalLink size={12} style={{ marginRight: 5, opacity: 0.5 }} />
+                          {r.title}
+                        </div>
+                        <div className="settings-hint client-history-meta">{r.regNumber}</div>
+                      </div>
+                      <span className={`absence-status reg-status-${r.status}`} style={{ flexShrink: 0 }}>
+                        {t(r.status === 'active' ? 'partnerRegulations.statusActive' : 'partnerRegulations.statusClosed')}
                       </span>
                     </li>
                   ))}
@@ -300,7 +382,8 @@ export default function Clients({ currentEmployee }: { currentEmployee: Employee
         open={formOpen}
         onClose={() => setFormOpen(false)}
         client={editingClient}
-        currentEmployeeId={currentEmployee.id}
+        currentEmployee={currentEmployee}
+        lockedPartnerId={scopedPartnerId}
         onSaved={load}
       />
 

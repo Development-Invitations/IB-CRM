@@ -1,6 +1,6 @@
 import { useEffect, useState, useContext, useMemo } from 'react';
 import { Plus, Search, MessageSquare, Pin, PinOff, Trash2, Pencil, ArrowLeft, X, List as ListIcon } from 'lucide-react';
-import { api, type Employee, type BlogTopic, type BlogComment, type BlogCategory } from '../lib/api';
+import { api, type Employee, type BlogTopic, type BlogComment, type BlogCategory, type Partner } from '../lib/api';
 import { FullscreenContext } from './Dashboard';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
@@ -43,6 +43,18 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
   const [formError, setFormError] = useState('');
   const [formInstanceKey, setFormInstanceKey] = useState(0);
 
+  // Адресовать тему партнёрам может только админ — см. list_blog_topics/
+  // create_blog_topic на бэкенде. Обычный сотрудник тему всегда создаёт "для
+  // сотрудников" (как раньше), партнёр вообще не может создавать/редактировать.
+  const [formAudience, setFormAudience] = useState<'employees' | 'all' | 'partner'>('employees');
+  const [formPartnerId, setFormPartnerId] = useState('');
+  const [partners, setPartners] = useState<Partner[]>([]);
+
+  useEffect(() => {
+    if (!currentEmployee.isAdmin) return;
+    api.listPartners().then(setPartners).catch(() => {});
+  }, [currentEmployee.isAdmin]);
+
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
@@ -53,7 +65,7 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
 
   const load = () => {
     setLoading(true);
-    api.listBlogTopics()
+    api.listBlogTopics(currentEmployee.id)
       .then((list) => {
         setTopics(list);
         setLoading(false);
@@ -115,6 +127,7 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
   const openCreate = () => {
     setEditingTopic(undefined);
     setFormCategory('discussion'); setFormTitle(''); setFormContent(''); setFormError('');
+    setFormAudience('employees'); setFormPartnerId('');
     setFormInstanceKey((k) => k + 1);
     setFormOpen(true);
   };
@@ -122,6 +135,9 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
     setEditingTopic(topic);
     setFormCategory(topic.category); setFormTitle(topic.title); setFormContent(topic.content ?? '');
     setFormError('');
+    if (topic.partnerAudience === '*') { setFormAudience('all'); setFormPartnerId(''); }
+    else if (topic.partnerAudience) { setFormAudience('partner'); setFormPartnerId(topic.partnerAudience); }
+    else { setFormAudience('employees'); setFormPartnerId(''); }
     setFormInstanceKey((k) => k + 1);
     setFormOpen(true);
   };
@@ -130,12 +146,13 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
     setFormError('');
     if (!formTitle.trim()) { setFormError(t('blog.errorRequired')); return; }
     setFormBusy(true);
+    const partnerAudience = formAudience === 'all' ? '*' : formAudience === 'partner' ? formPartnerId || null : null;
     try {
       if (editingTopic) {
-        await api.updateBlogTopic({ actorId: currentEmployee.id, id: editingTopic.id, category: formCategory, title: formTitle.trim(), content: isBlankHtml(formContent) ? null : formContent });
+        await api.updateBlogTopic({ actorId: currentEmployee.id, id: editingTopic.id, category: formCategory, title: formTitle.trim(), content: isBlankHtml(formContent) ? null : formContent, partnerAudience });
         showToast('success', t('blog.updated'));
       } else {
-        await api.createBlogTopic({ actorId: currentEmployee.id, category: formCategory, title: formTitle.trim(), content: isBlankHtml(formContent) ? null : formContent });
+        await api.createBlogTopic({ actorId: currentEmployee.id, category: formCategory, title: formTitle.trim(), content: isBlankHtml(formContent) ? null : formContent, partnerAudience });
         showToast('success', t('blog.added'));
       }
       setFormOpen(false);
@@ -174,7 +191,7 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
   };
 
   const handleAddComment = async () => {
-    if (!selected || isBlankHtml(commentText)) return;
+    if (!selected || isBlankHtml(commentText) || commentBusy) return;
     setCommentBusy(true);
     try {
       await api.addBlogComment({ actorId: currentEmployee.id, topicId: selected.id, content: commentText, replyToId: replyTo?.id ?? null });
@@ -264,11 +281,13 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
                             <strong>{c.authorName}</strong>
                             <span className="settings-hint">{parseSqliteUtc(c.createdAt).toLocaleString()}</span>
                           </div>
-                          <div className="reg-entry-actions">
-                            <button className="reg-action-btn" onClick={() => setReplyTo(c)} title={t('blog.replyBtn')}>
-                              <MessageSquare size={13} />
-                            </button>
-                          </div>
+                          {!currentEmployee.isPartner && (
+                            <div className="reg-entry-actions">
+                              <button className="reg-action-btn" onClick={() => setReplyTo(c)} title={t('blog.replyBtn')}>
+                                <MessageSquare size={13} />
+                              </button>
+                            </div>
+                          )}
                         </div>
                         {parent && (
                           <div className="blog-reply-to">↪ {t('blog.replyingTo', { name: parent.authorName })}</div>
@@ -281,25 +300,28 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
               )}
             </div>
 
-            <div className="reg-add-entry">
-              {replyTo && (
-                <div className="blog-reply-banner">
-                  {t('blog.replyingTo', { name: replyTo.authorName })}
-                  <button className="reg-action-btn" onClick={() => setReplyTo(null)}><X size={12} /></button>
+            {!currentEmployee.isPartner && (
+              <div className="reg-add-entry">
+                {replyTo && (
+                  <div className="blog-reply-banner">
+                    {t('blog.replyingTo', { name: replyTo.authorName })}
+                    <button className="reg-action-btn" onClick={() => setReplyTo(null)}><X size={12} /></button>
+                  </div>
+                )}
+                <RichEditor
+                  value={commentText}
+                  onChange={setCommentText}
+                  resetKey={`${selected.id}-${commentInstanceKey}`}
+                  placeholder={t('blog.commentPlaceholder')}
+                  onSubmitEnter={handleAddComment}
+                />
+                <div className="reg-add-entry-row">
+                  <button className="modal-btn danger" onClick={handleAddComment} disabled={isBlankHtml(commentText) || commentBusy}>
+                    <Plus size={14} /> {t('blog.commentSendBtn')}
+                  </button>
                 </div>
-              )}
-              <RichEditor
-                value={commentText}
-                onChange={setCommentText}
-                resetKey={`${selected.id}-${commentInstanceKey}`}
-                placeholder={t('blog.commentPlaceholder')}
-              />
-              <div className="reg-add-entry-row">
-                <button className="modal-btn danger" onClick={handleAddComment} disabled={isBlankHtml(commentText) || commentBusy}>
-                  <Plus size={14} /> {t('blog.commentSendBtn')}
-                </button>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -312,6 +334,26 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
           {formError && <div className="error-text">{formError}</div>}
           <div className="field"><label>{t('blog.categoryLabel')}</label><Select value={formCategory} options={categoryOptions} onChange={(v) => setFormCategory(v as BlogCategory)} /></div>
           <div className="field"><label>{t('blog.titleLabel')}</label><input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} /></div>
+          {currentEmployee.isAdmin && (
+            <div className="field">
+              <label>{t('blog.audienceLabel')}</label>
+              <Select
+                value={formAudience}
+                options={[
+                  { value: 'employees', label: t('blog.audienceEmployees') },
+                  { value: 'all', label: t('blog.audienceAllPartners') },
+                  { value: 'partner', label: t('blog.audienceSpecificPartner') },
+                ]}
+                onChange={(v) => setFormAudience(v as 'employees' | 'all' | 'partner')}
+              />
+            </div>
+          )}
+          {currentEmployee.isAdmin && formAudience === 'partner' && (
+            <div className="field">
+              <label>{t('partners.tabLabel')}</label>
+              <Select value={formPartnerId} options={partners.map((p) => ({ value: p.id, label: p.name }))} onChange={setFormPartnerId} />
+            </div>
+          )}
           <div className="field">
             <label>{t('blog.contentLabel')}</label>
             <RichEditor value={formContent} onChange={setFormContent} resetKey={`${editingTopic?.id ?? 'new'}-${formInstanceKey}`} placeholder={t('blog.editorPlaceholder')} />
@@ -334,9 +376,11 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
     <div className="employees-page">
       <div className="employees-header">
         <h1>{t('sidebar.blog')}</h1>
-        <button className="primary employees-add-btn" onClick={openCreate}>
-          <Plus size={16} /> {t('blog.addBtn')}
-        </button>
+        {!currentEmployee.isPartner && (
+          <button className="primary employees-add-btn" onClick={openCreate}>
+            <Plus size={16} /> {t('blog.addBtn')}
+          </button>
+        )}
       </div>
 
       <div className="employees-search-row">

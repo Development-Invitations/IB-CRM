@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback, useContext } from 'react';
 import { useLocation, useNavigate, type NavigateFunction } from 'react-router-dom';
 import { FullscreenContext } from './Dashboard';
-import { Plus, Pencil, FileText, Trash2, UserPlus, X, Paperclip, CheckSquare, XSquare, RotateCcw, ChevronDown, ChevronRight, Search, Copy, Check, ArrowLeft, Link2, Bell, CalendarClock, MoreVertical, Forward, Download, Send } from 'lucide-react';
+import { Plus, Pencil, FileText, Trash2, UserPlus, X, Paperclip, CheckSquare, XSquare, RotateCcw, ChevronDown, ChevronRight, Search, Copy, Check, ArrowLeft, Link2, Bell, CalendarClock, MoreVertical, Forward, Send } from 'lucide-react';
 import { api, type Employee, type Regulation, type RegulationMember, type RegulationMemberRole, type RegulationEntry, type RegulationReply, type RegulationStatus, type RegulationEntryStatus, type Client } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
@@ -12,44 +12,13 @@ import Modal from '../components/Modal';
 import Select from '../components/Select';
 import SearchableSelect from '../components/SearchableSelect';
 import LoadingScreen from '../components/LoadingScreen';
+import AttachmentPreview from '../components/AttachmentPreview';
 
 const ENTRY_STATUS_KEYS: Record<RegulationEntryStatus, string> = {
   open: 'regulations.entryStatusOpen',
   done: 'regulations.entryStatusDone',
   cancelled: 'regulations.entryStatusCancelled',
 };
-
-function AttachmentPreview({ dataUrl, name, onExpand }: { dataUrl: string; name: string | null; onExpand: () => void }) {
-  const { t } = useLocale();
-  const kind = classifyAttachment(dataUrl);
-  if (kind === 'image') {
-    return (
-      <div className="reg-attachment-media-wrap">
-        <button type="button" className="reg-attachment-image-btn" onClick={onExpand} title={name ?? undefined}>
-          <img className="reg-attachment-image" src={dataUrl} alt={name ?? ''} />
-        </button>
-        <a className="reg-attachment-download-btn" href={dataUrl} download={name ?? undefined} title={t('common.download')}>
-          <Download size={13} />
-        </a>
-      </div>
-    );
-  }
-  if (kind === 'video') {
-    return (
-      <div className="reg-attachment-media-wrap">
-        <video className="reg-attachment-video" src={dataUrl} controls preload="metadata" />
-        <a className="reg-attachment-download-link" href={dataUrl} download={name ?? undefined}>
-          <Download size={13} /> {t('common.download')}
-        </a>
-      </div>
-    );
-  }
-  return (
-    <a className="reg-entry-attachment" href={dataUrl} target="_blank" rel="noreferrer" download={name ?? undefined}>
-      <Paperclip size={13} /> <span>{name}</span>
-    </a>
-  );
-}
 
 function EntryRow({
   entry,
@@ -491,7 +460,7 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
 
   const load = useCallback(() => {
     setLoading(true);
-    Promise.all([api.listRegulations(), api.listClients(), api.listEmployees()])
+    Promise.all([api.listRegulations(), api.listClients({ actorId: currentEmployee.id }), api.listEmployees()])
       .then(([regs, cls, emps]) => {
         setRegulations(regs);
         setClients(cls);

@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { Copy, Check, FolderOpen, Upload, Eye, EyeOff, Download, Database } from 'lucide-react';
+import { Copy, Check, FolderOpen, Upload, Eye, EyeOff, Download, Database, Image as ImageIcon, X } from 'lucide-react';
 import { open as openFileDialog, save as saveFileDialog } from '@tauri-apps/plugin-dialog';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { relaunch } from '@tauri-apps/plugin-process';
@@ -12,6 +12,8 @@ import { connection } from '../lib/connection';
 import { session } from '../lib/session';
 import { ZOOM_LEVELS, getStoredZoom, applyZoom } from '../lib/zoom';
 import { getStoredWindowMode, applyWindowMode, type WindowMode } from '../lib/windowMode';
+import { compressLogoFile } from '../lib/photo';
+import { useAppLogo, setCachedAppLogo, applyRuntimeIcon, DEFAULT_LOGO } from '../lib/appLogo';
 import Select from '../components/Select';
 
 export default function Settings({ employee }: { employee: Employee }) {
@@ -70,6 +72,12 @@ export default function Settings({ employee }: { employee: Employee }) {
   const [radminBusy, setRadminBusy] = useState(false);
   const [copiedRadminId, setCopiedRadminId] = useState(false);
   const [copiedRadminPassword, setCopiedRadminPassword] = useState(false);
+
+  // Логотип приложения — виден и редактируем любым админом (в т.ч. другой
+  // компанией, ставящей это же приложение под своим брендом), применяется
+  // сразу для всех пользователей этой установки (app_meta, см. db.rs).
+  const currentLogo = useAppLogo();
+  const [logoBusy, setLogoBusy] = useState(false);
 
   useEffect(() => {
     if (!employee.isAdmin || isClient) return;
@@ -162,6 +170,37 @@ export default function Settings({ employee }: { employee: Employee }) {
       setCopiedRadminPassword(true);
       setTimeout(() => setCopiedRadminPassword(false), 2000);
     });
+  };
+
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setLogoBusy(true);
+    try {
+      const compressed = await compressLogoFile(file);
+      const saved = await api.setAppLogo({ adminId: employee.id, logoData: compressed });
+      setCachedAppLogo(saved);
+      if (saved) applyRuntimeIcon(saved).catch(() => {});
+      showToast('success', t('settings.logo.saveSuccess'));
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('settings.errorGeneric'));
+    } finally {
+      setLogoBusy(false);
+    }
+  };
+
+  const handleResetLogo = async () => {
+    setLogoBusy(true);
+    try {
+      await api.setAppLogo({ adminId: employee.id, logoData: null });
+      setCachedAppLogo(null);
+      showToast('success', t('settings.logo.resetSuccess'));
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('settings.errorGeneric'));
+    } finally {
+      setLogoBusy(false);
+    }
   };
 
   const handleExportBackup = async () => {
@@ -565,6 +604,28 @@ export default function Settings({ employee }: { employee: Employee }) {
           <button className="modal-btn" onClick={handleSaveRadmin} disabled={radminBusy}>
             {radminBusy ? t('common.loading') : t('settings.radmin.saveBtn')}
           </button>
+        </section>
+      )}
+
+      {employee.isAdmin && (
+        <section className="settings-section">
+          <h2>{t('settings.logo.title')}</h2>
+          <p className="settings-hint">{t('settings.logo.hint')}</p>
+
+          <div className="avatar-upload-row" style={{ marginTop: 10 }}>
+            <img src={currentLogo} alt="" style={{ width: 64, height: 64, objectFit: 'contain' }} />
+            <div className="avatar-upload-actions">
+              <input id="logo-file-input" type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoChange} />
+              <button type="button" className="modal-btn" onClick={() => document.getElementById('logo-file-input')?.click()} disabled={logoBusy}>
+                <ImageIcon size={14} /> {logoBusy ? t('settings.logo.uploadBusy') : t('settings.logo.uploadBtn')}
+              </button>
+              {currentLogo !== DEFAULT_LOGO && (
+                <button type="button" className="link-btn" onClick={handleResetLogo} disabled={logoBusy}>
+                  <X size={13} /> {t('settings.logo.resetBtn')}
+                </button>
+              )}
+            </div>
+          </div>
         </section>
       )}
 

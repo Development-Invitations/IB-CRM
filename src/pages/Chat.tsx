@@ -227,7 +227,17 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
       .then((list) => {
         setMessages(list);
         setLoading(false);
-        api.markChatChannelRead({ employeeId: currentEmployee.id, channel }).catch(() => {});
+        // ВАЖНО: помечаем прочитанным только на осознанном открытии канала
+        // (!silent), а не на каждом тихом фоновом опросе (silent, каждые
+        // POLL_INTERVAL_MS). Раньше это вызывалось безусловно на любом
+        // опросе — гонка с Topbar.tsx: пока переписка открыта, канал
+        // помечался прочитанным быстрее (4 сек), чем Topbar.tsx успевал
+        // опросить уведомления (8-10 сек) и показать баннер, из-за чего
+        // после первого сообщения баннер переставал появляться для всех
+        // следующих в ЭТОМ ЖЕ канале — см. журнал v0.2.24 в docs/TZ.md.
+        if (!silent) {
+          api.markChatChannelRead({ employeeId: currentEmployee.id, channel }).catch(() => {});
+        }
       })
       .catch(() => {
         setLoading(false);

@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.2.23';
+export const APP_VERSION = '0.2.24';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,12 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.2.24',
+      items: [
+        'Исправлена настоящая причина того, что уведомления в чате приходили только один раз, а следующие — нет: пока переписка открыта, чат помечал её прочитанной каждые 4 секунды, из-за чего баннер не успевал сработать. Теперь помечается прочитанной только при осознанном открытии переписки, а не на каждом фоновом опросе — уведомления приходят на каждое новое сообщение',
+      ],
+    },
     {
       version: '0.2.23',
       items: [
@@ -448,6 +454,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.2.24',
+      items: [
+        "Chatdagi bildirishnomalar faqat bir marta kelib, keyingilari kelmasligining haqiqiy sababi tuzatildi — yozishma ochiq turganda chat uni har 4 soniyada o'qilgan deb belgilardi, shu sababli banner ulgurmasdi. Endi faqat yozishmani ongli ravishda ochganda o'qilgan deb belgilanadi, har bir fon so'rovida emas — endi har bir yangi xabarga bildirishnoma keladi",
+      ],
+    },
+    {
       version: '0.2.23',
       items: [
         "Tuzatildi: IB Chat sarlavhasida suhbatdosh ismi va guruh nomi HAMMA HARFLARI BOSH holatda ko'rsatilardi, ilovaning qolgan qismidagidek emas — endi xodim kartochkasidagi kabi",
@@ -879,6 +891,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.2.24',
+      items: [
+        "Чатдаги билдиришномалар фақат бир марта келиб, кейингилари келмаслигининг ҳақиқий сабаби тузатилди — ёзишма очиқ турганда чат уни ҳар 4 сонияда ўқилган деб белгиларди, шу сабабли баннер улгурмасди. Энди фақат ёзишмани онгли равишда очганда ўқилган деб белгиланади, ҳар бир фон сўровида эмас — энди ҳар бир янги хабарга билдиришнома келади",
+      ],
+    },
     {
       version: '0.2.23',
       items: [

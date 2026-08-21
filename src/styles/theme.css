@@ -3543,7 +3543,7 @@ button.employees-add-btn {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 20px 24px;
+  padding: 20px 24px 32px;
   background: var(--color-surface);
 }
 

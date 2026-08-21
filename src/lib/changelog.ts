@@ -22,6 +22,7 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
         'Новый отчёт по партнёрам: сколько клиентов добавлено, сколько регламентов велось, финансовый итог по стоимости услуг — виден и админу в отчёте, и партнёру у себя на Главной',
         'В Настройках у админа — авто-выгрузка отчётов по расписанию (день месяца + время + папка назначения) и кнопка «Сформировать сейчас» с произвольным периодом',
         'Отчёт формируется в один Excel-файл с двумя листами ("Сотрудники" и "Партнёры"), стилизован под дизайн приложения, ширина колонок подгоняется под содержимое автоматически',
+        'В комментариях блога добавлено больше отступа снизу под формой отправки',
       ],
     },
     {
@@ -539,6 +540,7 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
         "Hamkorlar bo'yicha yangi hisobot: nechta mijoz qo'shilgan, nechta reglament olib borilgan, xizmatlar narxi bo'yicha moliyaviy yakun — hisobotda ham, hamkorning o'z Bosh sahifasida ham ko'rinadi",
         "Sozlamalarda admin uchun — hisobotlarni jadval bo'yicha avtomatik yuklab olish (oyning kuni + vaqt + maqsad papka) va istalgan davr uchun «Hozir shakllantirish» tugmasi",
         "Hisobot bitta Excel faylida ikkita varaq bilan shakllanadi (\"Xodimlar\" va \"Hamkorlar\"), ilova dizayniga moslashtirilgan, ustunlar kengligi mazmuniga qarab avtomatik moslashadi",
+        "Blog izohlarida yuborish formasi ostiga pastdan ko'proq bo'shliq qo'shildi",
       ],
     },
     {
@@ -1056,6 +1058,7 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
         'Ҳамкорлар бўйича янги ҳисобот: нечта мижоз қўшилган, нечта регламент олиб борилган, хизматлар нархи бўйича молиявий якун — ҳисоботда ҳам, ҳамкорнинг ўз Бош саҳифасида ҳам кўринади',
         'Созламаларда админ учун — ҳисоботларни жадвал бўйича автоматик юклаб олиш (ойнинг куни + вақт + мақсад папка) ва исталган давр учун «Ҳозир шакллантириш» тугмаси',
         'Ҳисобот битта Excel файлида иккита варақ билан шаклланади ("Ходимлар" ва "Ҳамкорлар"), илова дизайнига мослаштирилган, устунлар кенглиги мазмунига қараб автоматик мослашади',
+        'Блог изоҳларида юбориш формаси остига пастдан кўпроқ бўшлиқ қўшилди',
       ],
     },
     {

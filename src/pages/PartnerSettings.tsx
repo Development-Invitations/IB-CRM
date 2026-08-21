@@ -302,37 +302,39 @@ export default function PartnerSettings({ employee: initialEmployee }: { employe
         <h2>{t('settings.radmin.title')}</h2>
         <p className="settings-hint">{t('partnerSettings.radminHint')}</p>
 
-        <div className="field">
-          <label>{t('settings.radmin.networkIdLabel')}</label>
-          <div className="radmin-copy-row">
-            <input value={radminNetworkId} readOnly />
-            <button className="reg-action-btn" onClick={handleCopyRadminId} title={t('settings.server.copyAddress')}>
-              {copiedRadminId ? <Check size={13} /> : <Copy size={13} />}
-            </button>
-          </div>
-        </div>
-
-        <div className="field">
-          <label>{t('settings.radmin.networkPasswordLabel')}</label>
-          <div className="radmin-copy-row">
-            <input type={radminShowPassword ? 'text' : 'password'} value={radminNetworkPassword} readOnly />
-            <button className="reg-action-btn" onClick={() => setRadminShowPassword((v) => !v)} title={t('settings.radmin.networkPasswordLabel')}>
-              {radminShowPassword ? <EyeOff size={13} /> : <Eye size={13} />}
-            </button>
-            <button className="reg-action-btn" onClick={handleCopyRadminPassword} title={t('settings.server.copyAddress')}>
-              {copiedRadminPassword ? <Check size={13} /> : <Copy size={13} />}
-            </button>
-          </div>
-        </div>
-
-        {radminNote && (
+        <div className="telegram-bot-card">
           <div className="field">
-            <label>{t('settings.radmin.noteLabel')}</label>
-            <p className="settings-hint">{radminNote}</p>
+            <label>{t('settings.radmin.networkIdLabel')}</label>
+            <div className="radmin-copy-row">
+              <input value={radminNetworkId} readOnly />
+              <button className="reg-action-btn" onClick={handleCopyRadminId} title={t('settings.server.copyAddress')}>
+                {copiedRadminId ? <Check size={13} /> : <Copy size={13} />}
+              </button>
+            </div>
           </div>
-        )}
 
-        <button className="modal-btn" onClick={loadRadmin} disabled={radminLoading} style={{ marginTop: 8 }}>
+          <div className="field">
+            <label>{t('settings.radmin.networkPasswordLabel')}</label>
+            <div className="radmin-copy-row">
+              <input type={radminShowPassword ? 'text' : 'password'} value={radminNetworkPassword} readOnly />
+              <button className="reg-action-btn" onClick={() => setRadminShowPassword((v) => !v)} title={t('settings.radmin.networkPasswordLabel')}>
+                {radminShowPassword ? <EyeOff size={13} /> : <Eye size={13} />}
+              </button>
+              <button className="reg-action-btn" onClick={handleCopyRadminPassword} title={t('settings.server.copyAddress')}>
+                {copiedRadminPassword ? <Check size={13} /> : <Copy size={13} />}
+              </button>
+            </div>
+          </div>
+
+          {radminNote && (
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>{t('settings.radmin.noteLabel')}</label>
+              <p className="settings-hint">{radminNote}</p>
+            </div>
+          )}
+        </div>
+
+        <button className="modal-btn" onClick={loadRadmin} disabled={radminLoading} style={{ marginTop: 12 }}>
           <RefreshCw size={14} /> {t('partnerSettings.radminRefreshBtn')}
         </button>
       </section>

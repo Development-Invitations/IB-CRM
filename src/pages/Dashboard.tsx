@@ -17,6 +17,7 @@ import {
   Cake,
   LogOut,
   ClipboardList,
+  Handshake,
 } from 'lucide-react';
 import Topbar from '../components/Topbar';
 import Modal from '../components/Modal';
@@ -36,6 +37,7 @@ import BirthdaysPage from './Birthdays';
 import ChatPage from './Chat';
 import AdminPartners from './AdminPartners';
 import AdminPartnerWorkspace from './AdminPartnerWorkspace';
+import PartnerAccountsPage from './PartnerAccounts';
 import type { Employee } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { APP_VERSION } from '../lib/changelog';
@@ -49,6 +51,7 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
 
   const modules = [
     { label: t('sidebar.employees'), icon: Users, path: 'employees' },
+    ...(employee.isAdmin ? [{ label: t('partners.tabLabel'), icon: Handshake, path: 'partner-accounts' }] : []),
     { label: t('sidebar.departments'), icon: Building2, path: 'departments' },
     { label: t('sidebar.clients'), icon: Contact, path: 'clients' },
     { label: t('sidebar.projects'), icon: FolderKanban, path: 'projects' },
@@ -103,6 +106,7 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
             <Route index element={<Home employee={employee} />} />
             <Route path="employees" element={<EmployeesPage currentEmployee={employee} />} />
             <Route path="employees/:id" element={<EmployeeProfile currentEmployee={employee} />} />
+            <Route path="partner-accounts" element={employee.isAdmin ? <PartnerAccountsPage currentEmployee={employee} /> : <Navigate to="/dashboard" replace />} />
             <Route path="departments" element={<DepartmentsPage currentEmployee={employee} />} />
             <Route path="clients" element={<ClientsPage currentEmployee={employee} />} />
             <Route path="projects" element={<ProjectsPage currentEmployee={employee} />} />

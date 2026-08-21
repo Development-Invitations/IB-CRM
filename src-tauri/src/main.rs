@@ -3,6 +3,7 @@
 mod backup;
 mod db;
 mod dispatch;
+mod report_export;
 mod server;
 
 use db::Db;
@@ -483,6 +484,7 @@ struct PartnerService {
     #[serde(rename = "partnerId")]
     partner_id: String,
     name: String,
+    description: Option<String>,
     price: Option<String>,
     #[serde(rename = "rewardPercent")]
     reward_percent: Option<String>,
@@ -600,6 +602,58 @@ struct TelegramBotSettings {
     admin_partner_enabled: bool,
     #[serde(rename = "adminPartnerToken")]
     admin_partner_token: Option<String>,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct EmployeeReportRow {
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+    #[serde(rename = "fullName")]
+    full_name: String,
+    #[serde(rename = "employeeNumber")]
+    employee_number: String,
+    #[serde(rename = "departmentName")]
+    department_name: Option<String>,
+    #[serde(rename = "positionTitle")]
+    position_title: Option<String>,
+    #[serde(rename = "hoursWorked")]
+    hours_worked: f64,
+    #[serde(rename = "absenceCounts")]
+    absence_counts: Vec<(String, i64)>,
+    #[serde(rename = "regulationsCount")]
+    regulations_count: i64,
+    #[serde(rename = "projectsCount")]
+    projects_count: i64,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct PartnerReportRow {
+    #[serde(rename = "partnerId")]
+    partner_id: String,
+    #[serde(rename = "partnerName")]
+    partner_name: String,
+    #[serde(rename = "clientsAddedCount")]
+    clients_added_count: i64,
+    #[serde(rename = "regulationsCount")]
+    regulations_count: i64,
+    #[serde(rename = "financialTotal")]
+    financial_total: Option<f64>,
+    #[serde(rename = "financialTotalPartial")]
+    financial_total_partial: bool,
+    #[serde(rename = "financialRawValues")]
+    financial_raw_values: Vec<String>,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct ReportExportSettings {
+    enabled: bool,
+    #[serde(rename = "dayMode")]
+    day_mode: String,
+    #[serde(rename = "fixedDay")]
+    fixed_day: i64,
+    #[serde(rename = "timeHhmm")]
+    time_hhmm: String,
+    folder: String,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -1300,6 +1354,7 @@ struct CreatePartnerServicePayload {
     #[serde(rename = "partnerId")]
     partner_id: String,
     name: String,
+    description: Option<String>,
     price: Option<String>,
     #[serde(rename = "rewardPercent")]
     reward_percent: Option<String>,
@@ -1311,6 +1366,7 @@ struct UpdatePartnerServicePayload {
     actor_id: String,
     id: String,
     name: String,
+    description: Option<String>,
     price: Option<String>,
     #[serde(rename = "rewardPercent")]
     reward_percent: Option<String>,
@@ -1641,6 +1697,59 @@ struct SetTelegramBotSettingsPayload {
     admin_partner_enabled: bool,
     #[serde(rename = "adminPartnerToken")]
     admin_partner_token: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct GetEmployeeReportPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    #[serde(rename = "periodStart")]
+    period_start: String,
+    #[serde(rename = "periodEnd")]
+    period_end: String,
+}
+
+#[derive(serde::Deserialize)]
+struct GetPartnerReportPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "partnerId")]
+    partner_id: Option<String>,
+    #[serde(rename = "periodStart")]
+    period_start: Option<String>,
+    #[serde(rename = "periodEnd")]
+    period_end: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct GetReportExportSettingsPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct SetReportExportSettingsPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    enabled: bool,
+    #[serde(rename = "dayMode")]
+    day_mode: String,
+    #[serde(rename = "fixedDay")]
+    fixed_day: i64,
+    #[serde(rename = "timeHhmm")]
+    time_hhmm: String,
+    folder: String,
+}
+
+#[derive(serde::Deserialize)]
+struct GenerateReportNowPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    #[serde(rename = "periodStart")]
+    period_start: String,
+    #[serde(rename = "periodEnd")]
+    period_end: String,
+    folder: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -1999,6 +2108,7 @@ fn to_partner_service(s: db::PartnerServiceRecord) -> PartnerService {
         id: s.id,
         partner_id: s.partner_id,
         name: s.name,
+        description: s.description,
         price: s.price,
         reward_percent: s.reward_percent,
         created_by: s.created_by,
@@ -2152,6 +2262,42 @@ fn to_telegram_bot_settings(s: db::TelegramBotSettingsRecord) -> TelegramBotSett
         task_close_token: s.task_close_token,
         admin_partner_enabled: s.admin_partner_enabled,
         admin_partner_token: s.admin_partner_token,
+    }
+}
+
+fn to_employee_report_row(r: db::EmployeeReportRow) -> EmployeeReportRow {
+    EmployeeReportRow {
+        employee_id: r.employee_id,
+        full_name: r.full_name,
+        employee_number: r.employee_number,
+        department_name: r.department_name,
+        position_title: r.position_title,
+        hours_worked: r.hours_worked,
+        absence_counts: r.absence_counts,
+        regulations_count: r.regulations_count,
+        projects_count: r.projects_count,
+    }
+}
+
+fn to_partner_report_row(r: db::PartnerReportRow) -> PartnerReportRow {
+    PartnerReportRow {
+        partner_id: r.partner_id,
+        partner_name: r.partner_name,
+        clients_added_count: r.clients_added_count,
+        regulations_count: r.regulations_count,
+        financial_total: r.financial_total,
+        financial_total_partial: r.financial_total_partial,
+        financial_raw_values: r.financial_raw_values,
+    }
+}
+
+fn to_report_export_settings(s: db::ReportExportSettingsRecord) -> ReportExportSettings {
+    ReportExportSettings {
+        enabled: s.enabled,
+        day_mode: s.day_mode,
+        fixed_day: s.fixed_day,
+        time_hhmm: s.time_hhmm,
+        folder: s.folder,
     }
 }
 
@@ -2834,14 +2980,14 @@ fn list_partner_services(payload: ListPartnerServicesPayload, state: tauri::Stat
 #[tauri::command]
 fn create_partner_service(payload: CreatePartnerServicePayload, state: tauri::State<AppState>) -> Result<PartnerService, String> {
     let db = state.0.lock().unwrap();
-    db.create_partner_service(&payload.actor_id, &payload.partner_id, &payload.name, payload.price.as_deref(), payload.reward_percent.as_deref())
+    db.create_partner_service(&payload.actor_id, &payload.partner_id, &payload.name, payload.description.as_deref(), payload.price.as_deref(), payload.reward_percent.as_deref())
         .map(to_partner_service)
 }
 
 #[tauri::command]
 fn update_partner_service(payload: UpdatePartnerServicePayload, state: tauri::State<AppState>) -> Result<PartnerService, String> {
     let db = state.0.lock().unwrap();
-    db.update_partner_service(&payload.actor_id, &payload.id, &payload.name, payload.price.as_deref(), payload.reward_percent.as_deref())
+    db.update_partner_service(&payload.actor_id, &payload.id, &payload.name, payload.description.as_deref(), payload.price.as_deref(), payload.reward_percent.as_deref())
         .map(to_partner_service)
 }
 
@@ -3149,6 +3295,54 @@ fn set_telegram_bot_settings(payload: SetTelegramBotSettingsPayload, state: taur
     ).map(to_telegram_bot_settings)
 }
 
+#[tauri::command]
+fn get_employee_report(payload: GetEmployeeReportPayload, state: tauri::State<AppState>) -> Result<Vec<EmployeeReportRow>, String> {
+    let db = state.0.lock().unwrap();
+    db.list_employee_report_rows(&payload.admin_id, &payload.period_start, &payload.period_end)
+        .map(|rows| rows.into_iter().map(to_employee_report_row).collect())
+}
+
+#[tauri::command]
+fn get_partner_report(payload: GetPartnerReportPayload, state: tauri::State<AppState>) -> Result<Vec<PartnerReportRow>, String> {
+    let db = state.0.lock().unwrap();
+    db.list_partner_report_rows(&payload.actor_id, payload.partner_id.as_deref(), payload.period_start.as_deref(), payload.period_end.as_deref())
+        .map(|rows| rows.into_iter().map(to_partner_report_row).collect())
+}
+
+#[tauri::command]
+fn get_report_export_settings(payload: GetReportExportSettingsPayload, state: tauri::State<AppState>) -> Result<ReportExportSettings, String> {
+    let db = state.0.lock().unwrap();
+    db.get_report_export_settings(&payload.actor_id).map(to_report_export_settings)
+}
+
+#[tauri::command]
+fn set_report_export_settings(payload: SetReportExportSettingsPayload, state: tauri::State<AppState>) -> Result<ReportExportSettings, String> {
+    let db = state.0.lock().unwrap();
+    db.set_report_export_settings(&payload.admin_id, payload.enabled, &payload.day_mode, payload.fixed_day, &payload.time_hhmm, &payload.folder)
+        .map(to_report_export_settings)
+}
+
+#[tauri::command]
+fn generate_report_now(payload: GenerateReportNowPayload, state: tauri::State<AppState>) -> Result<String, String> {
+    let db = state.0.lock().unwrap();
+    let folder = match payload.folder.filter(|f| !f.is_empty()) {
+        Some(f) => f,
+        None => {
+            let settings = db.get_report_export_settings(&payload.admin_id)?;
+            if settings.folder.is_empty() {
+                return Err("Не выбрана папка для сохранения отчёта".into());
+            }
+            settings.folder
+        }
+    };
+    let employee_rows = db.list_employee_report_rows(&payload.admin_id, &payload.period_start, &payload.period_end)?;
+    let partner_rows = db.list_partner_report_rows(&payload.admin_id, None, Some(&payload.period_start), Some(&payload.period_end))?;
+    let file_name = format!("IB-CRM-Otchet-{}_{}.xlsx", payload.period_start, payload.period_end);
+    let out_path = std::path::Path::new(&folder).join(file_name);
+    report_export::generate_report_workbook(&employee_rows, &partner_rows, &out_path)?;
+    Ok(out_path.to_string_lossy().to_string())
+}
+
 // Без авторизации — логотип нужен уже на экране входа/первого запуска, до
 // того, как известен actor_id.
 #[tauri::command]
@@ -3334,6 +3528,8 @@ fn main() {
                 tauri::async_runtime::spawn(server::run(server_db, settings.port, server_dir));
             }
 
+            let report_export_db = db.clone();
+
             app.manage(AppState(db));
             app.manage(AppDataDir(app_data_dir));
 
@@ -3353,6 +3549,49 @@ fn main() {
             std::thread::spawn(move || loop {
                 std::thread::sleep(std::time::Duration::from_secs(8));
                 let _ = ticker_handle.emit("notification-tick", ());
+            });
+
+            // Планировщик авто-выгрузки отчётов (v0.5.0) — тот же паттерн ОС-потока,
+            // что у тикера уведомлений выше, но логика целиком здесь, в Rust (не нужен
+            // round-trip в JS — экспорт это чтение БД + запись файла, фронтенду нечего
+            // тут делать). На машине в режиме "клиент" report_export_enabled в её
+            // локальном app_meta никогда не станет true — Settings.tsx прячет всю
+            // секцию в этом режиме (та же причина, что у export_backup/
+            // set_update_installer — путь к папке имеет смысл только на машине,
+            // которая реально пишет файл) — поэтому здесь не нужно отдельно проверять
+            // локальный/серверный режим, достаточно проверить сам флаг.
+            std::thread::spawn(move || loop {
+                std::thread::sleep(std::time::Duration::from_secs(60));
+                let settings = report_export_db.lock().unwrap().read_report_export_settings();
+                if !settings.enabled {
+                    continue;
+                }
+                let now = chrono::Local::now().naive_local();
+                use chrono::Datelike;
+                let today = now.format("%Y-%m-%d").to_string();
+                let is_target_day = if settings.day_mode == "fixed_day" {
+                    now.day() as i64 == settings.fixed_day
+                } else {
+                    // "Последний день месяца" — считаем так, если завтра уже другой месяц.
+                    (now.date() + chrono::Duration::days(1)).month() != now.month()
+                };
+                if !is_target_day || now.format("%H:%M").to_string() != settings.time_hhmm {
+                    continue;
+                }
+                let db = report_export_db.lock().unwrap();
+                if db.report_export_last_fired_date().as_deref() == Some(today.as_str()) {
+                    continue;
+                }
+                let Some(admin_id) = db.report_export_admin_id() else { continue };
+                let period_start = format!("{}-01", now.format("%Y-%m"));
+                let employee_rows = db.list_employee_report_rows(&admin_id, &period_start, &today);
+                let partner_rows = db.list_partner_report_rows(&admin_id, None, Some(&period_start), Some(&today));
+                if let (Ok(employee_rows), Ok(partner_rows)) = (employee_rows, partner_rows) {
+                    let file_name = format!("IB-CRM-Otchet-{}.xlsx", now.format("%Y-%m"));
+                    let out_path = std::path::Path::new(&settings.folder).join(file_name);
+                    let _ = report_export::generate_report_workbook(&employee_rows, &partner_rows, &out_path);
+                }
+                db.set_report_export_last_fired_date(&today);
             });
 
             Ok(())
@@ -3489,6 +3728,11 @@ fn main() {
             set_radmin_settings,
             get_telegram_bot_settings,
             set_telegram_bot_settings,
+            get_employee_report,
+            get_partner_report,
+            get_report_export_settings,
+            set_report_export_settings,
+            generate_report_now,
             get_app_logo,
             set_app_logo,
             export_backup,

@@ -520,6 +520,27 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
       </div>
 
       <div className="reg-fullscreen-body">
+        {currentEmployee.isPartner && (
+          // Партнёр видит ту же боковую панель, что и сотрудник (v0.4.2),
+          // просто с единственным пунктом — общим чатом с админом (канал уже
+          // один на всю организацию партнёра, см. channels выше).
+          <aside className="reg-sidebar">
+            <div className="reg-sidebar-section">
+              <div className="department-members-title">{t('chat.myChatsTitle')}</div>
+              <ul className="chat-dm-list">
+                {channels.map((c) => (
+                  <li key={c.id} className={`chat-dm-item${channel === c.id ? ' active' : ''}`} onClick={() => openChannel(c.id)}>
+                    <Avatar name={c.label} size={28} />
+                    <div className="chat-dm-item-text">
+                      <span className="chat-dm-item-name">{c.label}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </aside>
+        )}
+
         {!currentEmployee.isPartner && (
           <aside className="reg-sidebar">
             <div className="reg-sidebar-section">

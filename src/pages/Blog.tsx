@@ -1,5 +1,5 @@
 import { useEffect, useState, useContext, useMemo } from 'react';
-import { Plus, Search, MessageSquare, Pin, PinOff, Trash2, Pencil, ArrowLeft, X, List as ListIcon } from 'lucide-react';
+import { Plus, Search, MessageSquare, Pin, PinOff, Trash2, Pencil, ArrowLeft, X, List as ListIcon, Send } from 'lucide-react';
 import { api, type Employee, type BlogTopic, type BlogComment, type BlogCategory, type Partner } from '../lib/api';
 import { FullscreenContext } from './Dashboard';
 import { useLocale } from '../lib/i18n';
@@ -301,23 +301,29 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
             </div>
 
             {!currentEmployee.isPartner && (
-              <div className="reg-add-entry">
+              <div className="reg-add-entry blog-comment-composer">
                 {replyTo && (
                   <div className="blog-reply-banner">
                     {t('blog.replyingTo', { name: replyTo.authorName })}
                     <button className="reg-action-btn" onClick={() => setReplyTo(null)}><X size={12} /></button>
                   </div>
                 )}
-                <RichEditor
-                  value={commentText}
-                  onChange={setCommentText}
-                  resetKey={`${selected.id}-${commentInstanceKey}`}
-                  placeholder={t('blog.commentPlaceholder')}
-                  onSubmitEnter={handleAddComment}
-                />
-                <div className="reg-add-entry-row">
-                  <button className="modal-btn danger" onClick={handleAddComment} disabled={isBlankHtml(commentText) || commentBusy}>
-                    <Plus size={14} /> {t('blog.commentSendBtn')}
+                <div className="blog-comment-editor-wrap">
+                  <RichEditor
+                    value={commentText}
+                    onChange={setCommentText}
+                    resetKey={`${selected.id}-${commentInstanceKey}`}
+                    placeholder={t('blog.commentPlaceholder')}
+                    onSubmitEnter={handleAddComment}
+                  />
+                  <button
+                    type="button"
+                    className="chat-composer-send-btn blog-comment-send-btn"
+                    onClick={handleAddComment}
+                    disabled={isBlankHtml(commentText) || commentBusy}
+                    title={t('blog.commentSendBtn')}
+                  >
+                    <Send size={16} />
                   </button>
                 </div>
               </div>

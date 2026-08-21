@@ -1,3 +1,4 @@
+use chrono::NaiveDateTime;
 use rusqlite::{params, Connection};
 use std::path::Path;
 use uuid::Uuid;
@@ -370,6 +371,7 @@ pub struct PartnerServiceRecord {
     pub id: String,
     pub partner_id: String,
     pub name: String,
+    pub description: Option<String>,
     pub price: Option<String>,
     pub reward_percent: Option<String>,
     pub created_by: Option<String>,
@@ -768,6 +770,7 @@ impl Db {
         // "Помощник" по регламенту партнёра (v0.4.0) — админ, если создаёт
         // партнёр, или конкретный сотрудник этого партнёра, если создаёт админ.
         add_column_if_missing(&conn, "partner_regulations", "assistant_id TEXT REFERENCES employees(id)");
+        add_column_if_missing(&conn, "partner_services", "description TEXT");
         // NULL = тема видна только сотрудникам (как раньше); '*' = всем
         // партнёрам; иначе — id конкретного партнёра, см. v0.3.0.
         add_column_if_missing(&conn, "blog_topics", "partner_audience TEXT");
@@ -4388,7 +4391,7 @@ impl Db {
     }
 
     const PARTNER_SERVICE_SELECT: &'static str = "SELECT
-            ps.id, ps.partner_id, ps.name, ps.price, ps.reward_percent,
+            ps.id, ps.partner_id, ps.name, ps.description, ps.price, ps.reward_percent,
             ps.created_by, cb.full_name, ps.created_at, ps.updated_at
         FROM partner_services ps
         LEFT JOIN employees cb ON cb.id = ps.created_by";
@@ -4398,12 +4401,13 @@ impl Db {
             id: row.get(0)?,
             partner_id: row.get(1)?,
             name: row.get(2)?,
-            price: row.get(3)?,
-            reward_percent: row.get(4)?,
-            created_by: row.get(5)?,
-            created_by_name: row.get(6)?,
-            created_at: row.get(7)?,
-            updated_at: row.get(8)?,
+            description: row.get(3)?,
+            price: row.get(4)?,
+            reward_percent: row.get(5)?,
+            created_by: row.get(6)?,
+            created_by_name: row.get(7)?,
+            created_at: row.get(8)?,
+            updated_at: row.get(9)?,
         })
     }
 
@@ -4482,7 +4486,7 @@ impl Db {
         Ok(rows.filter_map(|r| r.ok()).collect())
     }
 
-    pub fn create_partner_service(&self, actor_id: &str, partner_id: &str, name: &str, price: Option<&str>, reward_percent: Option<&str>) -> Result<PartnerServiceRecord, String> {
+    pub fn create_partner_service(&self, actor_id: &str, partner_id: &str, name: &str, description: Option<&str>, price: Option<&str>, reward_percent: Option<&str>) -> Result<PartnerServiceRecord, String> {
         self.can_access_partner_org(actor_id, partner_id)?;
         if name.trim().is_empty() {
             return Err("Укажите название услуги".into());
@@ -4490,14 +4494,14 @@ impl Db {
         let id = Uuid::new_v4().to_string();
         self.conn
             .execute(
-                "INSERT INTO partner_services (id, partner_id, name, price, reward_percent, created_by) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![id, partner_id, name.trim(), price, reward_percent, actor_id],
+                "INSERT INTO partner_services (id, partner_id, name, description, price, reward_percent, created_by) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![id, partner_id, name.trim(), description, price, reward_percent, actor_id],
             )
             .map_err(|e| e.to_string())?;
         self.get_partner_service(&id).ok_or_else(|| "Услуга не найдена".to_string())
     }
 
-    pub fn update_partner_service(&self, actor_id: &str, id: &str, name: &str, price: Option<&str>, reward_percent: Option<&str>) -> Result<PartnerServiceRecord, String> {
+    pub fn update_partner_service(&self, actor_id: &str, id: &str, name: &str, description: Option<&str>, price: Option<&str>, reward_percent: Option<&str>) -> Result<PartnerServiceRecord, String> {
         let existing = self.get_partner_service(id).ok_or_else(|| "Услуга не найдена".to_string())?;
         self.can_access_partner_org(actor_id, &existing.partner_id)?;
         if name.trim().is_empty() {
@@ -4505,8 +4509,8 @@ impl Db {
         }
         self.conn
             .execute(
-                "UPDATE partner_services SET name = ?1, price = ?2, reward_percent = ?3, updated_at = datetime('now') WHERE id = ?4",
-                params![name.trim(), price, reward_percent, id],
+                "UPDATE partner_services SET name = ?1, description = ?2, price = ?3, reward_percent = ?4, updated_at = datetime('now') WHERE id = ?5",
+                params![name.trim(), description, price, reward_percent, id],
             )
             .map_err(|e| e.to_string())?;
         self.get_partner_service(id).ok_or_else(|| "Услуга не найдена".to_string())
@@ -5318,6 +5322,260 @@ impl Db {
         set("tg_admin_partner_token", admin_partner_token.unwrap_or("")).map_err(|e| e.to_string())?;
         self.get_telegram_bot_settings(admin_id)
     }
+
+    // ---- Отчёты (v0.5.0) ----
+    // period_start/period_end — простые даты "YYYY-MM-DD" (как из <input type="date">),
+    // сами достраиваем границы суток при сравнении со строками datetime() в SQLite.
+
+    fn parse_sqlite_datetime(raw: &str) -> Option<NaiveDateTime> {
+        // SQLite datetime() отдаёт "YYYY-MM-DD HH:MM:SS"; login_at/logout_at всегда в этом
+        // формате (DEFAULT (datetime('now')) везде в схеме) — второй формат на случай, если
+        // где-то оказалась чистая дата без времени.
+        NaiveDateTime::parse_from_str(raw, "%Y-%m-%d %H:%M:%S")
+            .ok()
+            .or_else(|| NaiveDateTime::parse_from_str(&format!("{raw} 00:00:00"), "%Y-%m-%d %H:%M:%S").ok())
+    }
+
+    pub fn list_employee_report_rows(&self, admin_id: &str, period_start: &str, period_end: &str) -> Result<Vec<EmployeeReportRow>, String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        let range_start = format!("{period_start} 00:00:00");
+        let range_end = format!("{period_end} 23:59:59");
+        let period_start_dt = Self::parse_sqlite_datetime(&range_start).ok_or_else(|| "Некорректная дата начала периода".to_string())?;
+        let period_end_dt = Self::parse_sqlite_datetime(&range_end).ok_or_else(|| "Некорректная дата конца периода".to_string())?;
+
+        let sql = format!("{} WHERE e.is_partner = 0 ORDER BY e.full_name ASC", Self::EMPLOYEE_SELECT);
+        let mut stmt = self.conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let employees: Vec<EmployeeRecord> = stmt
+            .query_map([], Self::map_employee_row)
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let mut rows = Vec::with_capacity(employees.len());
+        for emp in employees {
+            // Часы работы — сырые пары login_at/logout_at за период, клэмпинг к границам
+            // периода и суммирование через chrono (строковая арифметика на границах ненадёжна,
+            // особенно для ещё не закрытых сессий — logout_at IS NULL считаем "по сейчас").
+            let mut sessions_stmt = self.conn.prepare(
+                "SELECT login_at, logout_at FROM employee_sessions
+                 WHERE employee_id = ?1 AND login_at <= ?2 AND COALESCE(logout_at, datetime('now')) >= ?3",
+            ).map_err(|e| e.to_string())?;
+            let sessions: Vec<(String, Option<String>)> = sessions_stmt
+                .query_map(params![emp.id, range_end, range_start], |row| Ok((row.get(0)?, row.get(1)?)))
+                .map_err(|e| e.to_string())?
+                .filter_map(|r| r.ok())
+                .collect();
+            let mut hours_worked = 0.0f64;
+            for (login_at, logout_at) in &sessions {
+                let Some(login_dt) = Self::parse_sqlite_datetime(login_at) else { continue };
+                let now = chrono::Local::now().naive_local();
+                let logout_dt = logout_at.as_deref().and_then(Self::parse_sqlite_datetime).unwrap_or(now);
+                let clamped_start = login_dt.max(period_start_dt);
+                let clamped_end = logout_dt.min(period_end_dt);
+                if clamped_end > clamped_start {
+                    hours_worked += (clamped_end - clamped_start).num_seconds() as f64 / 3600.0;
+                }
+            }
+
+            // Заявки на отсутствие за период, сгруппированные по типу.
+            let mut absence_stmt = self.conn.prepare(
+                "SELECT type, COUNT(*) FROM absence_requests
+                 WHERE employee_id = ?1 AND start_date <= ?2 AND end_date >= ?3
+                 GROUP BY type",
+            ).map_err(|e| e.to_string())?;
+            let absence_counts: Vec<(String, i64)> = absence_stmt
+                .query_map(params![emp.id, period_end, period_start], |row| Ok((row.get(0)?, row.get(1)?)))
+                .map_err(|e| e.to_string())?
+                .filter_map(|r| r.ok())
+                .collect();
+
+            let regulations_count: i64 = self.conn
+                .query_row("SELECT COUNT(DISTINCT regulation_id) FROM regulation_members WHERE employee_id = ?1", params![emp.id], |row| row.get(0))
+                .unwrap_or(0);
+            let projects_count: i64 = self.conn
+                .query_row("SELECT COUNT(DISTINCT project_id) FROM project_members WHERE employee_id = ?1", params![emp.id], |row| row.get(0))
+                .unwrap_or(0);
+
+            rows.push(EmployeeReportRow {
+                employee_id: emp.id,
+                full_name: emp.full_name,
+                employee_number: emp.employee_number,
+                department_name: emp.department_name,
+                position_title: emp.position_title,
+                hours_worked,
+                absence_counts,
+                regulations_count,
+                projects_count,
+            });
+        }
+        Ok(rows)
+    }
+
+    // Достаёт число из свободного текста ("5 000 000 сум" → 5000000.0, "10%" → 10.0,
+    // "договорная" → None) — deal_value/price в схеме исторически TEXT, не число (см.
+    // create_client/create_partner_service), парсинг всегда best-effort.
+    fn parse_numeric_amount(raw: &str) -> Option<f64> {
+        let digits: String = raw.chars().filter(|c| c.is_ascii_digit()).collect();
+        if digits.is_empty() {
+            return None;
+        }
+        digits.parse::<f64>().ok()
+    }
+
+    pub fn list_partner_report_rows(
+        &self,
+        actor_id: &str,
+        partner_id: Option<&str>,
+        period_start: Option<&str>,
+        period_end: Option<&str>,
+    ) -> Result<Vec<PartnerReportRow>, String> {
+        let partners: Vec<PartnerRecord> = match partner_id {
+            Some(pid) => {
+                self.can_access_partner_org(actor_id, pid)?;
+                self.list_partners().into_iter().filter(|p| p.id == pid).collect()
+            }
+            None => {
+                if !self.is_admin(actor_id) {
+                    return Err("Недостаточно прав".into());
+                }
+                self.list_partners()
+            }
+        };
+
+        let range_start = period_start.map(|s| format!("{s} 00:00:00"));
+        let range_end = period_end.map(|s| format!("{s} 23:59:59"));
+
+        let mut rows = Vec::with_capacity(partners.len());
+        for partner in partners {
+            let clients = self.list_clients(actor_id, Some(&partner.id));
+            let clients_in_period: Vec<&ClientRecord> = clients
+                .iter()
+                .filter(|c| {
+                    match (&range_start, &range_end) {
+                        (Some(s), Some(e)) => c.created_at.as_str() >= s.as_str() && c.created_at.as_str() <= e.as_str(),
+                        _ => true,
+                    }
+                })
+                .collect();
+
+            let regulations = self.list_partner_regulations(actor_id, &partner.id).unwrap_or_default();
+            let regulations_count = regulations
+                .iter()
+                .filter(|r| match (&range_start, &range_end) {
+                    (Some(s), Some(e)) => r.updated_at.as_str() >= s.as_str() && r.updated_at.as_str() <= e.as_str(),
+                    _ => true,
+                })
+                .count() as i64;
+
+            let mut financial_total = 0.0f64;
+            let mut any_parsed = false;
+            let mut any_unparsed = false;
+            let mut financial_raw_values = Vec::new();
+            for c in &clients_in_period {
+                if let Some(dv) = &c.deal_value {
+                    financial_raw_values.push(dv.clone());
+                    match Self::parse_numeric_amount(dv) {
+                        Some(n) => {
+                            financial_total += n;
+                            any_parsed = true;
+                        }
+                        None => any_unparsed = true,
+                    }
+                }
+            }
+
+            rows.push(PartnerReportRow {
+                partner_id: partner.id,
+                partner_name: partner.name,
+                clients_added_count: clients_in_period.len() as i64,
+                regulations_count,
+                financial_total: if any_parsed { Some(financial_total) } else { None },
+                financial_total_partial: any_parsed && any_unparsed,
+                financial_raw_values,
+            });
+        }
+        Ok(rows)
+    }
+
+    // ---- Настройки авто-выгрузки отчётов (v0.5.0) ----
+    // Тот же app_meta key/value паттерн, что у Radmin/Telegram-ботов — admin-only, и на чтение
+    // тоже (путь к папке на диске админа — не то, что стоит открывать всем сотрудникам).
+
+    // Без гейта — читается и из get_report_export_settings (после проверки прав там), и
+    // напрямую планировщиком в main.rs (там нет actor_id, вызов не от лица пользователя).
+    pub fn read_report_export_settings(&self) -> ReportExportSettingsRecord {
+        let get = |key: &str| -> Option<String> {
+            self.conn.query_row("SELECT value FROM app_meta WHERE key = ?1", params![key], |row| row.get(0)).ok()
+        };
+        ReportExportSettingsRecord {
+            enabled: get("report_export_enabled").as_deref() == Some("1"),
+            day_mode: get("report_export_day_mode").unwrap_or_else(|| "last_day".to_string()),
+            fixed_day: get("report_export_fixed_day").and_then(|v| v.parse().ok()).unwrap_or(1),
+            time_hhmm: get("report_export_time").unwrap_or_else(|| "20:00".to_string()),
+            folder: get("report_export_folder").unwrap_or_default(),
+        }
+    }
+
+    pub fn get_report_export_settings(&self, actor_id: &str) -> Result<ReportExportSettingsRecord, String> {
+        if !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        Ok(self.read_report_export_settings())
+    }
+
+    pub fn set_report_export_settings(
+        &self,
+        admin_id: &str,
+        enabled: bool,
+        day_mode: &str,
+        fixed_day: i64,
+        time_hhmm: &str,
+        folder: &str,
+    ) -> Result<ReportExportSettingsRecord, String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        if !["last_day", "fixed_day"].contains(&day_mode) {
+            return Err("Некорректный режим дня".into());
+        }
+        let set = |key: &str, value: &str| {
+            self.conn.execute(
+                "INSERT INTO app_meta (key, value) VALUES (?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params![key, value],
+            )
+        };
+        set("report_export_enabled", if enabled { "1" } else { "0" }).map_err(|e| e.to_string())?;
+        set("report_export_day_mode", day_mode).map_err(|e| e.to_string())?;
+        set("report_export_fixed_day", &fixed_day.clamp(1, 31).to_string()).map_err(|e| e.to_string())?;
+        set("report_export_time", time_hhmm).map_err(|e| e.to_string())?;
+        set("report_export_folder", folder).map_err(|e| e.to_string())?;
+        // Кто включил — от его имени планировщик будет дёргать гейтованные
+        // list_employee_report_rows/list_partner_report_rows (там нет "системного" актора).
+        if enabled {
+            set("report_export_admin_id", admin_id).map_err(|e| e.to_string())?;
+        }
+        Ok(self.read_report_export_settings())
+    }
+
+    // Только для планировщика (main.rs) — без гейта, вызывается не от лица пользователя.
+    pub fn report_export_admin_id(&self) -> Option<String> {
+        self.conn.query_row("SELECT value FROM app_meta WHERE key = 'report_export_admin_id'", [], |row| row.get(0)).ok()
+    }
+
+    pub fn report_export_last_fired_date(&self) -> Option<String> {
+        self.conn.query_row("SELECT value FROM app_meta WHERE key = 'report_export_last_fired_date'", [], |row| row.get(0)).ok()
+    }
+
+    pub fn set_report_export_last_fired_date(&self, date: &str) {
+        let _ = self.conn.execute(
+            "INSERT INTO app_meta (key, value) VALUES ('report_export_last_fired_date', ?1)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![date],
+        );
+    }
 }
 
 pub struct ServerSettingsRecord {
@@ -5338,5 +5596,35 @@ pub struct TelegramBotSettingsRecord {
     pub task_close_token: Option<String>,
     pub admin_partner_enabled: bool,
     pub admin_partner_token: Option<String>,
+}
+
+pub struct EmployeeReportRow {
+    pub employee_id: String,
+    pub full_name: String,
+    pub employee_number: String,
+    pub department_name: Option<String>,
+    pub position_title: Option<String>,
+    pub hours_worked: f64,
+    pub absence_counts: Vec<(String, i64)>,
+    pub regulations_count: i64,
+    pub projects_count: i64,
+}
+
+pub struct PartnerReportRow {
+    pub partner_id: String,
+    pub partner_name: String,
+    pub clients_added_count: i64,
+    pub regulations_count: i64,
+    pub financial_total: Option<f64>,
+    pub financial_total_partial: bool,
+    pub financial_raw_values: Vec<String>,
+}
+
+pub struct ReportExportSettingsRecord {
+    pub enabled: bool,
+    pub day_mode: String,
+    pub fixed_day: i64,
+    pub time_hhmm: String,
+    pub folder: String,
 }
 

@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.4.1';
+export const APP_VERSION = '0.5.0';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,27 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.5.0',
+      items: [
+        'Новый отчёт по сотрудникам (Настройки → админ): часы на работе, заявки на отсутствие, число регламентов и проектов по каждому — экспорт в Excel',
+        'Новый отчёт по партнёрам: сколько клиентов добавлено, сколько регламентов велось, финансовый итог по стоимости услуг — виден и админу в отчёте, и партнёру у себя на Главной',
+        'В Настройках у админа — авто-выгрузка отчётов по расписанию (день месяца + время + папка назначения) и кнопка «Сформировать сейчас» с произвольным периодом',
+        'Отчёт формируется в один Excel-файл с двумя листами ("Сотрудники" и "Партнёры"), стилизован под дизайн приложения, ширина колонок подгоняется под содержимое автоматически',
+      ],
+    },
+    {
+      version: '0.4.2',
+      items: [
+        'Исправлен большой пустой зазор в комментариях блога (между заголовком и первым комментарием) — колонка комментариев больше не растягивается на всю высоту статьи слева',
+        'Форма отправки комментария в блоге переоформлена под стиль IB Чата — единая скруглённая рамка редактора и круглая кнопка отправки вместо отдельной прямоугольной кнопки',
+        '"Партнёры" стали отдельным разделом в боковом меню (раньше — вкладка внутри "Сотрудники")',
+        'В "Услугах" партнёра появилось поле "Описание"',
+        'В IB Чате у партнёра теперь есть боковая панель с общим чатом с администратором — как у сотрудников, просто с одним пунктом',
+        'Поправлен внешний вид блока Radmin в Настройках партнёра — поле и кнопки копирования были на разных строках из-за отсутствующего стиля',
+        'Поправлены отступы на Главной странице панели партнёра — плитки статистики раньше растягивались на всю ширину',
+      ],
+    },
     {
       version: '0.4.1',
       items: [
@@ -512,6 +533,27 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.5.0',
+      items: [
+        "Xodimlar bo'yicha yangi hisobot (Sozlamalar → admin): ish vaqti, yo'qlik arizalari, har biri bo'yicha reglament va loyihalar soni — Excelga eksport",
+        "Hamkorlar bo'yicha yangi hisobot: nechta mijoz qo'shilgan, nechta reglament olib borilgan, xizmatlar narxi bo'yicha moliyaviy yakun — hisobotda ham, hamkorning o'z Bosh sahifasida ham ko'rinadi",
+        "Sozlamalarda admin uchun — hisobotlarni jadval bo'yicha avtomatik yuklab olish (oyning kuni + vaqt + maqsad papka) va istalgan davr uchun «Hozir shakllantirish» tugmasi",
+        "Hisobot bitta Excel faylida ikkita varaq bilan shakllanadi (\"Xodimlar\" va \"Hamkorlar\"), ilova dizayniga moslashtirilgan, ustunlar kengligi mazmuniga qarab avtomatik moslashadi",
+      ],
+    },
+    {
+      version: '0.4.2',
+      items: [
+        "Blog izohlaridagi katta bo'sh oraliq tuzatildi (sarlavha va birinchi izoh orasida) — izohlar ustuni endi chapdagi maqolaning to'liq balandligiga cho'zilmaydi",
+        "Blogda izoh yuborish formasi IB Chat uslubiga moslashtirildi — muharrirning yagona yumaloq ramkasi va alohida to'rtburchak tugma o'rniga yumaloq yuborish tugmasi",
+        "\"Hamkorlar\" alohida bo'lim bo'ldi yon menyuda (avval \"Xodimlar\" ichidagi ilova edi)",
+        "Hamkor \"Xizmatlar\"ida \"Tavsif\" maydoni paydo bo'ldi",
+        "IB Chatda hamkorda endi administrator bilan umumiy chat uchun yon panel bor — xodimlardagidek, faqat bitta band bilan",
+        "Hamkor Sozlamalaridagi Radmin blokining ko'rinishi tuzatildi — maydon va nusxalash tugmalari yo'q uslub sababli turli qatorlarda edi",
+        "Hamkor paneli Bosh sahifasidagi bo'shliqlar tuzatildi — statistika plitkalari avval butun kenglikka cho'zilardi",
+      ],
+    },
+    {
       version: '0.4.1',
       items: [
         "Klientlar sahifasidagi \"Manba\" filtri ko'rinishi tuzatildi — filtr yangi qatorga o'tganda qidiruv belgisi joyidan siljib qolardi",
@@ -1007,6 +1049,27 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.5.0',
+      items: [
+        'Ходимлар бўйича янги ҳисобот (Созламалар → админ): иш вақти, йўқлик аризалари, ҳар бири бўйича регламент ва лойиҳалар сони — Excelга экспорт',
+        'Ҳамкорлар бўйича янги ҳисобот: нечта мижоз қўшилган, нечта регламент олиб борилган, хизматлар нархи бўйича молиявий якун — ҳисоботда ҳам, ҳамкорнинг ўз Бош саҳифасида ҳам кўринади',
+        'Созламаларда админ учун — ҳисоботларни жадвал бўйича автоматик юклаб олиш (ойнинг куни + вақт + мақсад папка) ва исталган давр учун «Ҳозир шакллантириш» тугмаси',
+        'Ҳисобот битта Excel файлида иккита варақ билан шаклланади ("Ходимлар" ва "Ҳамкорлар"), илова дизайнига мослаштирилган, устунлар кенглиги мазмунига қараб автоматик мослашади',
+      ],
+    },
+    {
+      version: '0.4.2',
+      items: [
+        'Блог изоҳларидаги катта бўш оралиқ тузатилди (сарлавҳа ва биринчи изоҳ орасида) — изоҳлар устуни энди чапдаги мақоланинг тўлиқ баландлигига чўзилмайди',
+        'Блогда изоҳ юбориш формаси IB Chat услубига мослаштирилди — муҳаррирнинг ягона юмалоқ рамкаси ва алоҳида тўртбурчак тугма ўрнига юмалоқ юбориш тугмаси',
+        '"Ҳамкорлар" алоҳида бўлим бўлди ён менюда (аввал "Ходимлар" ичидаги илова эди)',
+        'Ҳамкор "Хизматлар"ида "Тавсиф" майдони пайдо бўлди',
+        'IB Chatда ҳамкорда энди администратор билан умумий чат учун ён панел бор — ходимлардагидек, фақат битта банд билан',
+        'Ҳамкор Созламаларидаги Radmin блокининг кўриниши тузатилди — майдон ва нусхалаш тугмалари йўқ услуб сабабли турли қаторларда эди',
+        'Ҳамкор панели Бош саҳифасидаги бўшлиқлар тузатилди — статистика плиткалари аввал бутун кенгликка чўзиларди',
+      ],
+    },
     {
       version: '0.4.1',
       items: [

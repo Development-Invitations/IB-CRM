@@ -459,12 +459,12 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
         }
         "create_partner_service" => {
             let p: crate::CreatePartnerServicePayload = from_payload(payload)?;
-            db.create_partner_service(&p.actor_id, &p.partner_id, &p.name, p.price.as_deref(), p.reward_percent.as_deref())
+            db.create_partner_service(&p.actor_id, &p.partner_id, &p.name, p.description.as_deref(), p.price.as_deref(), p.reward_percent.as_deref())
                 .map(crate::to_partner_service).map(to_json)
         }
         "update_partner_service" => {
             let p: crate::UpdatePartnerServicePayload = from_payload(payload)?;
-            db.update_partner_service(&p.actor_id, &p.id, &p.name, p.price.as_deref(), p.reward_percent.as_deref())
+            db.update_partner_service(&p.actor_id, &p.id, &p.name, p.description.as_deref(), p.price.as_deref(), p.reward_percent.as_deref())
                 .map(crate::to_partner_service).map(to_json)
         }
         "delete_partner_service" => {
@@ -641,6 +641,24 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
                 p.admin_partner_token.as_deref(),
             ).map(crate::to_telegram_bot_settings).map(to_json)
         }
+        "get_employee_report" => {
+            let p: crate::GetEmployeeReportPayload = from_payload(payload)?;
+            db.list_employee_report_rows(&p.admin_id, &p.period_start, &p.period_end)
+                .map(|rows| rows.into_iter().map(crate::to_employee_report_row).collect::<Vec<_>>()).map(to_json)
+        }
+        "get_partner_report" => {
+            let p: crate::GetPartnerReportPayload = from_payload(payload)?;
+            db.list_partner_report_rows(&p.actor_id, p.partner_id.as_deref(), p.period_start.as_deref(), p.period_end.as_deref())
+                .map(|rows| rows.into_iter().map(crate::to_partner_report_row).collect::<Vec<_>>()).map(to_json)
+        }
+        // get_report_export_settings/set_report_export_settings/generate_report_now
+        // сознательно НЕ зеркалированы здесь — folder — путь на диске конкретной машины
+        // (та, что реально считает по расписанию и пишет файл), тем же принципом, что у
+        // export_backup/set_update_installer выше по файлу: с клиента путь, выбранный в
+        // диалоге на ЕГО машине, был бы бессмысленным на диске сервера. UI (Settings.tsx)
+        // прячет всю секцию "Авто-выгрузка отчётов" в режиме клиента — это не должно
+        // вызываться по сети, но на случай прямого вызова команды — падаем явной ошибкой,
+        // а не тихо пишем не туда.
         "get_app_logo" => Ok(to_json(db.get_app_logo())),
         "set_app_logo" => {
             let p: crate::SetAppLogoPayload = from_payload(payload)?;

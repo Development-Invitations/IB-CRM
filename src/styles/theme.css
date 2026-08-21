@@ -862,6 +862,20 @@ button.primary:hover { filter: brightness(0.95); }
   align-items: center;
 }
 
+/* Строка "поле только для чтения + кнопки копирования/показа" — Radmin в
+   Настройках партнёра (PartnerSettings.tsx). Класс использовался в JSX без
+   определения в CSS — поле и кнопки схлопывались в отдельные строки вместо
+   одной, из-за этого и выглядело неаккуратно. */
+.radmin-copy-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 340px;
+}
+.radmin-copy-row input {
+  flex: 1;
+}
+
 .settings-subheading {
   font-size: 13px;
   font-weight: 600;
@@ -1642,6 +1656,15 @@ button.employees-add-btn {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 14px;
+}
+
+/* Панель партнёра — всего 2 плитки, без ограничения ширины трека auto-fit
+   растягивает их почти на весь контент-блок (см. .home-stats-row) —
+   получаются гигантские плитки с содержимым, прижатым в левый верхний угол.
+   Ограничиваем максимальную ширину трека, остальное место просто остаётся
+   пустым фоном страницы, а не раздутой плиткой. */
+.partner-home-stats-row {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 220px));
 }
 
 .home-stat-tile {
@@ -3271,6 +3294,37 @@ button.employees-add-btn {
   padding-top: 10px;
 }
 
+/* Комментарий блога — редактор + отправка в одной "пилюльной" рамке, в
+   стиле композера чата (.chat-composer-bar), вместо отдельной прямоугольной
+   кнопки "Отправить" под редактором. Тулбар форматирования остаётся своей
+   строкой сверху — с ним не уместить чат-стиль в одну строку и сохранить
+   форматирование одновременно. */
+.blog-comment-editor-wrap {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.blog-comment-editor-wrap .rich-editor {
+  flex: 1;
+  border-radius: 18px;
+}
+.blog-comment-editor-wrap .rich-editor-toolbar {
+  border-radius: 18px 18px 0 0;
+}
+.blog-comment-editor-wrap .rich-editor-content {
+  min-height: 44px;
+  max-height: 160px;
+  padding: 10px 14px;
+}
+.blog-comment-send-btn {
+  flex-shrink: 0;
+  margin-bottom: 2px;
+}
+.blog-comment-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ---- Композер чата — единый "пилюльный" блок (смайлики/вложение/поле
    ввода/отправка внутри одной рамки), как в мессенджерах ---- */
 .chat-composer-bar {
@@ -3493,16 +3547,24 @@ button.employees-add-btn {
   background: var(--color-surface);
 }
 
+.blog-topic-comments-col {
+  /* Не растягиваем колонку комментариев на всю высоту строки грида (как
+     статью слева) — если комментариев мало, колонка должна быть просто
+     компактной, а не создавать гигантский пустой зазор где-то внутри себя
+     (было то сверху, то снизу — оба варианта выглядели как баг). */
+  align-self: start;
+}
+
 .blog-comments-list {
-  flex: 1;
+  /* Без flex:1 — высота по контенту, а не растянута под пустую строку
+     грида; overflow/max-height — просто подстраховка на случай очень
+     длинной ветки комментариев. */
+  flex: 0 1 auto;
+  max-height: 60vh;
   overflow-y: auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  /* Комментарии "прижаты" к низу списка (как в чате) — если их мало или
-     нет совсем, пустое место остаётся СВЕРХУ, а не гигантским зазором
-     перед формой отправки внизу. */
-  justify-content: flex-end;
 }
 
 .blog-topic-meta { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 14px; }

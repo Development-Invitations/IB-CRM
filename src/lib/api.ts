@@ -299,6 +299,7 @@ export type PartnerService = {
   id: string;
   partnerId: string;
   name: string;
+  description: string | null;
   price: string | null;
   rewardPercent: string | null;
   createdBy: string | null;
@@ -493,6 +494,36 @@ export type TelegramBotSettings = {
   taskCloseToken: string | null;
   adminPartnerEnabled: boolean;
   adminPartnerToken: string | null;
+};
+
+export type EmployeeReportRow = {
+  employeeId: string;
+  fullName: string;
+  employeeNumber: string;
+  departmentName: string | null;
+  positionTitle: string | null;
+  hoursWorked: number;
+  absenceCounts: [string, number][];
+  regulationsCount: number;
+  projectsCount: number;
+};
+
+export type PartnerReportRow = {
+  partnerId: string;
+  partnerName: string;
+  clientsAddedCount: number;
+  regulationsCount: number;
+  financialTotal: number | null;
+  financialTotalPartial: boolean;
+  financialRawValues: string[];
+};
+
+export type ReportExportSettings = {
+  enabled: boolean;
+  dayMode: string;
+  fixedDay: number;
+  timeHhmm: string;
+  folder: string;
 };
 
 export type UpdateInstallerInfo = {
@@ -720,10 +751,10 @@ export const api = {
   listPartnerServices: (payload: { actorId: string; partnerId: string }) =>
     invoke<PartnerService[]>('list_partner_services', { payload }),
 
-  createPartnerService: (payload: { actorId: string; partnerId: string; name: string; price?: string | null; rewardPercent?: string | null }) =>
+  createPartnerService: (payload: { actorId: string; partnerId: string; name: string; description?: string | null; price?: string | null; rewardPercent?: string | null }) =>
     invoke<PartnerService>('create_partner_service', { payload }),
 
-  updatePartnerService: (payload: { actorId: string; id: string; name: string; price?: string | null; rewardPercent?: string | null }) =>
+  updatePartnerService: (payload: { actorId: string; id: string; name: string; description?: string | null; price?: string | null; rewardPercent?: string | null }) =>
     invoke<PartnerService>('update_partner_service', { payload }),
 
   deletePartnerService: (payload: { actorId: string; id: string }) => invoke<void>('delete_partner_service', { payload }),
@@ -942,6 +973,18 @@ export const api = {
     adminPartnerEnabled: boolean;
     adminPartnerToken?: string | null;
   }) => invoke<TelegramBotSettings>('set_telegram_bot_settings', { payload }),
+
+  getEmployeeReport: (payload: { adminId: string; periodStart: string; periodEnd: string }) =>
+    invoke<EmployeeReportRow[]>('get_employee_report', { payload }),
+  getPartnerReport: (payload: { actorId: string; partnerId?: string | null; periodStart?: string | null; periodEnd?: string | null }) =>
+    invoke<PartnerReportRow[]>('get_partner_report', { payload }),
+  getReportExportSettings: (payload: { actorId: string }) =>
+    invoke<ReportExportSettings>('get_report_export_settings', { payload }),
+  setReportExportSettings: (payload: { adminId: string; enabled: boolean; dayMode: string; fixedDay: number; timeHhmm: string; folder: string }) =>
+    invoke<ReportExportSettings>('set_report_export_settings', { payload }),
+  generateReportNow: (payload: { adminId: string; periodStart: string; periodEnd: string; folder?: string | null }) =>
+    invoke<string>('generate_report_now', { payload }),
+
   getAppLogo: () => invoke<string | null>('get_app_logo'),
   setAppLogo: (payload: { adminId: string; logoData: string | null }) =>
     invoke<string | null>('set_app_logo', { payload }),

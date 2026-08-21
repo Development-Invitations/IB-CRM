@@ -19,6 +19,7 @@ export default function PartnerServices({ currentEmployee, partnerId }: { curren
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<PartnerService | undefined>(undefined);
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [rewardPercent, setRewardPercent] = useState('');
   const [error, setError] = useState('');
@@ -48,6 +49,7 @@ export default function PartnerServices({ currentEmployee, partnerId }: { curren
   const openCreate = () => {
     setEditing(undefined);
     setName('');
+    setDescription('');
     setPrice('');
     setRewardPercent('');
     setError('');
@@ -57,6 +59,7 @@ export default function PartnerServices({ currentEmployee, partnerId }: { curren
   const openEdit = (s: PartnerService) => {
     setEditing(s);
     setName(s.name);
+    setDescription(s.description ?? '');
     setPrice(s.price ?? '');
     setRewardPercent(s.rewardPercent ?? '');
     setError('');
@@ -72,7 +75,7 @@ export default function PartnerServices({ currentEmployee, partnerId }: { curren
     setBusy(true);
     setError('');
     try {
-      const shared = { name: name.trim(), price: price.trim() || null, rewardPercent: rewardPercent.trim() || null };
+      const shared = { name: name.trim(), description: description.trim() || null, price: price.trim() || null, rewardPercent: rewardPercent.trim() || null };
       if (editing) {
         await api.updatePartnerService({ actorId: currentEmployee.id, id: editing.id, ...shared });
         showToast('success', t('partnerServices.updated'));
@@ -130,7 +133,10 @@ export default function PartnerServices({ currentEmployee, partnerId }: { curren
           <tbody>
             {services.map((s) => (
               <tr key={s.id} className="employees-row">
-                <td>{s.name}</td>
+                <td>
+                  <div>{s.name}</div>
+                  {s.description && <div className="settings-hint">{s.description}</div>}
+                </td>
                 <td>{s.price || '—'}</td>
                 <td>{s.rewardPercent || '—'}</td>
                 <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
@@ -167,6 +173,10 @@ export default function PartnerServices({ currentEmployee, partnerId }: { curren
           <div className="field">
             <label>{t('partnerServices.nameLabel')}</label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('partnerServices.namePlaceholder')} />
+          </div>
+          <div className="field">
+            <label>{t('partnerServices.descriptionLabel')}</label>
+            <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('partnerServices.descriptionPlaceholder')} />
           </div>
           <div className="field">
             <label>{t('partnerServices.priceLabel')}</label>

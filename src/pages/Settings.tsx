@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { Copy, Check, FolderOpen, Upload, Eye, EyeOff, Download, Database, Image as ImageIcon, X, Bot } from 'lucide-react';
+import { Copy, Check, FolderOpen, Upload, Eye, EyeOff, Download, Database, Image as ImageIcon, X, Bot, FileSpreadsheet } from 'lucide-react';
 import { open as openFileDialog, save as saveFileDialog } from '@tauri-apps/plugin-dialog';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { relaunch } from '@tauri-apps/plugin-process';
@@ -116,6 +116,89 @@ export default function Settings({ employee }: { employee: Employee }) {
     } finally {
       setTgBusy(false);
     }
+  };
+
+  // Авто-выгрузка отчётов (v0.5.0) — путь к папке имеет смысл только на
+  // машине, которая реально пишет файл, поэтому вся секция (как и
+  // Backup/installer выше) скрыта в клиент-режиме — см. docs/TZ.md v0.5.0.
+  const [reportEnabled, setReportEnabled] = useState(false);
+  const [reportDayMode, setReportDayMode] = useState<'last_day' | 'fixed_day'>('last_day');
+  const [reportFixedDay, setReportFixedDay] = useState('1');
+  const [reportTime, setReportTime] = useState('20:00');
+  const [reportFolder, setReportFolder] = useState('');
+  const [reportSettingsBusy, setReportSettingsBusy] = useState(false);
+
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [genPeriodStart, setGenPeriodStart] = useState(monthStart.toISOString().slice(0, 10));
+  const [genPeriodEnd, setGenPeriodEnd] = useState(todayStr);
+  const [genBusy, setGenBusy] = useState(false);
+  const [genLastPath, setGenLastPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!employee.isAdmin || isClient) return;
+    api.getReportExportSettings({ actorId: employee.id }).then((s) => {
+      setReportEnabled(s.enabled);
+      setReportDayMode(s.dayMode === 'fixed_day' ? 'fixed_day' : 'last_day');
+      setReportFixedDay(String(s.fixedDay || 1));
+      setReportTime(s.timeHhmm || '20:00');
+      setReportFolder(s.folder || '');
+    }).catch(() => {});
+  }, [employee.isAdmin, isClient, employee.id]);
+
+  const handlePickReportFolder = async () => {
+    const selected = await openFileDialog({ directory: true, multiple: false });
+    if (!selected || typeof selected !== 'string') return;
+    setReportFolder(selected);
+  };
+
+  const handleSaveReportSettings = async () => {
+    setReportSettingsBusy(true);
+    try {
+      const updated = await api.setReportExportSettings({
+        adminId: employee.id,
+        enabled: reportEnabled,
+        dayMode: reportDayMode,
+        fixedDay: Number(reportFixedDay) || 1,
+        timeHhmm: reportTime,
+        folder: reportFolder,
+      });
+      setReportEnabled(updated.enabled);
+      setReportDayMode(updated.dayMode === 'fixed_day' ? 'fixed_day' : 'last_day');
+      setReportFixedDay(String(updated.fixedDay || 1));
+      setReportTime(updated.timeHhmm);
+      setReportFolder(updated.folder);
+      showToast('success', t('settings.reportExport.saveSuccess'));
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('settings.errorGeneric'));
+    } finally {
+      setReportSettingsBusy(false);
+    }
+  };
+
+  const handleGenerateReportNow = async () => {
+    setGenBusy(true);
+    try {
+      const path = await api.generateReportNow({
+        adminId: employee.id,
+        periodStart: genPeriodStart,
+        periodEnd: genPeriodEnd,
+        folder: reportFolder || null,
+      });
+      setGenLastPath(path);
+      showToast('success', t('settings.reportExport.generateSuccess'));
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('settings.errorGeneric'));
+    } finally {
+      setGenBusy(false);
+    }
+  };
+
+  const handleOpenGeneratedFolder = () => {
+    if (!genLastPath) return;
+    const folder = genLastPath.replace(/[\\/][^\\/]*$/, '');
+    shellOpen(folder).catch(() => showToast('error', t('settings.errorGeneric')));
   };
 
   // Логотип приложения — виден и редактируем любым админом (в т.ч. другой
@@ -723,6 +806,87 @@ export default function Settings({ employee }: { employee: Employee }) {
           <button className="modal-btn" onClick={handleSaveTelegramBots} disabled={tgBusy}>
             {tgBusy ? t('common.loading') : t('settings.telegramBots.saveBtn')}
           </button>
+        </section>
+      )}
+
+      {employee.isAdmin && !isClient && (
+        <section className="settings-section">
+          <h2><FileSpreadsheet size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />{t('settings.reportExport.title')}</h2>
+          <p className="settings-hint">{t('settings.reportExport.hint')}</p>
+
+          <div className="telegram-bot-card">
+            <div className="telegram-bot-card-head">
+              <Checkbox checked={reportEnabled} onChange={setReportEnabled} label={t('settings.reportExport.enableLabel')} />
+            </div>
+
+            <div className="field" style={{ maxWidth: 280, marginTop: 8 }}>
+              <label>{t('settings.reportExport.dayModeLabel')}</label>
+              <Select
+                value={reportDayMode}
+                options={[
+                  { value: 'last_day', label: t('settings.reportExport.dayModeLastDay') },
+                  { value: 'fixed_day', label: t('settings.reportExport.dayModeFixedDay') },
+                ]}
+                onChange={(v) => setReportDayMode(v as 'last_day' | 'fixed_day')}
+              />
+            </div>
+
+            {reportDayMode === 'fixed_day' && (
+              <div className="field" style={{ maxWidth: 120 }}>
+                <label>{t('settings.reportExport.fixedDayLabel')}</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={reportFixedDay}
+                  onChange={(e) => setReportFixedDay(e.target.value.replace(/\D/g, ''))}
+                />
+              </div>
+            )}
+
+            <div className="field" style={{ maxWidth: 160 }}>
+              <label>{t('settings.reportExport.timeLabel')}</label>
+              <input type="time" value={reportTime} onChange={(e) => setReportTime(e.target.value)} />
+            </div>
+
+            <div className="field" style={{ maxWidth: 420 }}>
+              <label>{t('settings.reportExport.folderLabel')}</label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <input value={reportFolder} readOnly placeholder={t('settings.reportExport.folderLabel')} />
+                <button className="modal-btn" type="button" onClick={handlePickReportFolder}>
+                  <FolderOpen size={14} /> {t('settings.reportExport.pickFolderBtn')}
+                </button>
+              </div>
+            </div>
+
+            <button className="modal-btn" onClick={handleSaveReportSettings} disabled={reportSettingsBusy} style={{ marginTop: 10 }}>
+              {reportSettingsBusy ? t('common.loading') : t('settings.reportExport.saveBtn')}
+            </button>
+          </div>
+
+          <h3 className="settings-subheading" style={{ marginTop: 20 }}>{t('settings.reportExport.generateNowTitle')}</h3>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <div className="field" style={{ maxWidth: 180 }}>
+              <label>{t('settings.reportExport.periodFromLabel')}</label>
+              <input type="date" value={genPeriodStart} onChange={(e) => setGenPeriodStart(e.target.value)} />
+            </div>
+            <div className="field" style={{ maxWidth: 180 }}>
+              <label>{t('settings.reportExport.periodToLabel')}</label>
+              <input type="date" value={genPeriodEnd} onChange={(e) => setGenPeriodEnd(e.target.value)} />
+            </div>
+          </div>
+          <button className="modal-btn" onClick={handleGenerateReportNow} disabled={genBusy || !reportFolder}>
+            <FileSpreadsheet size={14} /> {genBusy ? t('settings.reportExport.generateBusy') : t('settings.reportExport.generateBtn')}
+          </button>
+          {!reportFolder && <p className="settings-hint">{t('settings.reportExport.folderRequiredHint')}</p>}
+          {genLastPath && (
+            <div className="account-row" style={{ marginTop: 10 }}>
+              <span className="settings-hint" style={{ wordBreak: 'break-all' }}>{genLastPath}</span>
+              <button className="reg-action-btn" onClick={handleOpenGeneratedFolder} title={t('settings.reportExport.openFolderBtn')}>
+                <FolderOpen size={13} />
+              </button>
+            </div>
+          )}
         </section>
       )}
 

@@ -1,5 +1,5 @@
 import { useState, createContext, useContext, useCallback } from 'react';
-import { Routes, Route, NavLink } from 'react-router-dom';
+import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
 
 // Контекст для полноэкранного режима — регламенты и проекты скрывают sidebar/topbar
 export const FullscreenContext = createContext<{
@@ -109,9 +109,9 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
             <Route path="regulations" element={<RegulationsPage currentEmployee={employee} />} />
             <Route path="blog" element={<BlogPage currentEmployee={employee} />} />
             <Route path="chat" element={<ChatPage currentEmployee={employee} />} />
-            <Route path="partners" element={<AdminPartners />} />
-            <Route path="partners/:partnerId/clients" element={<AdminPartnerWorkspace employee={employee} tab="clients" />} />
-            <Route path="partners/:partnerId/regulations" element={<AdminPartnerWorkspace employee={employee} tab="regulations" />} />
+            <Route path="partners" element={employee.isAdmin ? <AdminPartners /> : <Navigate to="/dashboard" replace />} />
+            <Route path="partners/:partnerId/clients" element={employee.isAdmin ? <AdminPartnerWorkspace employee={employee} tab="clients" /> : <Navigate to="/dashboard" replace />} />
+            <Route path="partners/:partnerId/regulations" element={employee.isAdmin ? <AdminPartnerWorkspace employee={employee} tab="regulations" /> : <Navigate to="/dashboard" replace />} />
             <Route path="birthdays" element={<BirthdaysPage />} />
             <Route path="absence-requests" element={<AbsenceRequestsPage currentEmployee={employee} />} />
             <Route path="settings" element={<SettingsPage employee={employee} />} />

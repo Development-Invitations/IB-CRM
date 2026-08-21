@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.3.1';
+export const APP_VERSION = '0.3.2';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.3.2',
+      items: [
+        'Фильтр "Источник" на странице Клиенты теперь виден только админу — у остальных сотрудников список без фильтра, но пометка "от партнёра" в самой таблице по-прежнему видна всем',
+        'Закрыт прямой доступ к разделу "Партнёры" по ссылке для не-админов — раньше кнопка в топбаре была скрыта, но саму страницу можно было открыть, зная адрес',
+        'Партнёр больше не может отправить комментарий в блоге даже прямым запросом к серверу — этот раздел для него был и остаётся только для чтения',
+      ],
+    },
     {
       version: '0.3.1',
       items: [
@@ -486,6 +494,14 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.3.2',
+      items: [
+        "\"Klientlar\" sahifasidagi \"Manba\" filtri endi faqat administratorga ko'rinadi — boshqa xodimlarda filtrsiz ro'yxat, lekin jadvaldagi \"hamkordan\" belgisi hammaga avvalgidek ko'rinadi",
+        "Admin bo'lmagan xodim uchun \"Hamkorlar\" bo'limiga havola orqali to'g'ridan-to'g'ri kirish endi yopiq — avval faqat topbardagi tugma yashirilgan edi, sahifaning o'zi manzilni bilgan har kimga ochiq qolardi",
+        "Hamkor endi serverga to'g'ridan-to'g'ri so'rov yuborib ham blogga izoh qoldira olmaydi — bu bo'lim u uchun avvalgidek faqat o'qish uchun",
+      ],
+    },
+    {
       version: '0.3.1',
       items: [
         "Sozlamalarda admin uchun \"Logotip\" bo'limi paydo bo'ldi — standart IB CRM o'rniga o'z logotipingizni yuklash mumkin, u darhol butun interfeysda (yuklanish ekrani, birinchi ishga tushirish) va oyna/vazifalar paneli belgisida, ushbu o'rnatishning barcha foydalanuvchilari uchun qo'llaniladi",
@@ -955,6 +971,14 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.3.2',
+      items: [
+        'Клиентлар саҳифасидаги "Манба" фильтри энди фақат администраторга кўринади — бошқа ходимларда фильтрсиз рўйхат, лекин жадвалдаги "ҳамкордан" белгиси ҳаммага аввалгидек кўринади',
+        'Админ бўлмаган ходим учун "Ҳамкорлар" бўлимига ҳавола орқали тўғридан-тўғри кириш энди ёпиқ — аввал фақат топбардаги тугма яширилган эди, саҳифанинг ўзи манзилни билган ҳар кимга очиқ қоларди',
+        'Ҳамкор энди серверга тўғридан-тўғри сўров юбориб ҳам блогга изоҳ қолдира олмайди — бу бўлим у учун аввалгидек фақат ўқиш учун',
+      ],
+    },
     {
       version: '0.3.1',
       items: [

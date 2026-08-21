@@ -66,9 +66,9 @@ export default function Clients({
   }, [scopedPartnerId]);
 
   useEffect(() => {
-    if (scopedPartnerId !== undefined) return;
+    if (scopedPartnerId !== undefined || !currentEmployee.isAdmin) return;
     api.listPartners().then(setPartners).catch(() => {});
-  }, [scopedPartnerId]);
+  }, [scopedPartnerId, currentEmployee.isAdmin]);
 
   useEffect(() => {
     if (!selected) {
@@ -163,7 +163,7 @@ export default function Clients({
       <div className="employees-search-row">
         <Search size={15} className="employees-search-icon" />
         <input className="employees-search-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('clients.searchPlaceholder')} />
-        {scopedPartnerId === undefined && partners.length > 0 && (
+        {scopedPartnerId === undefined && currentEmployee.isAdmin && partners.length > 0 && (
           <Select
             value={originFilter}
             options={[

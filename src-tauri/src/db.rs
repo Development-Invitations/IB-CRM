@@ -4866,6 +4866,13 @@ impl Db {
     }
 
     pub fn add_blog_comment(&self, actor_id: &str, topic_id: &str, content: &str, reply_to_id: Option<&str>) -> Result<BlogCommentRecord, String> {
+        let employee = self.get_employee(actor_id).ok_or_else(|| "Сотрудник не найден".to_string())?;
+        // Блог партнёра — только для чтения; UI не даёт дойти до формы
+        // комментария, но проверку нужно продублировать и на бэкенде, чтобы
+        // партнёр не мог написать комментарий прямым вызовом команды.
+        if employee.is_partner {
+            return Err("Недостаточно прав".into());
+        }
         if content.trim().is_empty() {
             return Err("Комментарий не может быть пустым".into());
         }

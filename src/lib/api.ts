@@ -118,6 +118,8 @@ export type Client = {
   partnerId: string | null;
   partnerName: string | null;
   dealValue: string | null;
+  serviceId: string | null;
+  serviceName: string | null;
 };
 
 export type ClientHistoryEntry = {
@@ -289,6 +291,20 @@ export type PartnerRegulation = {
   createdAt: string;
   updatedAt: string;
   entryCount: number;
+  assistantId: string | null;
+  assistantName: string | null;
+};
+
+export type PartnerService = {
+  id: string;
+  partnerId: string;
+  name: string;
+  price: string | null;
+  rewardPercent: string | null;
+  createdBy: string | null;
+  createdByName: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type PartnerRegulationEntry = {
@@ -654,6 +670,7 @@ export const api = {
     notes?: string | null;
     partnerId?: string | null;
     dealValue?: string | null;
+    serviceId?: string | null;
   }) => invoke<Client>('create_client', { payload }),
 
   updateClient: (payload: {
@@ -668,6 +685,7 @@ export const api = {
     notes?: string | null;
     partnerId?: string | null;
     dealValue?: string | null;
+    serviceId?: string | null;
   }) => invoke<Client>('update_client', { payload }),
 
   deleteClient: (payload: { adminId: string; id: string }) => invoke<void>('delete_client', { payload }),
@@ -682,13 +700,29 @@ export const api = {
 
   getPartnerRegulation: (id: string) => invoke<PartnerRegulation | null>('get_partner_regulation', { id }),
 
-  createPartnerRegulation: (payload: { actorId: string; partnerId: string; title: string; description?: string | null; clientId?: string | null; deadline?: string | null }) =>
+  createPartnerRegulation: (payload: { actorId: string; partnerId: string; title: string; description?: string | null; clientId?: string | null; deadline?: string | null; assistantId?: string | null }) =>
     invoke<PartnerRegulation>('create_partner_regulation', { payload }),
 
-  updatePartnerRegulation: (payload: { actorId: string; id: string; title: string; description?: string | null; clientId?: string | null; deadline?: string | null; status: PartnerRegulationStatus }) =>
+  updatePartnerRegulation: (payload: { actorId: string; id: string; title: string; description?: string | null; clientId?: string | null; deadline?: string | null; status: PartnerRegulationStatus; assistantId?: string | null }) =>
     invoke<PartnerRegulation>('update_partner_regulation', { payload }),
 
   deletePartnerRegulation: (payload: { adminId: string; id: string }) => invoke<void>('delete_partner_regulation', { payload }),
+
+  listPartnerServices: (payload: { actorId: string; partnerId: string }) =>
+    invoke<PartnerService[]>('list_partner_services', { payload }),
+
+  createPartnerService: (payload: { actorId: string; partnerId: string; name: string; price?: string | null; rewardPercent?: string | null }) =>
+    invoke<PartnerService>('create_partner_service', { payload }),
+
+  updatePartnerService: (payload: { actorId: string; id: string; name: string; price?: string | null; rewardPercent?: string | null }) =>
+    invoke<PartnerService>('update_partner_service', { payload }),
+
+  deletePartnerService: (payload: { actorId: string; id: string }) => invoke<void>('delete_partner_service', { payload }),
+
+  listAdminEmployees: () => invoke<Employee[]>('list_admin_employees'),
+
+  listPartnerOrgEmployees: (payload: { actorId: string; partnerId: string }) =>
+    invoke<Employee[]>('list_partner_org_employees', { payload }),
 
   listPartnerRegulationEntries: (payload: { actorId: string; partnerRegulationId: string }) =>
     invoke<PartnerRegulationEntry[]>('list_partner_regulation_entries', { payload }),

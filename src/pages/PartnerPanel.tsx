@@ -1,28 +1,30 @@
 import { useState, useCallback } from 'react';
 import { Routes, Route, NavLink } from 'react-router-dom';
-import { Home as HomeIcon, Contact, FileText, LogOut } from 'lucide-react';
+import { Contact, FileText, Users, Briefcase, LogOut } from 'lucide-react';
 import { FullscreenContext } from './Dashboard';
 import Modal from '../components/Modal';
 import UpdatesButton from '../components/UpdatesButton';
+import PartnerTopbar from '../components/PartnerTopbar';
 import ClientsPage from './Clients';
 import PartnerRegulationsPage from './PartnerRegulations';
+import PartnerServicesPage from './PartnerServices';
+import PartnerEmployeesPage from './PartnerEmployees';
+import PartnerSettingsPage from './PartnerSettings';
 import PartnerHome from './PartnerHome';
+import ChatPage from './Chat';
 import type { Employee } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { APP_VERSION } from '../lib/changelog';
 
-// Панель партнёра (v0.3.0) — настоящий роутинг + сайдбар в стиле основной
-// CRM (см. Dashboard.tsx — те же классы .sidebar/.brand/nav a/.footer/
-// .ghost-btn), вместо прежней заглушки на одну карточку (v0.2.8-0.2.9, см.
-// docs/TZ.md). Возможности партнёра ограничены явно: свои клиенты
-// (ClientsPage со scopedPartnerId), свои регламенты с админом
-// (PartnerRegulationsPage), и своя "Главная" со сменой пароля. Чат убран
-// отсюда полностью — его роль теперь берут на себя регламенты партнёра, см.
-// журнал v0.3.0. Свой FullscreenContext.Provider нужен, т.к. регламенты
-// партнёра используют его через useContext, как и обычные регламенты/блог.
-// Topbar.tsx по-прежнему НЕ импортируем — он завязан на Dashboard-специфичные
-// вещи (кабинет-ссылку, колокольчик с модалками рассмотрения заявок,
-// Настройки), которых у партнёра нет.
+// Панель партнёра (v0.3.0, расширена в v0.4.0) — настоящий роутинг + сайдбар
+// в стиле основной CRM (см. Dashboard.tsx — те же классы .sidebar/.brand/
+// nav a/.footer/.ghost-btn). С v0.4.0 добавлен топбар (PartnerTopbar.tsx —
+// Чат/Главная/Уведомления/Настройки, зеркалит основной Topbar.tsx) — "Главная"
+// поэтому убрана из сайдбара, доступна только через иконку в топбаре, как и
+// в основной CRM. IB Чат переиспользуется как есть (Chat.tsx уже
+// самоконфигурируется для is_partner-сотрудников). Свой FullscreenContext.
+// Provider нужен, т.к. регламенты партнёра и чат используют его через
+// useContext, как и обычные регламенты/блог/чат в Dashboard.
 export default function PartnerPanel({ employee, onLogout }: { employee: Employee; onLogout: () => void }) {
   const { t } = useLocale();
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
@@ -33,9 +35,10 @@ export default function PartnerPanel({ employee, onLogout }: { employee: Employe
   const partnerId = employee.partnerId ?? '';
 
   const modules = [
-    { label: t('partnerPanel.navHome'), icon: HomeIcon, path: '' },
     { label: t('sidebar.clients'), icon: Contact, path: 'clients' },
     { label: t('partnerPanel.navRegulations'), icon: FileText, path: 'regulations' },
+    { label: t('partnerPanel.navEmployees'), icon: Users, path: 'employees' },
+    { label: t('partnerPanel.navServices'), icon: Briefcase, path: 'services' },
   ];
 
   return (
@@ -45,7 +48,7 @@ export default function PartnerPanel({ employee, onLogout }: { employee: Employe
           <div className="brand">IB CRM</div>
           <nav>
             {modules.map((m) => (
-              <NavLink key={m.label} to={m.path} end={m.path === ''} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <NavLink key={m.label} to={m.path} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                 <m.icon size={16} className="nav-icon" />
                 {m.label}
               </NavLink>
@@ -63,11 +66,16 @@ export default function PartnerPanel({ employee, onLogout }: { employee: Employe
         </aside>
 
         <div className="main-area">
+          <PartnerTopbar employee={employee} />
           <main className="content">
             <Routes>
-              <Route index element={<PartnerHome employee={employee} />} />
+              <Route index element={<PartnerHome employee={employee} partnerId={partnerId} />} />
               <Route path="clients" element={<ClientsPage currentEmployee={employee} scopedPartnerId={partnerId} />} />
               <Route path="regulations" element={<PartnerRegulationsPage currentEmployee={employee} partnerId={partnerId} />} />
+              <Route path="services" element={<PartnerServicesPage currentEmployee={employee} partnerId={partnerId} />} />
+              <Route path="employees" element={<PartnerEmployeesPage currentEmployee={employee} partnerId={partnerId} />} />
+              <Route path="chat" element={<ChatPage currentEmployee={employee} />} />
+              <Route path="settings" element={<PartnerSettingsPage employee={employee} />} />
             </Routes>
           </main>
         </div>

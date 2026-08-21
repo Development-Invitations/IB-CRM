@@ -112,6 +112,7 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
             <Route path="partners" element={employee.isAdmin ? <AdminPartners /> : <Navigate to="/dashboard" replace />} />
             <Route path="partners/:partnerId/clients" element={employee.isAdmin ? <AdminPartnerWorkspace employee={employee} tab="clients" /> : <Navigate to="/dashboard" replace />} />
             <Route path="partners/:partnerId/regulations" element={employee.isAdmin ? <AdminPartnerWorkspace employee={employee} tab="regulations" /> : <Navigate to="/dashboard" replace />} />
+            <Route path="partners/:partnerId/services" element={employee.isAdmin ? <AdminPartnerWorkspace employee={employee} tab="services" /> : <Navigate to="/dashboard" replace />} />
             <Route path="birthdays" element={<BirthdaysPage />} />
             <Route path="absence-requests" element={<AbsenceRequestsPage currentEmployee={employee} />} />
             <Route path="settings" element={<SettingsPage employee={employee} />} />

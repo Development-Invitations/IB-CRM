@@ -202,6 +202,10 @@ struct Client {
     partner_name: Option<String>,
     #[serde(rename = "dealValue")]
     deal_value: Option<String>,
+    #[serde(rename = "serviceId")]
+    service_id: Option<String>,
+    #[serde(rename = "serviceName")]
+    service_name: Option<String>,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -467,6 +471,29 @@ struct PartnerRegulation {
     updated_at: String,
     #[serde(rename = "entryCount")]
     entry_count: i64,
+    #[serde(rename = "assistantId")]
+    assistant_id: Option<String>,
+    #[serde(rename = "assistantName")]
+    assistant_name: Option<String>,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct PartnerService {
+    id: String,
+    #[serde(rename = "partnerId")]
+    partner_id: String,
+    name: String,
+    price: Option<String>,
+    #[serde(rename = "rewardPercent")]
+    reward_percent: Option<String>,
+    #[serde(rename = "createdBy")]
+    created_by: Option<String>,
+    #[serde(rename = "createdByName")]
+    created_by_name: Option<String>,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+    #[serde(rename = "updatedAt")]
+    updated_at: String,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -943,6 +970,8 @@ struct CreateClientPayload {
     partner_id: Option<String>,
     #[serde(rename = "dealValue")]
     deal_value: Option<String>,
+    #[serde(rename = "serviceId")]
+    service_id: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -963,6 +992,8 @@ struct UpdateClientPayload {
     partner_id: Option<String>,
     #[serde(rename = "dealValue")]
     deal_value: Option<String>,
+    #[serde(rename = "serviceId")]
+    service_id: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -1212,6 +1243,8 @@ struct CreatePartnerRegulationPayload {
     #[serde(rename = "clientId")]
     client_id: Option<String>,
     deadline: Option<String>,
+    #[serde(rename = "assistantId")]
+    assistant_id: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -1225,6 +1258,8 @@ struct UpdatePartnerRegulationPayload {
     client_id: Option<String>,
     deadline: Option<String>,
     status: String,
+    #[serde(rename = "assistantId")]
+    assistant_id: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -1232,6 +1267,52 @@ struct DeletePartnerRegulationPayload {
     #[serde(rename = "adminId")]
     admin_id: String,
     id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct ListPartnerServicesPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "partnerId")]
+    partner_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct CreatePartnerServicePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "partnerId")]
+    partner_id: String,
+    name: String,
+    price: Option<String>,
+    #[serde(rename = "rewardPercent")]
+    reward_percent: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct UpdatePartnerServicePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    id: String,
+    name: String,
+    price: Option<String>,
+    #[serde(rename = "rewardPercent")]
+    reward_percent: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct DeletePartnerServicePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct ListPartnerOrgEmployeesPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "partnerId")]
+    partner_id: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -1724,6 +1805,8 @@ fn to_client(c: db::ClientRecord) -> Client {
         partner_id: c.partner_id,
         partner_name: c.partner_name,
         deal_value: c.deal_value,
+        service_id: c.service_id,
+        service_name: c.service_name,
     }
 }
 
@@ -1866,6 +1949,22 @@ fn to_partner_regulation(r: db::PartnerRegulationRecord) -> PartnerRegulation {
         created_at: r.created_at,
         updated_at: r.updated_at,
         entry_count: r.entry_count,
+        assistant_id: r.assistant_id,
+        assistant_name: r.assistant_name,
+    }
+}
+
+fn to_partner_service(s: db::PartnerServiceRecord) -> PartnerService {
+    PartnerService {
+        id: s.id,
+        partner_id: s.partner_id,
+        name: s.name,
+        price: s.price,
+        reward_percent: s.reward_percent,
+        created_by: s.created_by,
+        created_by_name: s.created_by_name,
+        created_at: s.created_at,
+        updated_at: s.updated_at,
     }
 }
 
@@ -2341,6 +2440,7 @@ fn create_client(payload: CreateClientPayload, state: tauri::State<AppState>) ->
         payload.notes.as_deref(),
         payload.partner_id.as_deref(),
         payload.deal_value.as_deref(),
+        payload.service_id.as_deref(),
     )
     .map(to_client)
 }
@@ -2360,6 +2460,7 @@ fn update_client(payload: UpdateClientPayload, state: tauri::State<AppState>) ->
         payload.notes.as_deref(),
         payload.partner_id.as_deref(),
         payload.deal_value.as_deref(),
+        payload.service_id.as_deref(),
     )
     .map(to_client)
 }
@@ -2656,14 +2757,14 @@ fn get_partner_regulation(id: String, state: tauri::State<AppState>) -> Option<P
 #[tauri::command]
 fn create_partner_regulation(payload: CreatePartnerRegulationPayload, state: tauri::State<AppState>) -> Result<PartnerRegulation, String> {
     let db = state.0.lock().unwrap();
-    db.create_partner_regulation(&payload.actor_id, &payload.partner_id, &payload.title, payload.description.as_deref(), payload.client_id.as_deref(), payload.deadline.as_deref())
+    db.create_partner_regulation(&payload.actor_id, &payload.partner_id, &payload.title, payload.description.as_deref(), payload.client_id.as_deref(), payload.deadline.as_deref(), payload.assistant_id.as_deref())
         .map(to_partner_regulation)
 }
 
 #[tauri::command]
 fn update_partner_regulation(payload: UpdatePartnerRegulationPayload, state: tauri::State<AppState>) -> Result<PartnerRegulation, String> {
     let db = state.0.lock().unwrap();
-    db.update_partner_regulation(&payload.actor_id, &payload.id, &payload.title, payload.description.as_deref(), payload.client_id.as_deref(), payload.deadline.as_deref(), &payload.status)
+    db.update_partner_regulation(&payload.actor_id, &payload.id, &payload.title, payload.description.as_deref(), payload.client_id.as_deref(), payload.deadline.as_deref(), &payload.status, payload.assistant_id.as_deref())
         .map(to_partner_regulation)
 }
 
@@ -2671,6 +2772,44 @@ fn update_partner_regulation(payload: UpdatePartnerRegulationPayload, state: tau
 fn delete_partner_regulation(payload: DeletePartnerRegulationPayload, state: tauri::State<AppState>) -> Result<(), String> {
     let db = state.0.lock().unwrap();
     db.delete_partner_regulation(&payload.admin_id, &payload.id)
+}
+
+#[tauri::command]
+fn list_partner_services(payload: ListPartnerServicesPayload, state: tauri::State<AppState>) -> Result<Vec<PartnerService>, String> {
+    let db = state.0.lock().unwrap();
+    db.list_partner_services(&payload.actor_id, &payload.partner_id).map(|rows| rows.into_iter().map(to_partner_service).collect())
+}
+
+#[tauri::command]
+fn create_partner_service(payload: CreatePartnerServicePayload, state: tauri::State<AppState>) -> Result<PartnerService, String> {
+    let db = state.0.lock().unwrap();
+    db.create_partner_service(&payload.actor_id, &payload.partner_id, &payload.name, payload.price.as_deref(), payload.reward_percent.as_deref())
+        .map(to_partner_service)
+}
+
+#[tauri::command]
+fn update_partner_service(payload: UpdatePartnerServicePayload, state: tauri::State<AppState>) -> Result<PartnerService, String> {
+    let db = state.0.lock().unwrap();
+    db.update_partner_service(&payload.actor_id, &payload.id, &payload.name, payload.price.as_deref(), payload.reward_percent.as_deref())
+        .map(to_partner_service)
+}
+
+#[tauri::command]
+fn delete_partner_service(payload: DeletePartnerServicePayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.delete_partner_service(&payload.actor_id, &payload.id)
+}
+
+#[tauri::command]
+fn list_admin_employees(state: tauri::State<AppState>) -> Vec<Employee> {
+    let db = state.0.lock().unwrap();
+    db.list_admin_employees().into_iter().map(to_employee).collect()
+}
+
+#[tauri::command]
+fn list_partner_org_employees(payload: ListPartnerOrgEmployeesPayload, state: tauri::State<AppState>) -> Result<Vec<Employee>, String> {
+    let db = state.0.lock().unwrap();
+    db.list_partner_org_employees(&payload.actor_id, &payload.partner_id).map(|rows| rows.into_iter().map(to_employee).collect())
 }
 
 #[tauri::command]
@@ -3242,6 +3381,12 @@ fn main() {
             add_partner_regulation_reply,
             edit_partner_regulation_reply,
             delete_partner_regulation_reply,
+            list_partner_services,
+            create_partner_service,
+            update_partner_service,
+            delete_partner_service,
+            list_admin_employees,
+            list_partner_org_employees,
             add_regulation_reminder,
             list_regulation_reminders,
             update_regulation_entry_deadline,

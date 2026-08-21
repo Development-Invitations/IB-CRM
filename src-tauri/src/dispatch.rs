@@ -207,7 +207,7 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
             db.create_client(
                 &p.actor_id, &p.name, p.contact_person.as_deref(), p.contact_position.as_deref(),
                 p.phone.as_deref(), p.email.as_deref(), p.address.as_deref(), p.notes.as_deref(),
-                p.partner_id.as_deref(), p.deal_value.as_deref(),
+                p.partner_id.as_deref(), p.deal_value.as_deref(), p.service_id.as_deref(),
             ).map(crate::to_client).map(to_json)
         }
         "update_client" => {
@@ -215,7 +215,7 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
             db.update_client(
                 &p.actor_id, &p.id, &p.name, p.contact_person.as_deref(), p.contact_position.as_deref(),
                 p.phone.as_deref(), p.email.as_deref(), p.address.as_deref(), p.notes.as_deref(),
-                p.partner_id.as_deref(), p.deal_value.as_deref(),
+                p.partner_id.as_deref(), p.deal_value.as_deref(), p.service_id.as_deref(),
             ).map(crate::to_client).map(to_json)
         }
         "delete_client" => {
@@ -402,12 +402,12 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
         }
         "create_partner_regulation" => {
             let p: crate::CreatePartnerRegulationPayload = from_payload(payload)?;
-            db.create_partner_regulation(&p.actor_id, &p.partner_id, &p.title, p.description.as_deref(), p.client_id.as_deref(), p.deadline.as_deref())
+            db.create_partner_regulation(&p.actor_id, &p.partner_id, &p.title, p.description.as_deref(), p.client_id.as_deref(), p.deadline.as_deref(), p.assistant_id.as_deref())
                 .map(crate::to_partner_regulation).map(to_json)
         }
         "update_partner_regulation" => {
             let p: crate::UpdatePartnerRegulationPayload = from_payload(payload)?;
-            db.update_partner_regulation(&p.actor_id, &p.id, &p.title, p.description.as_deref(), p.client_id.as_deref(), p.deadline.as_deref(), &p.status)
+            db.update_partner_regulation(&p.actor_id, &p.id, &p.title, p.description.as_deref(), p.client_id.as_deref(), p.deadline.as_deref(), &p.status, p.assistant_id.as_deref())
                 .map(crate::to_partner_regulation).map(to_json)
         }
         "delete_partner_regulation" => {
@@ -450,6 +450,31 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
         "delete_partner_regulation_reply" => {
             let p: crate::DeletePartnerRegulationReplyPayload = from_payload(payload)?;
             db.delete_partner_regulation_reply(&p.actor_id, &p.reply_id).map(to_json)
+        }
+
+        // ---- Услуги партнёра (v0.4.0) ----
+        "list_partner_services" => {
+            let p: crate::ListPartnerServicesPayload = from_payload(payload)?;
+            db.list_partner_services(&p.actor_id, &p.partner_id).map(|rows| rows.into_iter().map(crate::to_partner_service).collect::<Vec<_>>()).map(to_json)
+        }
+        "create_partner_service" => {
+            let p: crate::CreatePartnerServicePayload = from_payload(payload)?;
+            db.create_partner_service(&p.actor_id, &p.partner_id, &p.name, p.price.as_deref(), p.reward_percent.as_deref())
+                .map(crate::to_partner_service).map(to_json)
+        }
+        "update_partner_service" => {
+            let p: crate::UpdatePartnerServicePayload = from_payload(payload)?;
+            db.update_partner_service(&p.actor_id, &p.id, &p.name, p.price.as_deref(), p.reward_percent.as_deref())
+                .map(crate::to_partner_service).map(to_json)
+        }
+        "delete_partner_service" => {
+            let p: crate::DeletePartnerServicePayload = from_payload(payload)?;
+            db.delete_partner_service(&p.actor_id, &p.id).map(to_json)
+        }
+        "list_admin_employees" => Ok(to_json(db.list_admin_employees().into_iter().map(crate::to_employee).collect::<Vec<_>>())),
+        "list_partner_org_employees" => {
+            let p: crate::ListPartnerOrgEmployeesPayload = from_payload(payload)?;
+            db.list_partner_org_employees(&p.actor_id, &p.partner_id).map(|rows| rows.into_iter().map(crate::to_employee).collect::<Vec<_>>()).map(to_json)
         }
 
         "add_regulation_reminder" => {

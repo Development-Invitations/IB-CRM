@@ -269,11 +269,21 @@ export default function Clients({
                 <span>{selected.notes}</span>
               </div>
             )}
-            {selected.dealValue && (
+            {selected.serviceId ? (
               <div className="employee-card-row">
-                <span className="settings-hint">{t('clients.dealValueLabel')}</span>
-                <span>{selected.dealValue}</span>
+                <span className="settings-hint">{t('clients.serviceLabel')}</span>
+                <span>
+                  {selected.serviceName}
+                  {selected.dealValue ? ` · ${selected.dealValue}` : ''}
+                </span>
               </div>
+            ) : (
+              selected.dealValue && (
+                <div className="employee-card-row">
+                  <span className="settings-hint">{t('clients.dealValueLabel')}</span>
+                  <span>{selected.dealValue}</span>
+                </div>
+              )
             )}
             {scopedPartnerId === undefined && (
               <div className="employee-card-row">

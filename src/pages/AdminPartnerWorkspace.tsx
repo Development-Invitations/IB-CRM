@@ -6,13 +6,14 @@ import { useLocale } from '../lib/i18n';
 import { FullscreenContext } from './Dashboard';
 import ClientsPage from './Clients';
 import PartnerRegulationsPage from './PartnerRegulations';
+import PartnerServicesPage from './PartnerServices';
 
 // Рабочее пространство конкретного партнёра со стороны админа — те же
 // Клиенты/Регламенты, что видит сам партнёр в своей панели, просто в
 // контексте основной CRM (с обычным сайдбаром/топбаром вокруг). Доступ
 // UX-уровня (кнопка в топбаре видна только админу, см. Topbar.tsx) — реальная
 // защита уже на бэкенде через partner_filter/can_access_partner_regulation.
-export default function AdminPartnerWorkspace({ employee, tab }: { employee: Employee; tab: 'clients' | 'regulations' }) {
+export default function AdminPartnerWorkspace({ employee, tab }: { employee: Employee; tab: 'clients' | 'regulations' | 'services' }) {
   const { t } = useLocale();
   const navigate = useNavigate();
   const { partnerId } = useParams<{ partnerId: string }>();
@@ -47,14 +48,19 @@ export default function AdminPartnerWorkspace({ employee, tab }: { employee: Emp
             <button className={`employees-tab-btn${tab === 'regulations' ? ' active' : ''}`} onClick={() => navigate(`/dashboard/partners/${partnerId}/regulations`)}>
               {t('partnerPanel.navRegulations')}
             </button>
+            <button className={`employees-tab-btn${tab === 'services' ? ' active' : ''}`} onClick={() => navigate(`/dashboard/partners/${partnerId}/services`)}>
+              {t('partnerPanel.navServices')}
+            </button>
           </div>
         </>
       )}
 
       {tab === 'clients' ? (
         <ClientsPage currentEmployee={employee} scopedPartnerId={partnerId} regulationsBasePath={`/dashboard/partners/${partnerId}/regulations`} />
-      ) : (
+      ) : tab === 'regulations' ? (
         <PartnerRegulationsPage currentEmployee={employee} partnerId={partnerId} basePath={`/dashboard/partners/${partnerId}/regulations`} />
+      ) : (
+        <PartnerServicesPage currentEmployee={employee} partnerId={partnerId} />
       )}
     </div>
   );

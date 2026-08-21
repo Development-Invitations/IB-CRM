@@ -1,5 +1,5 @@
 import { useEffect, useState, FormEvent } from 'react';
-import { api, type Client, type Employee, type Partner } from '../lib/api';
+import { api, type Client, type Employee, type Partner, type PartnerService } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
 import { formatUzPhone } from '../lib/phone';
@@ -36,15 +36,29 @@ export default function ClientFormModal({
   const [dealValue, setDealValue] = useState('');
   const [partnerId, setPartnerId] = useState('');
   const [partners, setPartners] = useState<Partner[]>([]);
+  const [services, setServices] = useState<PartnerService[]>([]);
+  const [serviceId, setServiceId] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   const showPartnerSelect = !currentEmployee.isPartner && lockedPartnerId === undefined;
+  // Услуга доступна только когда у клиента есть партнёр (свой у lockedPartnerId,
+  // либо выбранный в свободном селекте на общей странице Клиентов) — без
+  // партнёра каталога услуг не существует, остаётся свободное поле "Стоимость".
+  const effectivePartnerId = lockedPartnerId !== undefined ? (lockedPartnerId ?? null) : (partnerId || null);
 
   useEffect(() => {
     if (!showPartnerSelect) return;
     api.listPartners().then(setPartners).catch(() => {});
   }, [showPartnerSelect]);
+
+  useEffect(() => {
+    if (!effectivePartnerId) {
+      setServices([]);
+      return;
+    }
+    api.listPartnerServices({ actorId: currentEmployee.id, partnerId: effectivePartnerId }).then(setServices).catch(() => setServices([]));
+  }, [effectivePartnerId, currentEmployee.id]);
 
   useEffect(() => {
     if (!open) return;
@@ -56,6 +70,7 @@ export default function ClientFormModal({
     setAddress(client?.address ?? '');
     setNotes(client?.notes ?? '');
     setDealValue(client?.dealValue ?? '');
+    setServiceId(client?.serviceId ?? '');
     setPartnerId(lockedPartnerId !== undefined ? (lockedPartnerId ?? '') : (client?.partnerId ?? ''));
     setError('');
   }, [open, client, lockedPartnerId]);
@@ -78,7 +93,8 @@ export default function ClientFormModal({
         address: address.trim() || null,
         notes: notes.trim() || null,
         partnerId: lockedPartnerId !== undefined ? lockedPartnerId : (partnerId || null),
-        dealValue: dealValue.trim() || null,
+        dealValue: effectivePartnerId ? null : (dealValue.trim() || null),
+        serviceId: effectivePartnerId ? (serviceId || null) : null,
       };
       if (client) {
         await api.updateClient({ actorId: currentEmployee.id, id: client.id, ...shared });
@@ -151,10 +167,21 @@ export default function ClientFormModal({
           <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('clients.notesPlaceholder')} />
         </div>
 
-        <div className="field">
-          <label>{t('clients.dealValueLabel')}</label>
-          <input value={dealValue} onChange={(e) => setDealValue(e.target.value)} placeholder={t('clients.dealValuePlaceholder')} />
-        </div>
+        {effectivePartnerId ? (
+          <div className="field">
+            <label>{t('clients.serviceLabel')}</label>
+            <Select
+              value={serviceId}
+              options={[{ value: '', label: t('clients.serviceNotSelected') }, ...services.map((s) => ({ value: s.id, label: s.name }))]}
+              onChange={setServiceId}
+            />
+          </div>
+        ) : (
+          <div className="field">
+            <label>{t('clients.dealValueLabel')}</label>
+            <input value={dealValue} onChange={(e) => setDealValue(e.target.value)} placeholder={t('clients.dealValuePlaceholder')} />
+          </div>
+        )}
 
         {showPartnerSelect && (
           <div className="field">

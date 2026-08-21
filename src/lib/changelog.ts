@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.3.2';
+export const APP_VERSION = '0.4.0';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,17 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.4.0',
+      items: [
+        'Панель партнёра стала полноценным рабочим пространством: добавлена шапка с IB Чатом, уведомлениями (колокольчик и всплывающий баннер — как у сотрудников) и настройками',
+        'В IB Чате теперь можно переписываться напрямую с администратором прямо из панели партнёра',
+        'Новый раздел "Настройки" у партнёра — тема оформления, язык, смена пароля, запрос на смену данных, фото профиля и данные для подключения через Radmin VPN (только просмотр, обновляются автоматически, если админ их поменяет)',
+        'Новый раздел "Сотрудники" у партнёра — видно своих коллег (других сотрудников той же организации) и администратора CRM',
+        'Новый раздел "Услуги" — партнёр (и админ, в его рабочем пространстве) ведёт каталог услуг с ценой и процентом вознаграждения; при создании клиента поле "Стоимость" заменяется выбором услуги из этого каталога',
+        'В регламентах партнёра появилось поле "Помощник" — партнёр указывает ответственного администратора, админ — конкретного сотрудника партнёра; по новым записям и ответам теперь приходят уведомления',
+      ],
+    },
     {
       version: '0.3.2',
       items: [
@@ -494,6 +505,17 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.4.0',
+      items: [
+        "Hamkor paneli to'liq ish maydoniga aylandi — IB Chat, bildirishnomalar (qo'ng'iroqcha va chiquvchi banner — xodimlardagidek) va sozlamalar bilan yangi shapka qo'shildi",
+        "IB Chatda endi hamkor panelidan to'g'ridan-to'g'ri administrator bilan yozishish mumkin",
+        "Hamkor uchun yangi \"Sozlamalar\" bo'limi — ko'rinish mavzusi, til, parolni almashtirish, ma'lumotlarni o'zgartirish so'rovi, profil surati va Radmin VPN orqali ulanish uchun ma'lumotlar (faqat ko'rish, admin o'zgartirsa avtomatik yangilanadi)",
+        "Hamkor uchun yangi \"Xodimlar\" bo'limi — o'sha tashkilotning boshqa xodimlari va CRM administratori ko'rinadi",
+        "Yangi \"Xizmatlar\" bo'limi — hamkor (va admin, uning ish maydonida) narxi va mukofot foizi bilan xizmatlar katalogini yuritadi; mijoz yaratishda \"Qiymati\" maydoni shu katalogdan xizmat tanlash bilan almashtiriladi",
+        "Hamkor reglamentlarida \"Yordamchi\" maydoni paydo bo'ldi — hamkor mas'ul administratorni, admin esa hamkorning aniq xodimini belgilaydi; yangi yozuv va javoblar bo'yicha endi bildirishnoma keladi",
+      ],
+    },
+    {
       version: '0.3.2',
       items: [
         "\"Klientlar\" sahifasidagi \"Manba\" filtri endi faqat administratorga ko'rinadi — boshqa xodimlarda filtrsiz ro'yxat, lekin jadvaldagi \"hamkordan\" belgisi hammaga avvalgidek ko'rinadi",
@@ -971,6 +993,17 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.4.0',
+      items: [
+        'Ҳамкор панели тўлиқ иш майдонига айланди — IB Chat, билдиришномалар (қўнғироқча ва чиқувчи баннер — ходимлардагидек) ва созламалар билан янги шапка қўшилди',
+        'IB Chatда энди ҳамкор панелидан тўғридан-тўғри администратор билан ёзишиш мумкин',
+        'Ҳамкор учун янги "Созламалар" бўлими — кўриниш мавзуси, тил, паролни алмаштириш, маълумотларни ўзгартириш сўрови, профил сурати ва Radmin VPN орқали уланиш учун маълумотлар (фақат кўриш, админ ўзгартирса автоматик янгиланади)',
+        'Ҳамкор учун янги "Ходимлар" бўлими — ўша ташкилотнинг бошқа ходимлари ва CRM администратори кўринади',
+        'Янги "Хизматлар" бўлими — ҳамкор (ва админ, унинг иш майдонида) нархи ва мукофот фоизи билан хизматлар каталогини юритади; мижоз яратишда "Қиймати" майдони шу каталогдан хизмат танлаш билан алмаштирилади',
+        'Ҳамкор регламентларида "Ёрдамчи" майдони пайдо бўлди — ҳамкор масъул администраторни, админ эса ҳамкорнинг аниқ ходимини белгилайди; янги ёзув ва жавоблар бўйича энди билдиришнома келади',
+      ],
+    },
     {
       version: '0.3.2',
       items: [

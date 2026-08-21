@@ -329,6 +329,7 @@ export default function PartnerRegulations({
 
   const [regulations, setRegulations] = useState<PartnerRegulation[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [assistantOptions, setAssistantOptions] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
@@ -342,6 +343,7 @@ export default function PartnerRegulations({
   const [formDesc, setFormDesc] = useState('');
   const [formClientId, setFormClientId] = useState('');
   const [formDeadline, setFormDeadline] = useState('');
+  const [formAssistantId, setFormAssistantId] = useState('');
   const [formBusy, setFormBusy] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -375,6 +377,17 @@ export default function PartnerRegulations({
   }, [partnerId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Помощник по регламенту (v0.4.0) — партнёр выбирает конкретного админа,
+  // админ (создающий из AdminPartnerWorkspace) — конкретного сотрудника
+  // именно этого партнёра.
+  useEffect(() => {
+    if (currentEmployee.isPartner) {
+      api.listAdminEmployees().then(setAssistantOptions).catch(() => setAssistantOptions([]));
+    } else {
+      api.listPartnerOrgEmployees({ actorId: currentEmployee.id, partnerId }).then(setAssistantOptions).catch(() => setAssistantOptions([]));
+    }
+  }, [currentEmployee.isPartner, currentEmployee.id, partnerId]);
 
   useEffect(() => {
     if (selected) enterFullscreen(); else exitFullscreen();
@@ -419,7 +432,7 @@ export default function PartnerRegulations({
 
   const openCreate = () => {
     setEditingReg(undefined);
-    setFormTitle(''); setFormDesc(''); setFormClientId(''); setFormDeadline(''); setFormError('');
+    setFormTitle(''); setFormDesc(''); setFormClientId(''); setFormDeadline(''); setFormAssistantId(''); setFormError('');
     setFormOpen(true);
   };
   const openEdit = () => {
@@ -427,6 +440,7 @@ export default function PartnerRegulations({
     setEditingReg(selected);
     setFormTitle(selected.title); setFormDesc(selected.description ?? '');
     setFormClientId(selected.clientId ?? ''); setFormDeadline(selected.deadline ?? '');
+    setFormAssistantId(selected.assistantId ?? '');
     setFormError('');
     setFormOpen(true);
   };
@@ -437,10 +451,10 @@ export default function PartnerRegulations({
     setFormBusy(true);
     try {
       if (editingReg) {
-        await api.updatePartnerRegulation({ actorId: currentEmployee.id, id: editingReg.id, title: formTitle.trim(), description: formDesc.trim() || null, clientId: formClientId || null, deadline: formDeadline || null, status: editingReg.status });
+        await api.updatePartnerRegulation({ actorId: currentEmployee.id, id: editingReg.id, title: formTitle.trim(), description: formDesc.trim() || null, clientId: formClientId || null, deadline: formDeadline || null, status: editingReg.status, assistantId: formAssistantId || null });
         showToast('success', t('partnerRegulations.updated'));
       } else {
-        await api.createPartnerRegulation({ actorId: currentEmployee.id, partnerId, title: formTitle.trim(), description: formDesc.trim() || null, clientId: formClientId || null, deadline: formDeadline || null });
+        await api.createPartnerRegulation({ actorId: currentEmployee.id, partnerId, title: formTitle.trim(), description: formDesc.trim() || null, clientId: formClientId || null, deadline: formDeadline || null, assistantId: formAssistantId || null });
         showToast('success', t('partnerRegulations.added'));
       }
       setFormOpen(false);
@@ -456,7 +470,7 @@ export default function PartnerRegulations({
     if (!selected || !canManage) return;
     const newStatus: PartnerRegulationStatus = selected.status === 'active' ? 'closed' : 'active';
     try {
-      await api.updatePartnerRegulation({ actorId: currentEmployee.id, id: selected.id, title: selected.title, description: selected.description, clientId: selected.clientId, deadline: selected.deadline, status: newStatus });
+      await api.updatePartnerRegulation({ actorId: currentEmployee.id, id: selected.id, title: selected.title, description: selected.description, clientId: selected.clientId, deadline: selected.deadline, status: newStatus, assistantId: selected.assistantId });
       showToast('success', newStatus === 'closed' ? t('partnerRegulations.closedSuccess') : t('partnerRegulations.reopenedSuccess'));
       load();
     } catch (err: any) {
@@ -526,6 +540,7 @@ export default function PartnerRegulations({
   };
 
   const clientOptions = [{ value: '', label: t('employees.notSelected') }, ...clients.map((c) => ({ value: c.id, label: c.name }))];
+  const assistantSelectOptions = [{ value: '', label: t('employees.notSelected') }, ...assistantOptions.map((e) => ({ value: e.id, label: e.fullName || e.login }))];
 
   if (selected) {
     return (
@@ -576,6 +591,12 @@ export default function PartnerRegulations({
                   <div className="employee-card-row">
                     <span className="settings-hint">{t('regulations.deadlineLabel')}</span>
                     <span>{selected.deadline}</span>
+                  </div>
+                )}
+                {selected.assistantName && (
+                  <div className="employee-card-row">
+                    <span className="settings-hint">{t('partnerRegulations.assistantLabel')}</span>
+                    <span>{selected.assistantName}</span>
                   </div>
                 )}
               </div>
@@ -660,6 +681,7 @@ export default function PartnerRegulations({
           <div className="field"><label>{t('partnerRegulations.descriptionLabel')}</label><textarea rows={3} value={formDesc} onChange={(e) => setFormDesc(e.target.value)} /></div>
           <div className="field"><label>{t('partnerRegulations.clientLabel')}</label><Select value={formClientId} options={clientOptions} onChange={setFormClientId} /></div>
           <div className="field"><label>{t('partnerRegulations.deadlineLabel')}</label><input type="date" value={formDeadline} onChange={(e) => setFormDeadline(e.target.value)} /></div>
+          <div className="field"><label>{t('partnerRegulations.assistantLabel')}</label><Select value={formAssistantId} options={assistantSelectOptions} onChange={setFormAssistantId} /></div>
         </Modal>
 
         <Modal open={deleteConfirmOpen} title={t('partnerRegulations.deleteConfirmTitle')} onClose={() => setDeleteConfirmOpen(false)}
@@ -697,6 +719,7 @@ export default function PartnerRegulations({
               <th>{t('partnerRegulations.colId')}</th>
               <th>{t('partnerRegulations.colName')}</th>
               <th>{t('partnerRegulations.colClient')}</th>
+              <th>{t('partnerRegulations.colAssistant')}</th>
               <th>{t('partnerRegulations.colStatus')}</th>
               <th>{t('partnerRegulations.colEntries')}</th>
             </tr>
@@ -707,6 +730,7 @@ export default function PartnerRegulations({
                 <td>{r.regNumber}</td>
                 <td><FileText size={13} style={{ marginRight: 6, opacity: 0.5 }} />{r.title}</td>
                 <td>{r.clientName || '—'}</td>
+                <td>{r.assistantName || '—'}</td>
                 <td><span className={`absence-status reg-status-${r.status}`}>{t(r.status === 'active' ? 'partnerRegulations.statusActive' : 'partnerRegulations.statusClosed')}</span></td>
                 <td>{r.entryCount}</td>
               </tr>
@@ -726,6 +750,7 @@ export default function PartnerRegulations({
         <div className="field"><label>{t('partnerRegulations.descriptionLabel')}</label><textarea rows={3} value={formDesc} onChange={(e) => setFormDesc(e.target.value)} /></div>
         <div className="field"><label>{t('partnerRegulations.clientLabel')}</label><Select value={formClientId} options={clientOptions} onChange={setFormClientId} /></div>
         <div className="field"><label>{t('partnerRegulations.deadlineLabel')}</label><input type="date" value={formDeadline} onChange={(e) => setFormDeadline(e.target.value)} /></div>
+        <div className="field"><label>{t('partnerRegulations.assistantLabel')}</label><Select value={formAssistantId} options={assistantSelectOptions} onChange={setFormAssistantId} /></div>
       </Modal>
     </div>
   );

@@ -1,73 +1,40 @@
-import { useState, FormEvent } from 'react';
+import { useEffect, useState } from 'react';
+import { Contact, FileText } from 'lucide-react';
 import { api, type Employee } from '../lib/api';
 import { useLocale } from '../lib/i18n';
-import { useToast } from '../lib/toast';
 
-export default function PartnerHome({ employee }: { employee: Employee }) {
+// Главная страница панели партнёра (v0.4.0) — лёгкое приветствие с базовыми
+// счётчиками; смена пароля переехала в Настройки (PartnerSettings.tsx),
+// доступные теперь через иконку в топбаре, как и у сотрудников.
+export default function PartnerHome({ employee, partnerId }: { employee: Employee; partnerId: string }) {
   const { t } = useLocale();
-  const { showToast } = useToast();
+  const [clientCount, setClientCount] = useState<number | null>(null);
+  const [openRegCount, setOpenRegCount] = useState<number | null>(null);
 
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  const handleChangePassword = async (e: FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    if (newPassword.length < 6) {
-      setError(t('settings.errorShort'));
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setError(t('settings.errorMismatch'));
-      return;
-    }
-
-    setBusy(true);
-    try {
-      await api.changePassword({ employeeId: employee.id, currentPassword, newPassword });
-      showToast('success', t('settings.success'));
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-    } catch (err: any) {
-      setError(typeof err === 'string' ? err : t('settings.errorGeneric'));
-    } finally {
-      setBusy(false);
-    }
-  };
+  useEffect(() => {
+    api.listClients({ actorId: employee.id, partnerId }).then((list) => setClientCount(list.length)).catch(() => {});
+    api.listPartnerRegulations({ actorId: employee.id, partnerId })
+      .then((list) => setOpenRegCount(list.filter((r) => r.status === 'active').length))
+      .catch(() => {});
+  }, [employee.id, partnerId]);
 
   return (
     <div className="settings-page">
       <h1>{t('partnerPanel.title', { name: employee.fullName || employee.login })}</h1>
       <p className="settings-hint">{t('partnerPanel.homeSubtitle')}</p>
 
-      <section className="settings-section">
-        <h2>{t('settings.passwordSection')}</h2>
-        <form className="password-form" onSubmit={handleChangePassword}>
-          {error && <div className="error-text">{error}</div>}
-
-          <div className="field">
-            <label>{t('settings.currentPassword')}</label>
-            <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
-          </div>
-          <div className="field">
-            <label>{t('settings.newPassword')}</label>
-            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
-          </div>
-          <div className="field">
-            <label>{t('settings.confirmPassword')}</label>
-            <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
-          </div>
-
-          <button className="primary" type="submit" disabled={busy} style={{ width: 220 }}>
-            {busy ? t('settings.changePasswordBusy') : t('settings.changePasswordBtn')}
-          </button>
-        </form>
-      </section>
+      <div className="home-stats-row">
+        <div className="home-stat-tile">
+          <Contact size={20} className="home-stat-icon" />
+          <div className="home-stat-value">{clientCount ?? '—'}</div>
+          <div className="home-stat-label">{t('sidebar.clients')}</div>
+        </div>
+        <div className="home-stat-tile">
+          <FileText size={20} className="home-stat-icon" />
+          <div className="home-stat-value">{openRegCount ?? '—'}</div>
+          <div className="home-stat-label">{t('partnerPanel.openRegulationsLabel')}</div>
+        </div>
+      </div>
     </div>
   );
 }

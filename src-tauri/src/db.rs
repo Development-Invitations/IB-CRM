@@ -5259,6 +5259,65 @@ impl Db {
         }
         Ok(self.get_app_logo())
     }
+
+    // ---- Telegram-боты (v0.4.1, только описание/подключение — сама
+    // отправка/приём сообщений не реализована в этой версии) ----
+    // Три независимых бота (свой токен у каждого — решение пользователя):
+    // 1) "admin_task" — уведомляет сотрудника в Telegram, когда админ
+    //    назначает ему задачу (запись в регламенте).
+    // 2) "task_close" — позволяет сотруднику закрыть свою задачу прямо из
+    //    Telegram, не заходя в CRM с компьютера.
+    // 3) "admin_partner" — по кнопке у админа отправляет партнёру в Telegram
+    //    уведомление о новом клиенте/регламенте.
+    // Токены — секрет админа, в отличие от Radmin-данных читать может только
+    // админ (не открыто всем, как get_radmin_settings). Тот же app_meta
+    // key/value паттерн, что у Radmin/логотипа.
+    pub fn get_telegram_bot_settings(&self, actor_id: &str) -> Result<TelegramBotSettingsRecord, String> {
+        if !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        let get = |key: &str| -> Option<String> {
+            self.conn.query_row("SELECT value FROM app_meta WHERE key = ?1", params![key], |row| row.get(0)).ok()
+        };
+        let flag = |key: &str| get(key).as_deref() == Some("1");
+        Ok(TelegramBotSettingsRecord {
+            admin_task_enabled: flag("tg_admin_task_enabled"),
+            admin_task_token: get("tg_admin_task_token"),
+            task_close_enabled: flag("tg_task_close_enabled"),
+            task_close_token: get("tg_task_close_token"),
+            admin_partner_enabled: flag("tg_admin_partner_enabled"),
+            admin_partner_token: get("tg_admin_partner_token"),
+        })
+    }
+
+    pub fn set_telegram_bot_settings(
+        &self,
+        admin_id: &str,
+        admin_task_enabled: bool,
+        admin_task_token: Option<&str>,
+        task_close_enabled: bool,
+        task_close_token: Option<&str>,
+        admin_partner_enabled: bool,
+        admin_partner_token: Option<&str>,
+    ) -> Result<TelegramBotSettingsRecord, String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        let set = |key: &str, value: &str| {
+            self.conn.execute(
+                "INSERT INTO app_meta (key, value) VALUES (?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params![key, value],
+            )
+        };
+        set("tg_admin_task_enabled", if admin_task_enabled { "1" } else { "0" }).map_err(|e| e.to_string())?;
+        set("tg_admin_task_token", admin_task_token.unwrap_or("")).map_err(|e| e.to_string())?;
+        set("tg_task_close_enabled", if task_close_enabled { "1" } else { "0" }).map_err(|e| e.to_string())?;
+        set("tg_task_close_token", task_close_token.unwrap_or("")).map_err(|e| e.to_string())?;
+        set("tg_admin_partner_enabled", if admin_partner_enabled { "1" } else { "0" }).map_err(|e| e.to_string())?;
+        set("tg_admin_partner_token", admin_partner_token.unwrap_or("")).map_err(|e| e.to_string())?;
+        self.get_telegram_bot_settings(admin_id)
+    }
 }
 
 pub struct ServerSettingsRecord {
@@ -5270,5 +5329,14 @@ pub struct RadminSettingsRecord {
     pub network_id: String,
     pub network_password: String,
     pub note: String,
+}
+
+pub struct TelegramBotSettingsRecord {
+    pub admin_task_enabled: bool,
+    pub admin_task_token: Option<String>,
+    pub task_close_enabled: bool,
+    pub task_close_token: Option<String>,
+    pub admin_partner_enabled: bool,
+    pub admin_partner_token: Option<String>,
 }
 

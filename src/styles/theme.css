@@ -849,6 +849,19 @@ button.primary:hover { filter: brightness(0.95); }
   margin: 8px 0 0;
 }
 
+.telegram-bot-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-top: 12px;
+  background: var(--color-surface-2);
+}
+
+.telegram-bot-card-head {
+  display: flex;
+  align-items: center;
+}
+
 .settings-subheading {
   font-size: 13px;
   font-weight: 600;
@@ -2575,6 +2588,18 @@ button.employees-add-btn {
   position: relative;
   margin-bottom: 16px;
   max-width: 380px;
+}
+
+/* Клиенты: строка поиска + фильтр "Источник" рядом — вынесены в отдельный
+   flex-контейнер, а не оба внутри .employees-search-row, иначе иконка поиска
+   (position:absolute, top:50% от родителя) центрируется по высоте ДВУХ
+   строк, если фильтр переносится ниже поля поиска на узком окне. */
+.clients-search-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
 }
 
 .employees-search-icon {

@@ -587,6 +587,22 @@ struct RadminSettings {
 }
 
 #[derive(Clone, serde::Serialize)]
+struct TelegramBotSettings {
+    #[serde(rename = "adminTaskEnabled")]
+    admin_task_enabled: bool,
+    #[serde(rename = "adminTaskToken")]
+    admin_task_token: Option<String>,
+    #[serde(rename = "taskCloseEnabled")]
+    task_close_enabled: bool,
+    #[serde(rename = "taskCloseToken")]
+    task_close_token: Option<String>,
+    #[serde(rename = "adminPartnerEnabled")]
+    admin_partner_enabled: bool,
+    #[serde(rename = "adminPartnerToken")]
+    admin_partner_token: Option<String>,
+}
+
+#[derive(Clone, serde::Serialize)]
 struct BlogTopic {
     id: String,
     category: String,
@@ -1604,6 +1620,30 @@ struct SetRadminSettingsPayload {
 }
 
 #[derive(serde::Deserialize)]
+struct GetTelegramBotSettingsPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct SetTelegramBotSettingsPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    #[serde(rename = "adminTaskEnabled")]
+    admin_task_enabled: bool,
+    #[serde(rename = "adminTaskToken")]
+    admin_task_token: Option<String>,
+    #[serde(rename = "taskCloseEnabled")]
+    task_close_enabled: bool,
+    #[serde(rename = "taskCloseToken")]
+    task_close_token: Option<String>,
+    #[serde(rename = "adminPartnerEnabled")]
+    admin_partner_enabled: bool,
+    #[serde(rename = "adminPartnerToken")]
+    admin_partner_token: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
 struct SetAppLogoPayload {
     #[serde(rename = "adminId")]
     admin_id: String,
@@ -2101,6 +2141,17 @@ fn to_radmin_settings(r: db::RadminSettingsRecord) -> RadminSettings {
         network_id: r.network_id,
         network_password: r.network_password,
         note: r.note,
+    }
+}
+
+fn to_telegram_bot_settings(s: db::TelegramBotSettingsRecord) -> TelegramBotSettings {
+    TelegramBotSettings {
+        admin_task_enabled: s.admin_task_enabled,
+        admin_task_token: s.admin_task_token,
+        task_close_enabled: s.task_close_enabled,
+        task_close_token: s.task_close_token,
+        admin_partner_enabled: s.admin_partner_enabled,
+        admin_partner_token: s.admin_partner_token,
     }
 }
 
@@ -3078,6 +3129,26 @@ fn set_radmin_settings(payload: SetRadminSettingsPayload, state: tauri::State<Ap
         .map(to_radmin_settings)
 }
 
+#[tauri::command]
+fn get_telegram_bot_settings(payload: GetTelegramBotSettingsPayload, state: tauri::State<AppState>) -> Result<TelegramBotSettings, String> {
+    let db = state.0.lock().unwrap();
+    db.get_telegram_bot_settings(&payload.actor_id).map(to_telegram_bot_settings)
+}
+
+#[tauri::command]
+fn set_telegram_bot_settings(payload: SetTelegramBotSettingsPayload, state: tauri::State<AppState>) -> Result<TelegramBotSettings, String> {
+    let db = state.0.lock().unwrap();
+    db.set_telegram_bot_settings(
+        &payload.admin_id,
+        payload.admin_task_enabled,
+        payload.admin_task_token.as_deref(),
+        payload.task_close_enabled,
+        payload.task_close_token.as_deref(),
+        payload.admin_partner_enabled,
+        payload.admin_partner_token.as_deref(),
+    ).map(to_telegram_bot_settings)
+}
+
 // Без авторизации — логотип нужен уже на экране входа/первого запуска, до
 // того, как известен actor_id.
 #[tauri::command]
@@ -3416,6 +3487,8 @@ fn main() {
             set_server_settings,
             get_radmin_settings,
             set_radmin_settings,
+            get_telegram_bot_settings,
+            set_telegram_bot_settings,
             get_app_logo,
             set_app_logo,
             export_backup,

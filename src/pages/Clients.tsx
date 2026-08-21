@@ -160,9 +160,11 @@ export default function Clients({
         </button>
       </div>
 
-      <div className="employees-search-row">
-        <Search size={15} className="employees-search-icon" />
-        <input className="employees-search-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('clients.searchPlaceholder')} />
+      <div className="clients-search-filter-row">
+        <div className="employees-search-row" style={{ marginBottom: 0 }}>
+          <Search size={15} className="employees-search-icon" />
+          <input className="employees-search-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('clients.searchPlaceholder')} />
+        </div>
         {scopedPartnerId === undefined && currentEmployee.isAdmin && partners.length > 0 && (
           <Select
             value={originFilter}

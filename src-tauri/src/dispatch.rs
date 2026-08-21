@@ -625,6 +625,22 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
                 .map(crate::to_radmin_settings)
                 .map(to_json)
         }
+        "get_telegram_bot_settings" => {
+            let p: crate::GetTelegramBotSettingsPayload = from_payload(payload)?;
+            db.get_telegram_bot_settings(&p.actor_id).map(crate::to_telegram_bot_settings).map(to_json)
+        }
+        "set_telegram_bot_settings" => {
+            let p: crate::SetTelegramBotSettingsPayload = from_payload(payload)?;
+            db.set_telegram_bot_settings(
+                &p.admin_id,
+                p.admin_task_enabled,
+                p.admin_task_token.as_deref(),
+                p.task_close_enabled,
+                p.task_close_token.as_deref(),
+                p.admin_partner_enabled,
+                p.admin_partner_token.as_deref(),
+            ).map(crate::to_telegram_bot_settings).map(to_json)
+        }
         "get_app_logo" => Ok(to_json(db.get_app_logo())),
         "set_app_logo" => {
             let p: crate::SetAppLogoPayload = from_payload(payload)?;

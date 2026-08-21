@@ -486,6 +486,15 @@ export type RadminSettings = {
   note: string;
 };
 
+export type TelegramBotSettings = {
+  adminTaskEnabled: boolean;
+  adminTaskToken: string | null;
+  taskCloseEnabled: boolean;
+  taskCloseToken: string | null;
+  adminPartnerEnabled: boolean;
+  adminPartnerToken: string | null;
+};
+
 export type UpdateInstallerInfo = {
   available: boolean;
   sizeBytes: number;
@@ -923,6 +932,16 @@ export const api = {
   getRadminSettings: () => invoke<RadminSettings>('get_radmin_settings'),
   setRadminSettings: (payload: { adminId: string; networkId: string; networkPassword: string; note: string }) =>
     invoke<RadminSettings>('set_radmin_settings', { payload }),
+  getTelegramBotSettings: (payload: { actorId: string }) => invoke<TelegramBotSettings>('get_telegram_bot_settings', { payload }),
+  setTelegramBotSettings: (payload: {
+    adminId: string;
+    adminTaskEnabled: boolean;
+    adminTaskToken?: string | null;
+    taskCloseEnabled: boolean;
+    taskCloseToken?: string | null;
+    adminPartnerEnabled: boolean;
+    adminPartnerToken?: string | null;
+  }) => invoke<TelegramBotSettings>('set_telegram_bot_settings', { payload }),
   getAppLogo: () => invoke<string | null>('get_app_logo'),
   setAppLogo: (payload: { adminId: string; logoData: string | null }) =>
     invoke<string | null>('set_app_logo', { payload }),

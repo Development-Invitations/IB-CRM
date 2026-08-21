@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.4.0';
+export const APP_VERSION = '0.4.1';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,13 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.4.1',
+      items: [
+        'Исправлено отображение фильтра «Источник» на странице Клиенты — иконка поиска съезжала при переносе фильтра на новую строку',
+        'В Настройках у админа появился раздел «Telegram-боты» — описание трёх ботов (задачи от админа, закрытие задач сотрудником удалённо, уведомления партнёрам) и подключение токена; сама отправка сообщений появится в следующем обновлении',
+      ],
+    },
     {
       version: '0.4.0',
       items: [
@@ -505,6 +512,13 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.4.1',
+      items: [
+        "Klientlar sahifasidagi \"Manba\" filtri ko'rinishi tuzatildi — filtr yangi qatorga o'tganda qidiruv belgisi joyidan siljib qolardi",
+        "Sozlamalarda admin uchun \"Telegram-botlar\" bo'limi paydo bo'ldi — uchta bot tavsifi (admindan vazifa, xodim tomonidan vazifani masofadan yopish, hamkorlarga bildirishnoma) va token ulash; xabar yuborishning o'zi keyingi yangilanishda paydo bo'ladi",
+      ],
+    },
+    {
       version: '0.4.0',
       items: [
         "Hamkor paneli to'liq ish maydoniga aylandi — IB Chat, bildirishnomalar (qo'ng'iroqcha va chiquvchi banner — xodimlardagidek) va sozlamalar bilan yangi shapka qo'shildi",
@@ -993,6 +1007,13 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.4.1',
+      items: [
+        'Клиентлар саҳифасидаги "Манба" фильтри кўриниши тузатилди — фильтр янги қаторга ўтганда қидирув белгиси жойидан силжиб қоларди',
+        'Созламаларда админ учун "Telegram-ботлар" бўлими пайдо бўлди — учта бот тавсифи (админдан вазифа, ходим томонидан вазифани масофадан ёпиш, ҳамкорларга билдиришнома) ва токен улаш; хабар юборишнинг ўзи кейинги янгиланишда пайдо бўлади',
+      ],
+    },
     {
       version: '0.4.0',
       items: [

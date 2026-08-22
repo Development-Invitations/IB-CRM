@@ -496,6 +496,12 @@ export type TelegramBotSettings = {
   adminPartnerToken: string | null;
 };
 
+export type TelegramLinkInfo = {
+  code: string;
+  deepLink: string | null;
+  botConfigured: boolean;
+};
+
 export type EmployeeReportRow = {
   employeeId: string;
   fullName: string;
@@ -973,6 +979,14 @@ export const api = {
     adminPartnerEnabled: boolean;
     adminPartnerToken?: string | null;
   }) => invoke<TelegramBotSettings>('set_telegram_bot_settings', { payload }),
+  generateTelegramLinkCode: (payload: { actorId: string; employeeId: string }) =>
+    invoke<TelegramLinkInfo>('generate_telegram_link_code', { payload }),
+  getTelegramLinkStatus: (payload: { actorId: string; employeeId: string }) =>
+    invoke<boolean>('get_telegram_link_status', { payload }),
+  unlinkTelegram: (payload: { actorId: string; employeeId: string }) =>
+    invoke<void>('unlink_telegram', { payload }),
+  sendPartnerTelegramNotification: (payload: { actorId: string; partnerId: string; title: string; body: string }) =>
+    invoke<void>('send_partner_telegram_notification', { payload }),
 
   getEmployeeReport: (payload: { adminId: string; periodStart: string; periodEnd: string }) =>
     invoke<EmployeeReportRow[]>('get_employee_report', { payload }),

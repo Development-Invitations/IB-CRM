@@ -843,6 +843,13 @@ impl Db {
         add_column_if_missing(&conn, "employees", "is_partner INTEGER NOT NULL DEFAULT 0");
         add_column_if_missing(&conn, "employees", "partner_id TEXT REFERENCES partners(id)");
 
+        // Привязка Telegram-аккаунта (v0.5.3) — одна строка employees = один
+        // логин (штатный или партнёрский), значит один Telegram-чат и один
+        // активный одноразовый код одновременно; отдельная таблица не нужна.
+        add_column_if_missing(&conn, "employees", "telegram_chat_id TEXT");
+        add_column_if_missing(&conn, "employees", "telegram_link_code TEXT");
+        add_column_if_missing(&conn, "employees", "telegram_link_code_expires_at TEXT");
+
         // Чат — "channel" хранит либо литерал 'general' (общий чат всех не-партнёров),
         // либо id из таблицы partners (приватный тред с этим партнёром, доступен только
         // админам и аккаунтам этого партнёра — см. Db::can_access_chat_channel). Ответ на
@@ -1353,6 +1360,11 @@ impl Db {
         })
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
         .unwrap_or_default()
+    }
+
+    // Для Telegram-уведомления партнёру (v0.5.3) — только имя, без полного PartnerRecord.
+    pub fn get_partner_name(&self, partner_id: &str) -> Option<String> {
+        self.conn.query_row("SELECT name FROM partners WHERE id = ?1", params![partner_id], |row| row.get(0)).ok()
     }
 
     pub fn create_partner(&self, admin_id: &str, name: &str) -> Result<PartnerRecord, String> {
@@ -2241,6 +2253,22 @@ impl Db {
         for id in ids {
             self.notify(&id, notification_type, title, body, related_type, related_id);
         }
+    }
+
+    // Вызывается из telegram.rs (не может видеть приватный notify_all_admins
+    // напрямую — другой модуль) при неудачной отправке sendMessage, обычно
+    // означает, что человек ни разу не писал этому боту /start. Best-effort,
+    // как и остальные notify*.
+    pub fn notify_telegram_send_failed(&self, target_name: &str) {
+        self.notify_all_admins(
+            "telegram_send_failed",
+            "Не удалось отправить уведомление в Telegram",
+            Some(&format!(
+                "«{target_name}» — сообщение не доставлено. Возможно, аккаунт нужно привязать заново (написать боту /start в Telegram).",
+            )),
+            None,
+            None,
+        );
     }
 
     pub fn list_notifications(&self, employee_id: &str) -> Vec<NotificationRecord> {
@@ -3525,6 +3553,12 @@ impl Db {
         Ok(())
     }
 
+    // Для Telegram-уведомления (v0.5.3) — см. get_regulation_entry, тот же приём.
+    pub fn get_project_chat_message(&self, message_id: &str) -> Option<ProjectChatMessageRecord> {
+        let project_id: String = self.conn.query_row("SELECT project_id FROM project_chat_messages WHERE id = ?1", params![message_id], |row| row.get(0)).ok()?;
+        self.list_project_chat(&project_id).into_iter().find(|m| m.id == message_id)
+    }
+
     pub fn assign_project_chat_message(&self, actor_id: &str, message_id: &str, target_employee_id: &str, deadline: Option<&str>) -> Result<(), String> {
         let (project_id, sender_id): (String, String) = self.conn
             .query_row("SELECT project_id, sender_id FROM project_chat_messages WHERE id = ?1", params![message_id], |row| Ok((row.get(0)?, row.get(1)?)))
@@ -3563,7 +3597,9 @@ impl Db {
             )
             .map_err(|_| "Сообщение не найдено".to_string())?;
         let project = self.get_project(&project_id).ok_or_else(|| "Проект не найден".to_string())?;
-        if !self.can_manage_project(actor_id, &project.owner_id) && sender_id != actor_id {
+        // Исполнитель (target_employee_id) тоже может закрыть СВОЮ задачу
+        // (v0.5.3) — см. тот же комментарий в update_entry_status.
+        if !self.can_manage_project(actor_id, &project.owner_id) && sender_id != actor_id && target_employee_id != actor_id {
             return Err("Недостаточно прав".into());
         }
         // Задачу, порученную коллеге (target_employee_id != sender_id), после
@@ -4173,6 +4209,13 @@ impl Db {
         Ok(())
     }
 
+    // Для Telegram-уведомления (v0.5.3) — после assign_regulation_entry
+    // (который сам ничего не возвращает) main.rs дозапрашивает запись целиком.
+    pub fn get_regulation_entry(&self, entry_id: &str) -> Option<RegulationEntryRecord> {
+        let regulation_id: String = self.conn.query_row("SELECT regulation_id FROM regulation_entries WHERE id = ?1", params![entry_id], |row| row.get(0)).ok()?;
+        self.list_regulation_entries(&regulation_id).into_iter().find(|e| e.id == entry_id)
+    }
+
     pub fn assign_regulation_entry(&self, actor_id: &str, entry_id: &str, target_employee_id: &str, deadline: Option<&str>) -> Result<(), String> {
         let (regulation_id, author_id): (String, String) = self.conn
             .query_row("SELECT regulation_id, author_id FROM regulation_entries WHERE id = ?1", params![entry_id], |row| Ok((row.get(0)?, row.get(1)?)))
@@ -4211,7 +4254,11 @@ impl Db {
             )
             .map_err(|_| "Запись не найдена".to_string())?;
         let reg = self.get_regulation(&regulation_id).ok_or_else(|| "Регламент не найден".to_string())?;
-        if !self.is_admin(actor_id) && reg.owner_id != actor_id && author_id != actor_id {
+        // Исполнитель (target_employee_id) тоже может закрыть СВОЮ задачу
+        // (v0.5.3, для кнопки «Готово» в Telegram-боте «Сотрудник → Закрыть
+        // задачу») — раньше это мог только admin/владелец регламента/автор
+        // записи (обычно постановщик, не исполнитель).
+        if !self.is_admin(actor_id) && reg.owner_id != actor_id && author_id != actor_id && target_employee_id != actor_id {
             return Err("Недостаточно прав".into());
         }
         // Задачу, порученную коллеге (target_employee_id != author_id), после
@@ -5336,6 +5383,131 @@ impl Db {
         set("tg_admin_partner_enabled", if admin_partner_enabled { "1" } else { "0" }).map_err(|e| e.to_string())?;
         set("tg_admin_partner_token", admin_partner_token.unwrap_or("")).map_err(|e| e.to_string())?;
         self.get_telegram_bot_settings(admin_id)
+    }
+
+    // Без actor-гейта — читается фоновым polling-циклом и хук-поинтами
+    // отправки в main.rs (v0.5.3), у которых нет "админа-актора" в контексте
+    // (фоновый поток, не запрос от конкретного пользователя). Тот же
+    // паттерн, что read_report_export_settings() у отчётов.
+    pub fn get_telegram_bot_settings_internal(&self) -> TelegramBotSettingsRecord {
+        let get = |key: &str| -> Option<String> {
+            self.conn.query_row("SELECT value FROM app_meta WHERE key = ?1", params![key], |row| row.get(0)).ok()
+        };
+        let flag = |key: &str| get(key).as_deref() == Some("1");
+        TelegramBotSettingsRecord {
+            admin_task_enabled: flag("tg_admin_task_enabled"),
+            admin_task_token: get("tg_admin_task_token").filter(|v| !v.is_empty()),
+            task_close_enabled: flag("tg_task_close_enabled"),
+            task_close_token: get("tg_task_close_token").filter(|v| !v.is_empty()),
+            admin_partner_enabled: flag("tg_admin_partner_enabled"),
+            admin_partner_token: get("tg_admin_partner_token").filter(|v| !v.is_empty()),
+        }
+    }
+
+    // ---- Telegram: курсор getUpdates и кэш username бота, по роли
+    // ("admin_task"/"task_close"/"admin_partner") — app_meta, тот же
+    // key/value паттерн, что у остальных настроек в этом файле.
+    pub fn get_telegram_update_offset(&self, role: &str) -> i64 {
+        self.conn
+            .query_row("SELECT value FROM app_meta WHERE key = ?1", params![format!("tg_{role}_update_offset")], |row| row.get::<_, String>(0))
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0)
+    }
+
+    pub fn set_telegram_update_offset(&self, role: &str, offset: i64) {
+        let _ = self.conn.execute(
+            "INSERT INTO app_meta (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![format!("tg_{role}_update_offset"), offset.to_string()],
+        );
+    }
+
+    pub fn get_telegram_bot_username(&self, role: &str) -> Option<String> {
+        self.conn.query_row("SELECT value FROM app_meta WHERE key = ?1", params![format!("tg_{role}_bot_username")], |row| row.get(0)).ok()
+    }
+
+    pub fn set_telegram_bot_username(&self, role: &str, username: &str) {
+        let _ = self.conn.execute(
+            "INSERT INTO app_meta (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![format!("tg_{role}_bot_username"), username],
+        );
+    }
+
+    // ---- Telegram: привязка личного чата по одноразовому коду (v0.5.3) ----
+    // Код действует 15 минут, одноразовый (стирается сразу после успешной
+    // привязки), хранится прямо на строке employees — см. комментарий у
+    // add_column_if_missing выше.
+    pub fn generate_telegram_link_code(&self, actor_id: &str, employee_id: &str) -> Result<String, String> {
+        if actor_id != employee_id && !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        let code = Uuid::new_v4().to_string().replace('-', "")[..8].to_uppercase();
+        self.conn
+            .execute(
+                "UPDATE employees SET telegram_link_code = ?1, telegram_link_code_expires_at = datetime('now', '+15 minutes') WHERE id = ?2",
+                params![code, employee_id],
+            )
+            .map_err(|e| e.to_string())?;
+        Ok(code)
+    }
+
+    pub fn telegram_link_status(&self, employee_id: &str) -> bool {
+        self.conn
+            .query_row("SELECT telegram_chat_id FROM employees WHERE id = ?1", params![employee_id], |row| row.get::<_, Option<String>>(0))
+            .ok()
+            .flatten()
+            .is_some()
+    }
+
+    pub fn unlink_telegram(&self, actor_id: &str, employee_id: &str) -> Result<(), String> {
+        if actor_id != employee_id && !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn
+            .execute("UPDATE employees SET telegram_chat_id = NULL WHERE id = ?1", params![employee_id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    // Вызывается из telegram.rs при входящем "/start <code>" — возвращает
+    // employee_id при успехе, None если код неверный/просрочен (не 500-я
+    // ошибка — обычный отрицательный исход, бот просто ответит текстом).
+    pub fn link_telegram_chat_by_code(&self, code: &str, chat_id: &str) -> Option<String> {
+        let employee_id: String = self.conn
+            .query_row(
+                "SELECT id FROM employees WHERE telegram_link_code = ?1 AND telegram_link_code_expires_at > datetime('now')",
+                params![code],
+                |row| row.get(0),
+            )
+            .ok()?;
+        self.conn
+            .execute(
+                "UPDATE employees SET telegram_chat_id = ?1, telegram_link_code = NULL, telegram_link_code_expires_at = NULL WHERE id = ?2",
+                params![chat_id, employee_id],
+            )
+            .ok()?;
+        Some(employee_id)
+    }
+
+    pub fn get_employee_telegram_chat_id(&self, employee_id: &str) -> Option<String> {
+        self.conn
+            .query_row("SELECT telegram_chat_id FROM employees WHERE id = ?1", params![employee_id], |row| row.get::<_, Option<String>>(0))
+            .ok()
+            .flatten()
+    }
+
+    pub fn list_partner_telegram_chat_ids(&self, partner_id: &str) -> Vec<String> {
+        let mut stmt = match self.conn.prepare("SELECT telegram_chat_id FROM employees WHERE partner_id = ?1 AND is_partner = 1 AND telegram_chat_id IS NOT NULL") {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map(params![partner_id], |row| row.get::<_, String>(0))
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn find_employee_id_by_chat_id(&self, chat_id: &str) -> Option<String> {
+        self.conn.query_row("SELECT id FROM employees WHERE telegram_chat_id = ?1", params![chat_id], |row| row.get(0)).ok()
     }
 
     // ---- Отчёты (v0.5.0) ----

@@ -5,6 +5,7 @@ mod db;
 mod dispatch;
 mod report_export;
 mod server;
+mod telegram;
 
 use db::Db;
 use std::sync::{Arc, Mutex};
@@ -602,6 +603,15 @@ struct TelegramBotSettings {
     admin_partner_enabled: bool,
     #[serde(rename = "adminPartnerToken")]
     admin_partner_token: Option<String>,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct TelegramLinkInfo {
+    code: String,
+    #[serde(rename = "deepLink")]
+    deep_link: Option<String>,
+    #[serde(rename = "botConfigured")]
+    bot_configured: bool,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -1700,6 +1710,40 @@ struct SetTelegramBotSettingsPayload {
 }
 
 #[derive(serde::Deserialize)]
+struct GenerateTelegramLinkCodePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct GetTelegramLinkStatusPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct UnlinkTelegramPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct SendPartnerTelegramNotificationPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "partnerId")]
+    partner_id: String,
+    title: String,
+    body: String,
+}
+
+#[derive(serde::Deserialize)]
 struct GetEmployeeReportPayload {
     #[serde(rename = "adminId")]
     admin_id: String,
@@ -2751,6 +2795,59 @@ fn transfer_project_ownership(payload: TransferProjectOwnershipPayload, state: t
         .map(to_project)
 }
 
+// ---- Telegram: fire-and-forget уведомление о назначенной задаче (v0.5.3) ----
+// Общий хелпер для 4 хук-поинтов ниже (send_project_chat_message,
+// assign_project_chat_message, add_regulation_entry, assign_regulation_entry).
+// resolve_* лочит db КОРОТКО и синхронно (внутри уже открытого lock-блока
+// команды), собирает всё нужное owned-значениями и возвращает None, если
+// слать некому/нечем (сам себе, бот не настроен, получатель не привязан) —
+// spawn_telegram_task потом безопасно вызывается уже ПОСЛЕ того, как lock
+// на state.0 отпущен (Mutex<Db> нельзя держать через .await). pub(crate) —
+// dispatch.rs зеркалирует эти же 4 команды для HTTP-режима "клиент" и
+// переиспользует эти же функции (crate::resolve_telegram_task_spawn/
+// crate::spawn_telegram_task) вместо дублирования логики.
+pub(crate) struct TelegramTaskSpawn {
+    db: Arc<Mutex<Db>>,
+    client: reqwest::Client,
+    token: String,
+    chat_id: String,
+    employee_name: String,
+    title: String,
+    body: String,
+    deadline: Option<String>,
+    entry_kind: &'static str,
+    entry_id: String,
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn resolve_telegram_task_spawn(
+    db: &Db,
+    state_db: &Arc<Mutex<Db>>,
+    assignee_id: &str,
+    actor_id: &str,
+    title: String,
+    body: String,
+    deadline: Option<String>,
+    entry_kind: &'static str,
+    entry_id: String,
+) -> Option<TelegramTaskSpawn> {
+    if assignee_id == actor_id {
+        return None;
+    }
+    let settings = db.get_telegram_bot_settings_internal();
+    let (_, token) = telegram::effective_task_bot(&settings)?;
+    let chat_id = db.get_employee_telegram_chat_id(assignee_id)?;
+    let employee_name = db.get_employee(assignee_id).map(|e| e.full_name).unwrap_or_default();
+    Some(TelegramTaskSpawn { db: state_db.clone(), client: reqwest::Client::new(), token, chat_id, employee_name, title, body, deadline, entry_kind, entry_id })
+}
+
+pub(crate) fn spawn_telegram_task(spawn: TelegramTaskSpawn) {
+    tauri::async_runtime::spawn(telegram::notify_task_assigned(
+        spawn.db, spawn.client, spawn.token, spawn.chat_id, spawn.employee_name,
+        spawn.title, spawn.body, spawn.deadline, spawn.entry_kind, spawn.entry_id, true,
+    ));
+}
+
 #[tauri::command]
 fn list_project_chat(project_id: String, state: tauri::State<AppState>) -> Vec<ProjectChatMessage> {
     let db = state.0.lock().unwrap();
@@ -2759,9 +2856,21 @@ fn list_project_chat(project_id: String, state: tauri::State<AppState>) -> Vec<P
 
 #[tauri::command]
 fn send_project_chat_message(payload: SendProjectChatMessagePayload, state: tauri::State<AppState>) -> Result<ProjectChatMessage, String> {
-    let db = state.0.lock().unwrap();
-    db.send_project_chat_message(&payload.actor_id, &payload.project_id, &payload.target_employee_id, &payload.content, payload.attachment_data.as_deref(), payload.attachment_name.as_deref(), payload.deadline.as_deref())
-        .map(to_project_chat_message)
+    let (result, spawn) = {
+        let db = state.0.lock().unwrap();
+        let message = db.send_project_chat_message(&payload.actor_id, &payload.project_id, &payload.target_employee_id, &payload.content, payload.attachment_data.as_deref(), payload.attachment_name.as_deref(), payload.deadline.as_deref())?;
+        let project_name = db.get_project(&payload.project_id).map(|p| p.name).unwrap_or_default();
+        let spawn = resolve_telegram_task_spawn(
+            &db, &state.0, &message.target_employee_id, &payload.actor_id,
+            format!("Вам поставили задачу в проекте «{project_name}»"),
+            message.content.clone(), message.deadline.clone(), "proj", message.id.clone(),
+        );
+        (to_project_chat_message(message), spawn)
+    };
+    if let Some(spawn) = spawn {
+        spawn_telegram_task(spawn);
+    }
+    Ok(result)
 }
 
 #[tauri::command]
@@ -2778,8 +2887,22 @@ fn delete_project_chat_message(payload: DeleteProjectChatMessagePayload, state: 
 
 #[tauri::command]
 fn assign_project_chat_message(payload: AssignProjectChatMessagePayload, state: tauri::State<AppState>) -> Result<(), String> {
-    let db = state.0.lock().unwrap();
-    db.assign_project_chat_message(&payload.actor_id, &payload.message_id, &payload.target_employee_id, payload.deadline.as_deref())
+    let spawn = {
+        let db = state.0.lock().unwrap();
+        db.assign_project_chat_message(&payload.actor_id, &payload.message_id, &payload.target_employee_id, payload.deadline.as_deref())?;
+        db.get_project_chat_message(&payload.message_id).and_then(|message| {
+            let project_name = db.get_project(&message.project_id).map(|p| p.name).unwrap_or_default();
+            resolve_telegram_task_spawn(
+                &db, &state.0, &message.target_employee_id, &payload.actor_id,
+                format!("Вам передали задачу в проекте «{project_name}»"),
+                message.content.clone(), message.deadline.clone(), "proj", message.id.clone(),
+            )
+        })
+    };
+    if let Some(spawn) = spawn {
+        spawn_telegram_task(spawn);
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -2883,9 +3006,21 @@ fn list_my_open_project_tasks(employee_id: String, state: tauri::State<AppState>
 
 #[tauri::command]
 fn add_regulation_entry(payload: AddRegulationEntryPayload, state: tauri::State<AppState>) -> Result<RegulationEntry, String> {
-    let db = state.0.lock().unwrap();
-    db.add_regulation_entry(&payload.actor_id, &payload.regulation_id, &payload.target_employee_id, &payload.content, payload.attachment_data.as_deref(), payload.attachment_name.as_deref(), payload.deadline.as_deref())
-        .map(to_reg_entry)
+    let (result, spawn) = {
+        let db = state.0.lock().unwrap();
+        let entry = db.add_regulation_entry(&payload.actor_id, &payload.regulation_id, &payload.target_employee_id, &payload.content, payload.attachment_data.as_deref(), payload.attachment_name.as_deref(), payload.deadline.as_deref())?;
+        let reg_title = db.get_regulation(&payload.regulation_id).map(|r| r.title).unwrap_or_default();
+        let spawn = resolve_telegram_task_spawn(
+            &db, &state.0, &entry.target_employee_id, &payload.actor_id,
+            format!("Вам поставили задачу в регламенте «{reg_title}»"),
+            entry.content.clone(), entry.deadline.clone(), "reg", entry.id.clone(),
+        );
+        (to_reg_entry(entry), spawn)
+    };
+    if let Some(spawn) = spawn {
+        spawn_telegram_task(spawn);
+    }
+    Ok(result)
 }
 
 #[tauri::command]
@@ -2902,8 +3037,22 @@ fn delete_regulation_entry(payload: DeleteRegulationEntryPayload, state: tauri::
 
 #[tauri::command]
 fn assign_regulation_entry(payload: AssignRegulationEntryPayload, state: tauri::State<AppState>) -> Result<(), String> {
-    let db = state.0.lock().unwrap();
-    db.assign_regulation_entry(&payload.actor_id, &payload.entry_id, &payload.target_employee_id, payload.deadline.as_deref())
+    let spawn = {
+        let db = state.0.lock().unwrap();
+        db.assign_regulation_entry(&payload.actor_id, &payload.entry_id, &payload.target_employee_id, payload.deadline.as_deref())?;
+        db.get_regulation_entry(&payload.entry_id).and_then(|entry| {
+            let reg_title = db.get_regulation(&entry.regulation_id).map(|r| r.title).unwrap_or_default();
+            resolve_telegram_task_spawn(
+                &db, &state.0, &entry.target_employee_id, &payload.actor_id,
+                format!("Вам передали задачу в регламенте «{reg_title}»"),
+                entry.content.clone(), entry.deadline.clone(), "reg", entry.id.clone(),
+            )
+        })
+    };
+    if let Some(spawn) = spawn {
+        spawn_telegram_task(spawn);
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -3296,6 +3445,59 @@ fn set_telegram_bot_settings(payload: SetTelegramBotSettingsPayload, state: taur
 }
 
 #[tauri::command]
+fn generate_telegram_link_code(payload: GenerateTelegramLinkCodePayload, state: tauri::State<AppState>) -> Result<TelegramLinkInfo, String> {
+    let db = state.0.lock().unwrap();
+    let code = db.generate_telegram_link_code(&payload.actor_id, &payload.employee_id)?;
+    let employee = db.get_employee(&payload.employee_id).ok_or_else(|| "Сотрудник не найден".to_string())?;
+    let settings = db.get_telegram_bot_settings_internal();
+    let role = if employee.is_partner {
+        settings.admin_partner_enabled.then_some(telegram::BotRole::AdminPartner)
+    } else {
+        telegram::effective_task_bot(&settings).map(|(role, _)| role)
+    };
+    let bot_configured = role.is_some();
+    let deep_link = role
+        .and_then(|r| db.get_telegram_bot_username(r.key()))
+        .map(|username| format!("https://t.me/{username}?start={code}"));
+    Ok(TelegramLinkInfo { code, deep_link, bot_configured })
+}
+
+#[tauri::command]
+fn get_telegram_link_status(payload: GetTelegramLinkStatusPayload, state: tauri::State<AppState>) -> Result<bool, String> {
+    let db = state.0.lock().unwrap();
+    if payload.actor_id != payload.employee_id && !db.is_admin(&payload.actor_id) {
+        return Err("Недостаточно прав".into());
+    }
+    Ok(db.telegram_link_status(&payload.employee_id))
+}
+
+#[tauri::command]
+fn unlink_telegram(payload: UnlinkTelegramPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.unlink_telegram(&payload.actor_id, &payload.employee_id)
+}
+
+#[tauri::command]
+fn send_partner_telegram_notification(payload: SendPartnerTelegramNotificationPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    if !db.is_admin(&payload.actor_id) {
+        return Err("Недостаточно прав".into());
+    }
+    let settings = db.get_telegram_bot_settings_internal();
+    if !settings.admin_partner_enabled {
+        return Err("Бот «Админ → Партнёр» не включён в Настройках".into());
+    }
+    let token = settings.admin_partner_token.filter(|t| !t.is_empty()).ok_or_else(|| "Не задан токен бота «Админ → Партнёр»".to_string())?;
+    let chat_ids = db.list_partner_telegram_chat_ids(&payload.partner_id);
+    if chat_ids.is_empty() {
+        return Err("У партнёра нет привязанного Telegram-аккаунта".into());
+    }
+    let partner_name = db.get_partner_name(&payload.partner_id).unwrap_or_default();
+    tauri::async_runtime::spawn(telegram::notify_partner(state.0.clone(), reqwest::Client::new(), token, chat_ids, partner_name, payload.title, payload.body));
+    Ok(())
+}
+
+#[tauri::command]
 fn get_employee_report(payload: GetEmployeeReportPayload, state: tauri::State<AppState>) -> Result<Vec<EmployeeReportRow>, String> {
     let db = state.0.lock().unwrap();
     db.list_employee_report_rows(&payload.admin_id, &payload.period_start, &payload.period_end)
@@ -3529,6 +3731,7 @@ fn main() {
             }
 
             let report_export_db = db.clone();
+            let telegram_db = db.clone();
 
             app.manage(AppState(db));
             app.manage(AppDataDir(app_data_dir));
@@ -3593,6 +3796,18 @@ fn main() {
                 }
                 db.set_report_export_last_fired_date(&today);
             });
+
+            // Telegram-боты (v0.5.3) — long-polling getUpdates, по одной
+            // async-задаче на каждую из 3 ролей (см. telegram.rs). В отличие
+            // от тикеров выше это настоящий async I/O (сетевые запросы),
+            // поэтому tauri::async_runtime::spawn, а не std::thread — тот же
+            // рантайм, что уже используют embedded axum-сервер (server::run
+            // чуть выше) и отправка задач (main.rs::spawn_telegram_task).
+            // Настройки перечитываются на каждой итерации цикла — без
+            // рестарта приложения; на клиент-машине включённость всегда
+            // false локально (запись проксируется в БД сервера), поэтому
+            // реально работает только там, где живёт канонический Db.
+            telegram::spawn_polling_tasks(telegram_db, app.handle().clone());
 
             Ok(())
         })
@@ -3728,6 +3943,10 @@ fn main() {
             set_radmin_settings,
             get_telegram_bot_settings,
             set_telegram_bot_settings,
+            generate_telegram_link_code,
+            get_telegram_link_status,
+            unlink_telegram,
+            send_partner_telegram_notification,
             get_employee_report,
             get_partner_report,
             get_report_export_settings,

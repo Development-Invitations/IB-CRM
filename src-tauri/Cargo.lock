@@ -1661,11 +1661,12 @@ dependencies = [
 
 [[package]]
 name = "ib-crm"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "axum",
  "bcrypt",
  "chrono",
+ "reqwest 0.12.28",
  "ring",
  "rusqlite",
  "rust_xlsxwriter",

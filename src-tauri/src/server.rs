@@ -121,7 +121,7 @@ async fn invoke_handler(
 
     let dispatch_result = {
         let db = state.db.lock().unwrap();
-        crate::dispatch::dispatch(&req.command, req.payload, &db, &state.app_data_dir)
+        crate::dispatch::dispatch(&req.command, req.payload, &db, &state.db, &state.app_data_dir)
     };
 
     match dispatch_result {

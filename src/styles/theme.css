@@ -1,4 +1,10 @@
 :root {
+  /* Влияет на рендер нативных элементов управления браузером/WebView —
+     в частности, иконку календаря/часов у <input type="date"/"time">.
+     Без этого иконка всегда рисуется в светлой (тёмной по цвету) палитре,
+     даже на тёмных темах — там она сливается с тёмным фоном поля и
+     выглядит просто чёрным квадратом/невидимой. */
+  color-scheme: light;
   --color-primary: #1E3A8A;      /* тёмно-синий из логотипа */
   --color-accent: #F5C518;       /* золотой из логотипа */
   /* Светлая тема — теперь стандартная по умолчанию */
@@ -15,6 +21,7 @@
 }
 
 [data-theme='dark'] {
+  color-scheme: dark;
   --color-bg: #0F1B3D;
   --color-surface: #16234F;
   --color-surface-2: #1D2C5C;
@@ -23,9 +30,15 @@
   --color-border: #2A3A70;
   --color-danger: #E5484D;
   --color-success: #3DBE7A;
+  /* Тот же случай, что у classicBlue ниже (см. её комментарий) — фон/
+     поверхности этой темы тоже тёмно-синие, того же оттенка, что дефолтный
+     --color-primary (#1E3A8A) из :root — бейджи "Открыта"/"Обсуждение" и
+     т.п. были почти не видны. Та же светлая замена. */
+  --color-primary: #5B8DEF;
 }
 
 [data-theme='graphite'] {
+  color-scheme: dark;
   --color-bg: #1A1B1E;
   --color-surface: #232427;
   --color-surface-2: #2C2D31;
@@ -49,6 +62,7 @@
 }
 
 [data-theme='classicBlue'] {
+  color-scheme: dark;
   --color-bg: #10265C;
   --color-surface: #16307A;
   --color-surface-2: #1D3B8F;

@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.5.2';
+export const APP_VERSION = '0.5.3';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,16 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.5.3',
+      items: [
+        'Telegram-боты заработали по-настоящему: «Админ → Задача» присылает сотруднику текст задачи и срок при назначении в регламенте или проекте, «Сотрудник → Закрыть задачу» — закрывает её прямо из Telegram по кнопке «Готово», «Админ → Партнёр» — шлёт партнёру уведомление о клиенте/регламенте по кнопке',
+        'Привязка Telegram-аккаунта — одноразовый код в Настройках (у сотрудника) или в Настройках партнёра, вводится в чат с ботом',
+        'Сотрудник теперь может закрыть свою задачу не только из Telegram, но и сам в CRM — раньше закрыть мог только постановщик или руководитель',
+        'Поправлена читаемость статусов/тегов на тёмной теме — «Открыта», «Обсуждение» и похожие бейджи сливались с тёмно-синим фоном, теперь светлее и хорошо видны',
+        'Иконки календаря и часов в полях даты/времени были не видны на тёмных темах (чёрные на тёмном) — теперь видны на всех темах',
+      ],
+    },
     {
       version: '0.5.2',
       items: [
@@ -548,6 +558,16 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.5.3',
+      items: [
+        "Telegram-botlar endi haqiqatdan ishlaydi: \"Admin → Vazifa\" reglament yoki loyihada vazifa tayinlanganda xodimga matn va muddatni yuboradi, \"Xodim → Vazifani yopish\" — uni Telegramdan \"Bajarildi\" tugmasi bilan yopadi, \"Admin → Hamkor\" — tugma bosilganda hamkorga mijoz/reglament haqida bildirishnoma yuboradi",
+        "Telegram akkauntini bog'lash — Sozlamalarda (xodim uchun) yoki hamkor Sozlamalarida bir martalik kod, bot bilan chatga kiritiladi",
+        "Endi xodim o'z vazifasini nafaqat Telegramdan, balki CRM'ning o'zida ham yopishi mumkin — avval faqat topshiruvchi yoki rahbar yopa olardi",
+        "Qorong'i mavzuda status/teglarning o'qilishi tuzatildi — \"Ochiq\", \"Muhokama\" va shunga o'xshash belgilar to'q ko'k fon bilan qo'shilib ketardi, endi yorqinroq va yaxshi ko'rinadi",
+        "Sana/vaqt maydonlaridagi kalendar va soat belgilari qorong'i mavzularda ko'rinmasdi (qorong'ida qora rangda) — endi barcha mavzularda ko'rinadi",
+      ],
+    },
+    {
       version: '0.5.2',
       items: [
         "Sozlamalarda — yangi \"Bildirishnoma tovushi\" bo'limi: yoqish/o'chirish va 5 ta ohangdan birini tanlash, \"Tinglash\" tugmasi bilan; tovush endi har qanday yangi bildirishnomada eshitiladi (reglamentlar, loyihalar, chat, arizalar, tug'ilgan kunlar)",
@@ -1079,6 +1099,16 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.5.3',
+      items: [
+        'Telegram-ботлар энди ҳақиқатдан ишлайди: "Админ → Вазифа" регламент ёки лойиҳада вазифа тайинланганда ходимга матн ва муддатни юборади, "Ходим → Вазифани ёпиш" — уни Telegramдан "Бажарилди" тугмаси билан ёпади, "Админ → Ҳамкор" — тугма босилганда ҳамкорга мижоз/регламент ҳақида билдиришнома юборади',
+        'Telegram аккаунтини боғлаш — Созламаларда (ходим учун) ёки ҳамкор Созламаларида бир мартали код, бот билан чатга киритилади',
+        'Энди ходим ўз вазифасини нафақат Telegramдан, балки CRMнинг ўзида ҳам ёпиши мумкин — аввал фақат топшириувчи ёки раҳбар ёпа оларди',
+        'Қоронғи мавзуда статус/тегларнинг ўқилиши тузатилди — "Очиқ", "Муҳокама" ва шунга ўхшаш белгилар тўқ кўк фон билан қўшилиб кетарди, энди ёрқинроқ ва яхши кўринади',
+        'Сана/вақт майдонларидаги календарь ва соат белгилари қоронғи мавзуларда кўринмасди (қоронғида қора рангда) — энди барча мавзуларда кўринади',
+      ],
+    },
     {
       version: '0.5.2',
       items: [

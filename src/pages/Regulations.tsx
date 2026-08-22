@@ -417,6 +417,7 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
   const [formDeadline, setFormDeadline] = useState('');
   const [formBusy, setFormBusy] = useState(false);
   const [formError, setFormError] = useState('');
+  const [tgSendBusy, setTgSendBusy] = useState(false);
 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -576,6 +577,30 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
       setFormError(typeof err === 'string' ? err : t('regulations.errorGeneric'));
     } finally {
       setFormBusy(false);
+    }
+  };
+
+  // Бот "Админ → Партнёр" (v0.5.3) — партнёр резолвится через выбранного в
+  // форме клиента (formClientId), т.к. у самого регламента прямого поля
+  // "партнёр" нет. Доступно только при редактировании уже существующего
+  // регламента — send_partner_telegram_notification гейтит admin-ом сам.
+  const handleSendTelegramNotification = async () => {
+    if (!editingReg) return;
+    const partnerId = clients.find((c) => c.id === formClientId)?.partnerId;
+    if (!partnerId) return;
+    setTgSendBusy(true);
+    try {
+      await api.sendPartnerTelegramNotification({
+        actorId: currentEmployee.id,
+        partnerId,
+        title: t('regulations.telegramNotificationTitle', { name: formTitle.trim() || editingReg.title }),
+        body: formDesc.trim() || (formTitle.trim() || editingReg.title),
+      });
+      showToast('success', t('regulations.telegramNotificationSuccess'));
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('regulations.telegramNotificationError'));
+    } finally {
+      setTgSendBusy(false);
     }
   };
 
@@ -1122,6 +1147,11 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
           <div className="field"><label>{t('regulations.descriptionLabel')}</label><textarea rows={3} value={formDesc} onChange={(e) => setFormDesc(e.target.value)} /></div>
           <div className="field"><label>{t('regulations.clientLabel')}</label><Select value={formClientId} options={clientOptions} onChange={setFormClientId} /></div>
           <div className="field"><label>{t('regulations.deadlineLabel')}</label><input type="date" value={formDeadline} onChange={(e) => setFormDeadline(e.target.value)} /></div>
+          {editingReg && currentEmployee.isAdmin && !!clients.find((c) => c.id === formClientId)?.partnerId && (
+            <button type="button" className="modal-btn" onClick={handleSendTelegramNotification} disabled={tgSendBusy}>
+              <Send size={14} /> {tgSendBusy ? t('common.loading') : t('regulations.sendTelegramNotificationBtn')}
+            </button>
+          )}
         </Modal>
 
         <Modal open={deleteConfirmOpen} title={t('regulations.deleteConfirmTitle')} onClose={() => setDeleteConfirmOpen(false)}

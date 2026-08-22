@@ -66,6 +66,44 @@ export default function Settings({ employee }: { employee: Employee }) {
     playNotificationSound(id);
   };
 
+  // Привязка своего Telegram-аккаунта (v0.5.3) — доступна любому сотруднику
+  // (не только админу), в отличие от токенов ботов ниже. Реальная отправка/
+  // приём сообщений — background-поток в Rust (telegram.rs), тут только
+  // получение одноразового кода и статус привязки.
+  const [tgLinked, setTgLinked] = useState(false);
+  const [tgLinkInfo, setTgLinkInfo] = useState<{ code: string; deepLink: string | null; botConfigured: boolean } | null>(null);
+  const [tgLinkBusy, setTgLinkBusy] = useState(false);
+
+  useEffect(() => {
+    api.getTelegramLinkStatus({ actorId: employee.id, employeeId: employee.id }).then(setTgLinked).catch(() => {});
+  }, [employee.id]);
+
+  const handleGetTelegramCode = async () => {
+    setTgLinkBusy(true);
+    try {
+      const info = await api.generateTelegramLinkCode({ actorId: employee.id, employeeId: employee.id });
+      setTgLinkInfo(info);
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('settings.errorGeneric'));
+    } finally {
+      setTgLinkBusy(false);
+    }
+  };
+
+  const handleUnlinkTelegram = async () => {
+    setTgLinkBusy(true);
+    try {
+      await api.unlinkTelegram({ actorId: employee.id, employeeId: employee.id });
+      setTgLinked(false);
+      setTgLinkInfo(null);
+      showToast('success', t('settings.telegramLink.unlinkSuccess'));
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('settings.errorGeneric'));
+    } finally {
+      setTgLinkBusy(false);
+    }
+  };
+
   const isClient = connection.isClient();
   const [serverSettings, setServerSettingsState] = useState<ServerSettings | null>(null);
   const [lanAddress, setLanAddress] = useState<string | null>(null);
@@ -588,6 +626,34 @@ export default function Settings({ employee }: { employee: Employee }) {
           <span className="settings-hint">{t('settings.idFieldLabel')}</span>
           <span>{employee.employeeNumber}</span>
         </div>
+        <div className="account-row">
+          <span className="settings-hint">{t('settings.telegramLink.statusLabel')}</span>
+          {tgLinked ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="absence-status reg-entry-badge-done">{t('settings.telegramLink.linked')}</span>
+              <button className="reg-action-btn" onClick={handleUnlinkTelegram} disabled={tgLinkBusy} title={t('settings.telegramLink.unlinkBtn')}>
+                <X size={13} />
+              </button>
+            </span>
+          ) : (
+            <button className="modal-btn" onClick={handleGetTelegramCode} disabled={tgLinkBusy}>
+              {tgLinkBusy ? t('common.loading') : t('settings.telegramLink.getCodeBtn')}
+            </button>
+          )}
+        </div>
+        {tgLinkInfo && !tgLinked && (
+          <>
+            {!tgLinkInfo.botConfigured && <p className="settings-hint">{t('settings.telegramLink.noBotConfigured')}</p>}
+            <div className="account-row">
+              <span className="settings-hint">{t('settings.telegramLink.codeHint', { code: tgLinkInfo.code })}</span>
+              {tgLinkInfo.deepLink && (
+                <a className="modal-btn" href={tgLinkInfo.deepLink} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+                  {t('settings.telegramLink.openBotBtn')}
+                </a>
+              )}
+            </div>
+          </>
+        )}
       </section>
 
       <section className="settings-section">

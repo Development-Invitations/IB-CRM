@@ -1,6 +1,6 @@
 [package]
 name = "ib-crm"
-version = "0.5.2"
+version = "0.5.3"
 description = "IB CRM — desktop приложение"
 authors = ["IB - Команда"]
 edition = "2021"
@@ -22,8 +22,9 @@ rusqlite = { version = "0.31", features = ["bundled", "backup"] }
 bcrypt = "0.15"
 uuid = { version = "1", features = ["v4"] }
 axum = "0.7"
-tokio = { version = "1", features = ["net", "rt-multi-thread", "macros", "fs"] }
+tokio = { version = "1", features = ["net", "rt-multi-thread", "macros", "fs", "time"] }
 tower-http = { version = "0.5", features = ["cors"] }
 ring = "=0.17.14"
 rust_xlsxwriter = "0.98"
 chrono = "0.4"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }

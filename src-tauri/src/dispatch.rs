@@ -14,6 +14,7 @@
 use crate::db::Db;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
+use std::sync::{Arc, Mutex};
 
 fn from_payload<T: DeserializeOwned>(payload: Value) -> Result<T, String> {
     serde_json::from_value(payload).map_err(|e| format!("Некорректные данные запроса: {e}"))
@@ -31,7 +32,13 @@ fn field(payload: &Value, key: &str) -> Result<String, String> {
         .ok_or_else(|| format!("Отсутствует поле '{key}'"))
 }
 
-pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Path) -> Result<Value, String> {
+// db_arc — тот же Arc<Mutex<Db>>, что уже залочен вызывающей стороной для
+// получения `db: &Db` (см. server.rs::invoke_handler) — нужен отдельно от
+// `db` только для команд, которые запускают fire-and-forget Telegram-отправку
+// (tauri::async_runtime::spawn), т.к. этой async-задаче нужен СВОЙ owned
+// Arc<Mutex<Db>>, а не временный &Db, живущий только на время текущего
+// синхронного вызова dispatch().
+pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app_data_dir: &std::path::Path) -> Result<Value, String> {
     match cmd {
         // ---- Авторизация / сотрудники ----
         "has_admin" => Ok(to_json(db.has_admin())),
@@ -273,8 +280,17 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
         }
         "send_project_chat_message" => {
             let p: crate::SendProjectChatMessagePayload = from_payload(payload)?;
-            db.send_project_chat_message(&p.actor_id, &p.project_id, &p.target_employee_id, &p.content, p.attachment_data.as_deref(), p.attachment_name.as_deref(), p.deadline.as_deref())
-                .map(crate::to_project_chat_message).map(to_json)
+            let message = db.send_project_chat_message(&p.actor_id, &p.project_id, &p.target_employee_id, &p.content, p.attachment_data.as_deref(), p.attachment_name.as_deref(), p.deadline.as_deref())?;
+            let project_name = db.get_project(&p.project_id).map(|pr| pr.name).unwrap_or_default();
+            let spawn = crate::resolve_telegram_task_spawn(
+                db, db_arc, &message.target_employee_id, &p.actor_id,
+                format!("Вам поставили задачу в проекте «{project_name}»"),
+                message.content.clone(), message.deadline.clone(), "proj", message.id.clone(),
+            );
+            if let Some(spawn) = spawn {
+                crate::spawn_telegram_task(spawn);
+            }
+            Ok(to_json(crate::to_project_chat_message(message)))
         }
         "edit_project_chat_message" => {
             let p: crate::EditProjectChatMessagePayload = from_payload(payload)?;
@@ -286,7 +302,19 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
         }
         "assign_project_chat_message" => {
             let p: crate::AssignProjectChatMessagePayload = from_payload(payload)?;
-            db.assign_project_chat_message(&p.actor_id, &p.message_id, &p.target_employee_id, p.deadline.as_deref()).map(to_json)
+            db.assign_project_chat_message(&p.actor_id, &p.message_id, &p.target_employee_id, p.deadline.as_deref())?;
+            let spawn = db.get_project_chat_message(&p.message_id).and_then(|message| {
+                let project_name = db.get_project(&message.project_id).map(|pr| pr.name).unwrap_or_default();
+                crate::resolve_telegram_task_spawn(
+                    db, db_arc, &message.target_employee_id, &p.actor_id,
+                    format!("Вам передали задачу в проекте «{project_name}»"),
+                    message.content.clone(), message.deadline.clone(), "proj", message.id.clone(),
+                )
+            });
+            if let Some(spawn) = spawn {
+                crate::spawn_telegram_task(spawn);
+            }
+            Ok(to_json(()))
         }
         "update_project_chat_message_status" => {
             let p: crate::UpdateProjectChatMessageStatusPayload = from_payload(payload)?;
@@ -355,8 +383,17 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
         }
         "add_regulation_entry" => {
             let p: crate::AddRegulationEntryPayload = from_payload(payload)?;
-            db.add_regulation_entry(&p.actor_id, &p.regulation_id, &p.target_employee_id, &p.content, p.attachment_data.as_deref(), p.attachment_name.as_deref(), p.deadline.as_deref())
-                .map(crate::to_reg_entry).map(to_json)
+            let entry = db.add_regulation_entry(&p.actor_id, &p.regulation_id, &p.target_employee_id, &p.content, p.attachment_data.as_deref(), p.attachment_name.as_deref(), p.deadline.as_deref())?;
+            let reg_title = db.get_regulation(&p.regulation_id).map(|r| r.title).unwrap_or_default();
+            let spawn = crate::resolve_telegram_task_spawn(
+                db, db_arc, &entry.target_employee_id, &p.actor_id,
+                format!("Вам поставили задачу в регламенте «{reg_title}»"),
+                entry.content.clone(), entry.deadline.clone(), "reg", entry.id.clone(),
+            );
+            if let Some(spawn) = spawn {
+                crate::spawn_telegram_task(spawn);
+            }
+            Ok(to_json(crate::to_reg_entry(entry)))
         }
         "edit_regulation_entry" => {
             let p: crate::EditRegulationEntryPayload = from_payload(payload)?;
@@ -368,7 +405,19 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
         }
         "assign_regulation_entry" => {
             let p: crate::AssignRegulationEntryPayload = from_payload(payload)?;
-            db.assign_regulation_entry(&p.actor_id, &p.entry_id, &p.target_employee_id, p.deadline.as_deref()).map(to_json)
+            db.assign_regulation_entry(&p.actor_id, &p.entry_id, &p.target_employee_id, p.deadline.as_deref())?;
+            let spawn = db.get_regulation_entry(&p.entry_id).and_then(|entry| {
+                let reg_title = db.get_regulation(&entry.regulation_id).map(|r| r.title).unwrap_or_default();
+                crate::resolve_telegram_task_spawn(
+                    db, db_arc, &entry.target_employee_id, &p.actor_id,
+                    format!("Вам передали задачу в регламенте «{reg_title}»"),
+                    entry.content.clone(), entry.deadline.clone(), "reg", entry.id.clone(),
+                )
+            });
+            if let Some(spawn) = spawn {
+                crate::spawn_telegram_task(spawn);
+            }
+            Ok(to_json(()))
         }
         "update_entry_status" => {
             let p: crate::UpdateEntryStatusPayload = from_payload(payload)?;
@@ -640,6 +689,49 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, app_data_dir: &std::path::Pa
                 p.admin_partner_enabled,
                 p.admin_partner_token.as_deref(),
             ).map(crate::to_telegram_bot_settings).map(to_json)
+        }
+        "generate_telegram_link_code" => {
+            let p: crate::GenerateTelegramLinkCodePayload = from_payload(payload)?;
+            let code = db.generate_telegram_link_code(&p.actor_id, &p.employee_id)?;
+            let employee = db.get_employee(&p.employee_id).ok_or_else(|| "Сотрудник не найден".to_string())?;
+            let settings = db.get_telegram_bot_settings_internal();
+            let role = if employee.is_partner {
+                settings.admin_partner_enabled.then_some(crate::telegram::BotRole::AdminPartner)
+            } else {
+                crate::telegram::effective_task_bot(&settings).map(|(role, _)| role)
+            };
+            let bot_configured = role.is_some();
+            let deep_link = role.and_then(|r| db.get_telegram_bot_username(r.key())).map(|username| format!("https://t.me/{username}?start={code}"));
+            Ok(to_json(crate::TelegramLinkInfo { code, deep_link, bot_configured }))
+        }
+        "get_telegram_link_status" => {
+            let p: crate::GetTelegramLinkStatusPayload = from_payload(payload)?;
+            if p.actor_id != p.employee_id && !db.is_admin(&p.actor_id) {
+                return Err("Недостаточно прав".into());
+            }
+            Ok(to_json(db.telegram_link_status(&p.employee_id)))
+        }
+        "unlink_telegram" => {
+            let p: crate::UnlinkTelegramPayload = from_payload(payload)?;
+            db.unlink_telegram(&p.actor_id, &p.employee_id).map(to_json)
+        }
+        "send_partner_telegram_notification" => {
+            let p: crate::SendPartnerTelegramNotificationPayload = from_payload(payload)?;
+            if !db.is_admin(&p.actor_id) {
+                return Err("Недостаточно прав".into());
+            }
+            let settings = db.get_telegram_bot_settings_internal();
+            if !settings.admin_partner_enabled {
+                return Err("Бот «Админ → Партнёр» не включён в Настройках".into());
+            }
+            let token = settings.admin_partner_token.filter(|t| !t.is_empty()).ok_or_else(|| "Не задан токен бота «Админ → Партнёр»".to_string())?;
+            let chat_ids = db.list_partner_telegram_chat_ids(&p.partner_id);
+            if chat_ids.is_empty() {
+                return Err("У партнёра нет привязанного Telegram-аккаунта".into());
+            }
+            let partner_name = db.get_partner_name(&p.partner_id).unwrap_or_default();
+            tauri::async_runtime::spawn(crate::telegram::notify_partner(db_arc.clone(), reqwest::Client::new(), token, chat_ids, partner_name, p.title, p.body));
+            Ok(to_json(()))
         }
         "get_employee_report" => {
             let p: crate::GetEmployeeReportPayload = from_payload(payload)?;

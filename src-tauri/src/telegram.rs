@@ -2,36 +2,25 @@
 // версии в Настройках был только "коннектор" (чекбокс + токен, см.
 // db.rs::TelegramBotSettingsRecord) — сама интеграция не существовала.
 //
+// v0.6.3: изначально было 3 отдельных бота (свой токен у каждого) — после
+// первого живого теста пользователь решил оставить ОДИН бот, который ставит
+// задачи И принимает их закрытие тем же токеном (функция "Админ → Партнёр"
+// убрана целиком). Это заодно устранило искусственную сложность
+// "эффективного бота" — раньше кнопку "Готово" мог обработать только тот
+// бот, который прислал сообщение, а с одним бот-токеном это больше не
+// проблема в принципе.
+//
 // Весь сетевой код живёт здесь, а не в db.rs — db.rs синхронный и держит
 // std::sync::Mutex<Db>, который нельзя держать через .await (см. main.rs —
 // та же причина, почему report_export.rs не трогает Db напрямую). Функции
 // здесь принимают только owned-значения (токен/chat_id/текст), либо
 // Arc<Mutex<Db>> — если нужен, лочится КОРОТКО и СИНХРОННО, гвард дропается
 // до следующего await.
-use crate::db::{Db, TelegramBotSettingsRecord};
+use crate::db::Db;
 use serde_json::json;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::Emitter;
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum BotRole {
-    AdminTask,
-    TaskClose,
-    AdminPartner,
-}
-
-impl BotRole {
-    // Используется и как ключ app_meta (offset/username), и как префикс
-    // callback_data не участвует — там свой формат "close_reg:<id>".
-    pub fn key(self) -> &'static str {
-        match self {
-            BotRole::AdminTask => "admin_task",
-            BotRole::TaskClose => "task_close",
-            BotRole::AdminPartner => "admin_partner",
-        }
-    }
-}
 
 pub struct TelegramError(pub String);
 
@@ -56,10 +45,9 @@ pub async fn send_message(
     text: &str,
     reply_button: Option<(&str, &str)>,
 ) -> Result<(), TelegramError> {
-    // Без parse_mode (plain text) — текст задачи/клиента вводится
-    // пользователем свободно, экранировать под MarkdownV2/HTML не пытаемся:
-    // спецсимволы (_,*,[ и т.д.) в неэкранированном виде роняли бы
-    // sendMessage целиком.
+    // Без parse_mode (plain text) — текст задачи вводится пользователем
+    // свободно, экранировать под MarkdownV2/HTML не пытаемся: спецсимволы
+    // (_,*,[ и т.д.) в неэкранированном виде роняли бы sendMessage целиком.
     let mut body = json!({ "chat_id": chat_id, "text": text });
     if let Some((label, callback_data)) = reply_button {
         body["reply_markup"] = json!({ "inline_keyboard": [[{ "text": label, "callback_data": callback_data }]] });
@@ -92,27 +80,8 @@ async fn get_updates(client: &reqwest::Client, token: &str, offset: i64, timeout
         .ok_or_else(|| TelegramError("getUpdates: некорректный ответ".into()))
 }
 
-// Кнопку "Готово" может обработать только тот бот, который прислал
-// сообщение — а "Админ → Задача" и "Сотрудник → Закрыть задачу" это 2
-// разных токена. Решение пользователя: один эффективный бот на все
-// уведомления о задачах — предпочитаем task_close (тогда кнопка работает),
-// иначе admin_task (просто уведомление, без кнопки).
-pub fn effective_task_bot(settings: &TelegramBotSettingsRecord) -> Option<(BotRole, String)> {
-    if settings.task_close_enabled {
-        if let Some(token) = settings.task_close_token.clone().filter(|t| !t.is_empty()) {
-            return Some((BotRole::TaskClose, token));
-        }
-    }
-    if settings.admin_task_enabled {
-        if let Some(token) = settings.admin_task_token.clone().filter(|t| !t.is_empty()) {
-            return Some((BotRole::AdminTask, token));
-        }
-    }
-    None
-}
-
-// ---- Высокоуровневые отправители — вызываются fire-and-forget из main.rs
-// (tauri::async_runtime::spawn), принимают только owned-значения. ----
+// ---- Высокоуровневый отправитель — вызывается fire-and-forget из main.rs
+// (tauri::async_runtime::spawn), принимает только owned-значения. ----
 
 #[allow(clippy::too_many_arguments)]
 pub async fn notify_task_assigned(
@@ -126,46 +95,27 @@ pub async fn notify_task_assigned(
     deadline: Option<String>,
     entry_kind: &'static str, // "reg" | "proj"
     entry_id: String,
-    with_button: bool,
 ) {
     let mut text = format!("{title}\n\n{body}");
     if let Some(d) = deadline {
         text.push_str(&format!("\n\nСрок: {d}"));
     }
-    let button_data = with_button.then(|| format!("close_{entry_kind}:{entry_id}"));
-    let button_ref = button_data.as_deref().map(|d| ("✅ Готово", d));
-    if send_message(&client, &token, &chat_id, &text, button_ref).await.is_err() {
+    let button_data = format!("close_{entry_kind}:{entry_id}");
+    if send_message(&client, &token, &chat_id, &text, Some(("✅ Готово", &button_data))).await.is_err() {
         db.lock().unwrap().notify_telegram_send_failed(&employee_name);
     }
 }
 
-pub async fn notify_partner(db: Arc<Mutex<Db>>, client: reqwest::Client, token: String, chat_ids: Vec<String>, partner_name: String, title: String, body: String) {
-    let text = format!("{title}\n\n{body}");
-    let mut any_ok = false;
-    for chat_id in &chat_ids {
-        if send_message(&client, &token, chat_id, &text, None).await.is_ok() {
-            any_ok = true;
-        }
-    }
-    if !any_ok && !chat_ids.is_empty() {
-        db.lock().unwrap().notify_telegram_send_failed(&partner_name);
-    }
-}
-
-// ---- Long-polling супервизор — по одной задаче на каждую из 3 ролей,
-// поднимается один раз в main.rs::setup(), живёт всё время работы
-// приложения. Настройки перечитываются на каждой итерации — включение
-// бота/смена токена подхватывается без рестарта. ----
+// ---- Long-polling супервизор — одна задача на единственный бот, поднимается
+// один раз в main.rs::setup(), живёт всё время работы приложения. Настройки
+// перечитываются на каждой итерации — включение бота/смена токена
+// подхватывается без рестарта. ----
 
 pub fn spawn_polling_tasks(db: Arc<Mutex<Db>>, app_handle: tauri::AppHandle) {
-    for role in [BotRole::AdminTask, BotRole::TaskClose, BotRole::AdminPartner] {
-        let db = db.clone();
-        let app_handle = app_handle.clone();
-        tauri::async_runtime::spawn(poll_loop(db, app_handle, role));
-    }
+    tauri::async_runtime::spawn(poll_loop(db, app_handle));
 }
 
-async fn poll_loop(db: Arc<Mutex<Db>>, app_handle: tauri::AppHandle, role: BotRole) {
+async fn poll_loop(db: Arc<Mutex<Db>>, app_handle: tauri::AppHandle) {
     // getUpdates держит соединение открытым до timeout_secs (~25с) —
     // клиенту нужен таймаут длиннее этого, иначе reqwest сам оборвёт запрос
     // раньше, чем ответит Telegram. Остальные методы — отдельный короткий
@@ -174,28 +124,20 @@ async fn poll_loop(db: Arc<Mutex<Db>>, app_handle: tauri::AppHandle, role: BotRo
     let short_client = reqwest::Client::builder().timeout(Duration::from_secs(10)).build().expect("reqwest client");
 
     loop {
-        let (enabled, token) = {
-            let db = db.lock().unwrap();
-            let s = db.get_telegram_bot_settings_internal();
-            match role {
-                BotRole::AdminTask => (s.admin_task_enabled, s.admin_task_token),
-                BotRole::TaskClose => (s.task_close_enabled, s.task_close_token),
-                BotRole::AdminPartner => (s.admin_partner_enabled, s.admin_partner_token),
-            }
-        };
-        let Some(token) = token.filter(|t| !t.is_empty()).filter(|_| enabled) else {
+        let settings = { db.lock().unwrap().get_telegram_bot_settings_internal() };
+        let Some(token) = settings.token.filter(|t| !t.is_empty()).filter(|_| settings.enabled) else {
             tokio::time::sleep(Duration::from_secs(5)).await;
             continue;
         };
 
-        let cached_username = db.lock().unwrap().get_telegram_bot_username(role.key());
+        let cached_username = db.lock().unwrap().get_telegram_bot_username("bot");
         if cached_username.is_none() {
             if let Ok(username) = get_me(&short_client, &token).await {
-                db.lock().unwrap().set_telegram_bot_username(role.key(), &username);
+                db.lock().unwrap().set_telegram_bot_username("bot", &username);
             }
         }
 
-        let offset = db.lock().unwrap().get_telegram_update_offset(role.key());
+        let offset = db.lock().unwrap().get_telegram_update_offset("bot");
         match get_updates(&long_client, &token, offset, 25).await {
             Ok(updates) => {
                 let mut max_update_id = offset - 1;
@@ -206,7 +148,7 @@ async fn poll_loop(db: Arc<Mutex<Db>>, app_handle: tauri::AppHandle, role: BotRo
                     }
                 }
                 if max_update_id >= offset {
-                    db.lock().unwrap().set_telegram_update_offset(role.key(), max_update_id + 1);
+                    db.lock().unwrap().set_telegram_update_offset("bot", max_update_id + 1);
                 }
             }
             // Сеть моргнула / токен невалиден / getUpdates уже слушает
@@ -215,7 +157,7 @@ async fn poll_loop(db: Arc<Mutex<Db>>, app_handle: tauri::AppHandle, role: BotRo
             // `cargo tauri dev`/логах установленного приложения), полезно
             // при живой отладке, почему бот "молчит".
             Err(e) => {
-                eprintln!("[telegram:{}] getUpdates error: {}", role.key(), e.0);
+                eprintln!("[telegram] getUpdates error: {}", e.0);
                 tokio::time::sleep(Duration::from_secs(5)).await;
             }
         }
@@ -287,8 +229,8 @@ async fn handle_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client, token: &st
             // окна CRM сами перечитают свежие данные (см. useNotifications.ts).
             let _ = app_handle.emit("notification-tick", ());
             // Постановщику задачи — тоже в Telegram (best-effort, тем же
-            // ботом/токеном, что закрыл задачу; молча не сработает, если
-            // постановщик не привязал СВОЙ Telegram к этому же боту).
+            // ботом; молча не сработает, если постановщик не привязал СВОЙ
+            // Telegram).
             if let Some(entry_id) = data.strip_prefix("close_reg:") {
                 notify_task_closed_to_assigner(db, client, token, &actor_id, "reg", entry_id).await;
             } else if let Some(message_id) = data.strip_prefix("close_proj:") {

@@ -3980,3 +3980,60 @@ Telegram не пришло. Чат с ботом пуст, ответа даже
 
 `cargo check --offline` — чисто, без единого warning. Версия поднята до 0.6.2 (patch — расширение
 уже существующей фичи, не новый модуль).
+
+### v0.6.3 — Живое обновление после закрытия из Telegram + один Telegram-бот вместо трёх
+
+Два запроса пользователя в одном заходе.
+
+**1. Live-refresh без перезагрузки.** Пользователь нажал "Готово" в Telegram, но `Regulations.tsx`
+продолжал показывать задачу открытой, пока страницу не перезагрузили вручную. Бэкенд уже дёргал
+`notification-tick` при закрытии из Telegram (`telegram.rs::handle_update`, добавлено раньше), но
+слушал его только `useNotifications.ts` — сама страница регламента/проекта на это событие не
+реагировала. Исправлено добавлением `useEffect(() => { const unlisten = listen('notification-tick',
+() => loadDetail()); return () => { unlisten.then((f) => f()); }; }, [loadDetail]);` в
+`Regulations.tsx` и `Projects.tsx` — теперь открытая карточка регламента/проекта перечитывает записи
+сразу же, как только приходит любой тик уведомлений (закрытие из Telegram — один из источников, но
+не единственный, поэтому это общий, а не Telegram-специфичный фикс).
+
+**2. Консолидация 3 ботов → 1.** Пользователь: "И удали остольных ботов тогда оставь тока 1
+админского бота". Уточнено `AskUserQuestion` — только задачи (постановка + закрытие), бота
+"Админ → Партнёр" убрать полностью вместе с фичей уведомления партнёра.
+
+Бэкенд: `TelegramBotSettingsRecord` в `db.rs` сокращён с 6 полей (`admin_task_*`/`task_close_*`/
+`admin_partner_*`) до 2 (`enabled`/`token`); app_meta-ключи заменены на `tg_bot_enabled`/
+`tg_bot_token` (старые ключи трёх ботов осиротели в БД — намеренно не мигрированы, цена миграции
+не оправдана для пре-релизного единственного тестового пользователя). В `telegram.rs` убраны
+`BotRole`, `effective_task_bot()`, `notify_partner()` — `spawn_polling_tasks` теперь поднимает ровно
+один `poll_loop`, все ключи опроса берут захардкоженную роль `"bot"` вместо параметра. У
+`notify_task_assigned` убран параметр `with_button: bool` — кнопка "Готово" теперь всегда
+прикладывается, отдельного "тихого" варианта уведомления не осталось. В `main.rs` и `dispatch.rs`
+(отдельно, оба места дублируют команды по конвенции проекта) упрощены DTO/payload'ы
+`TelegramBotSettings`/`SetTelegramBotSettingsPayload`, команда `send_partner_telegram_notification`
+удалена целиком (включая из `generate_handler!`), `generate_telegram_link_code` избавлен от ветвления
+`is_partner`/`BotRole::AdminPartner` — теперь просто спрашивает единственный `get_telegram_bot_settings_internal()`.
+`list_partner_telegram_chat_ids`/`get_partner_name` в `db.rs` оставлены как есть (мёртвый код без
+использования — не мешает, вычищать не стали, риск важнее пользы для пре-релизной кодовой базы).
+
+Фронтенд: `api.ts` — тип `TelegramBotSettings` сокращён до `{ enabled, token }`, функция
+`sendPartnerTelegramNotification` удалена. `Settings.tsx` — 3 карточки бота схлопнуты в одну
+(состояние `tgAdminTaskEnabled/TaskCloseEnabled/AdminPartnerEnabled` → просто `tgEnabled`/`tgToken`),
+подписи переписаны под единый бот "Задачи в Telegram". `PartnerSettings.tsx` — вся секция "Telegram"
+(привязка аккаунта партнёра) удалена целиком: с уходом бота "Админ → Партнёр" у партнёра больше нет
+сценария, где CRM написала бы ему в Telegram (`partner_regulations` не имеют хук-поинтов назначения
+задач через этого бота). `ClientFormModal.tsx` и `Regulations.tsx` — кнопки "Отправить уведомление в
+Telegram" (у карточки клиента и в форме регламента) удалены вместе с обработчиками; live-refresh
+эффект из пункта 1 не тронут. i18n (все 3 локали) — вычищены `telegramBots.taskCloseTitle/Desc`,
+`adminPartnerTitle/Desc`, `clients.*`/`regulations.*` ключи уведомления партнёра,
+`partnerSettings.telegramLinkHint`; `telegramBots.title/hint/adminTaskTitle/adminTaskDesc`
+переписаны под единый бот.
+
+Отложено на следующий заход (по прямой просьбе пользователя, но осознанно не в этой версии — новая
+фича должна строиться поверх уже упрощённой одноботовой структуры, а не поверх ещё не убранной
+трёхботовой): (а) возможность прикладывать текстовое описание к "Готово" в Telegram вместо мгновенного
+закрытия без комментария; (б) постановка задач/создание регламентов АДМИНОМ прямо из переписки с
+ботом (обратное направление Telegram → CRM) — потребует стейтфул-диалога (отслеживание "на каком шаге
+этот чат сейчас", выбор сотрудника через Telegram, маппинг ответов на `create_regulation`/
+`add_regulation_entry`), кандидат на отдельный заход в Plan Mode.
+
+`cargo check --offline`, `npx tsc --noEmit`, `npx vite build` — все чисто. Версия поднята до 0.6.3
+(patch — по объёму скорее рефакторинг существующей фичи + точечный багфикс, не новый модуль).

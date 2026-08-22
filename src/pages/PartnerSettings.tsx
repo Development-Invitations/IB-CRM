@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent, ChangeEvent, useRef } from 'react';
-import { Copy, Check, Eye, EyeOff, Send, Clock, Camera, RefreshCw, Bot, X, NotebookText } from 'lucide-react';
+import { Copy, Check, Eye, EyeOff, Send, Clock, Camera, RefreshCw, NotebookText } from 'lucide-react';
 import { api, type Employee } from '../lib/api';
 import { useLocale, LOCALE_LABELS, type Locale } from '../lib/i18n';
 import { useTheme, THEME_NAMES } from '../lib/theme';
@@ -189,44 +189,6 @@ export default function PartnerSettings({ employee: initialEmployee }: { employe
     });
   };
 
-  // ---- Telegram (v0.5.3) — та же логика, что у сотрудника в Settings.tsx,
-  // просто у партнёра нет отдельной страницы "Мой кабинет" — привязка живёт
-  // прямо тут, рядом с Radmin. ----
-  const [tgLinked, setTgLinked] = useState(false);
-  const [tgLinkInfo, setTgLinkInfo] = useState<{ code: string; deepLink: string | null; botConfigured: boolean } | null>(null);
-  const [tgLinkBusy, setTgLinkBusy] = useState(false);
-
-  useEffect(() => {
-    api.getTelegramLinkStatus({ actorId: employee.id, employeeId: employee.id }).then(setTgLinked).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employee.id]);
-
-  const handleGetTelegramCode = async () => {
-    setTgLinkBusy(true);
-    try {
-      const info = await api.generateTelegramLinkCode({ actorId: employee.id, employeeId: employee.id });
-      setTgLinkInfo(info);
-    } catch (err: any) {
-      showToast('error', typeof err === 'string' ? err : t('settings.errorGeneric'));
-    } finally {
-      setTgLinkBusy(false);
-    }
-  };
-
-  const handleUnlinkTelegram = async () => {
-    setTgLinkBusy(true);
-    try {
-      await api.unlinkTelegram({ actorId: employee.id, employeeId: employee.id });
-      setTgLinked(false);
-      setTgLinkInfo(null);
-      showToast('success', t('settings.telegramLink.unlinkSuccess'));
-    } catch (err: any) {
-      showToast('error', typeof err === 'string' ? err : t('settings.errorGeneric'));
-    } finally {
-      setTgLinkBusy(false);
-    }
-  };
-
   // Записная книжка (v0.6.0) — та же логика, что у сотрудника в Settings.tsx.
   const [notebookEnabled, setNotebookEnabledState] = useState(false);
   const [notebookName, setNotebookName] = useState('');
@@ -404,42 +366,6 @@ export default function PartnerSettings({ employee: initialEmployee }: { employe
         <button className="modal-btn" onClick={loadRadmin} disabled={radminLoading} style={{ marginTop: 12 }}>
           <RefreshCw size={14} /> {t('partnerSettings.radminRefreshBtn')}
         </button>
-      </section>
-
-      <section className="settings-section">
-        <h2><Bot size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />{t('settings.telegramLink.title')}</h2>
-        <p className="settings-hint">{t('partnerSettings.telegramLinkHint')}</p>
-
-        <div className="telegram-bot-card">
-          <div className="account-row">
-            <span className="settings-hint">{t('settings.telegramLink.statusLabel')}</span>
-            {tgLinked ? (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="absence-status reg-entry-badge-done">{t('settings.telegramLink.linked')}</span>
-                <button className="reg-action-btn" onClick={handleUnlinkTelegram} disabled={tgLinkBusy} title={t('settings.telegramLink.unlinkBtn')}>
-                  <X size={13} />
-                </button>
-              </span>
-            ) : (
-              <button className="modal-btn" onClick={handleGetTelegramCode} disabled={tgLinkBusy}>
-                {tgLinkBusy ? t('common.loading') : t('settings.telegramLink.getCodeBtn')}
-              </button>
-            )}
-          </div>
-          {tgLinkInfo && !tgLinked && (
-            <>
-              {!tgLinkInfo.botConfigured && <p className="settings-hint">{t('settings.telegramLink.noBotConfigured')}</p>}
-              <div className="account-row" style={{ marginTop: 8 }}>
-                <span className="settings-hint">{t('settings.telegramLink.codeHint', { code: tgLinkInfo.code })}</span>
-                {tgLinkInfo.deepLink && (
-                  <a className="modal-btn" href={tgLinkInfo.deepLink} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
-                    {t('settings.telegramLink.openBotBtn')}
-                  </a>
-                )}
-              </div>
-            </>
-          )}
-        </div>
       </section>
 
       <section className="settings-section">

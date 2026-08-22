@@ -591,18 +591,8 @@ struct RadminSettings {
 
 #[derive(Clone, serde::Serialize)]
 struct TelegramBotSettings {
-    #[serde(rename = "adminTaskEnabled")]
-    admin_task_enabled: bool,
-    #[serde(rename = "adminTaskToken")]
-    admin_task_token: Option<String>,
-    #[serde(rename = "taskCloseEnabled")]
-    task_close_enabled: bool,
-    #[serde(rename = "taskCloseToken")]
-    task_close_token: Option<String>,
-    #[serde(rename = "adminPartnerEnabled")]
-    admin_partner_enabled: bool,
-    #[serde(rename = "adminPartnerToken")]
-    admin_partner_token: Option<String>,
+    enabled: bool,
+    token: Option<String>,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -1722,18 +1712,8 @@ struct GetTelegramBotSettingsPayload {
 struct SetTelegramBotSettingsPayload {
     #[serde(rename = "adminId")]
     admin_id: String,
-    #[serde(rename = "adminTaskEnabled")]
-    admin_task_enabled: bool,
-    #[serde(rename = "adminTaskToken")]
-    admin_task_token: Option<String>,
-    #[serde(rename = "taskCloseEnabled")]
-    task_close_enabled: bool,
-    #[serde(rename = "taskCloseToken")]
-    task_close_token: Option<String>,
-    #[serde(rename = "adminPartnerEnabled")]
-    admin_partner_enabled: bool,
-    #[serde(rename = "adminPartnerToken")]
-    admin_partner_token: Option<String>,
+    enabled: bool,
+    token: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -1758,16 +1738,6 @@ struct UnlinkTelegramPayload {
     actor_id: String,
     #[serde(rename = "employeeId")]
     employee_id: String,
-}
-
-#[derive(serde::Deserialize)]
-struct SendPartnerTelegramNotificationPayload {
-    #[serde(rename = "actorId")]
-    actor_id: String,
-    #[serde(rename = "partnerId")]
-    partner_id: String,
-    title: String,
-    body: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -2378,14 +2348,7 @@ fn to_radmin_settings(r: db::RadminSettingsRecord) -> RadminSettings {
 }
 
 fn to_telegram_bot_settings(s: db::TelegramBotSettingsRecord) -> TelegramBotSettings {
-    TelegramBotSettings {
-        admin_task_enabled: s.admin_task_enabled,
-        admin_task_token: s.admin_task_token,
-        task_close_enabled: s.task_close_enabled,
-        task_close_token: s.task_close_token,
-        admin_partner_enabled: s.admin_partner_enabled,
-        admin_partner_token: s.admin_partner_token,
-    }
+    TelegramBotSettings { enabled: s.enabled, token: s.token }
 }
 
 fn to_employee_report_row(r: db::EmployeeReportRow) -> EmployeeReportRow {
@@ -2914,7 +2877,7 @@ pub(crate) fn resolve_telegram_task_spawn(
         return None;
     }
     let settings = db.get_telegram_bot_settings_internal();
-    let (_, token) = telegram::effective_task_bot(&settings)?;
+    let token = settings.token.filter(|t| !t.is_empty()).filter(|_| settings.enabled)?;
     let chat_id = db.get_employee_telegram_chat_id(assignee_id)?;
     let employee_name = db.get_employee(assignee_id).map(|e| e.full_name).unwrap_or_default();
     Some(TelegramTaskSpawn { db: state_db.clone(), client: reqwest::Client::new(), token, chat_id, employee_name, title, body, deadline, entry_kind, entry_id })
@@ -2923,7 +2886,7 @@ pub(crate) fn resolve_telegram_task_spawn(
 pub(crate) fn spawn_telegram_task(spawn: TelegramTaskSpawn) {
     tauri::async_runtime::spawn(telegram::notify_task_assigned(
         spawn.db, spawn.client, spawn.token, spawn.chat_id, spawn.employee_name,
-        spawn.title, spawn.body, spawn.deadline, spawn.entry_kind, spawn.entry_id, true,
+        spawn.title, spawn.body, spawn.deadline, spawn.entry_kind, spawn.entry_id,
     ));
 }
 
@@ -3512,32 +3475,20 @@ fn get_telegram_bot_settings(payload: GetTelegramBotSettingsPayload, state: taur
 #[tauri::command]
 fn set_telegram_bot_settings(payload: SetTelegramBotSettingsPayload, state: tauri::State<AppState>) -> Result<TelegramBotSettings, String> {
     let db = state.0.lock().unwrap();
-    db.set_telegram_bot_settings(
-        &payload.admin_id,
-        payload.admin_task_enabled,
-        payload.admin_task_token.as_deref(),
-        payload.task_close_enabled,
-        payload.task_close_token.as_deref(),
-        payload.admin_partner_enabled,
-        payload.admin_partner_token.as_deref(),
-    ).map(to_telegram_bot_settings)
+    db.set_telegram_bot_settings(&payload.admin_id, payload.enabled, payload.token.as_deref()).map(to_telegram_bot_settings)
 }
 
 #[tauri::command]
 fn generate_telegram_link_code(payload: GenerateTelegramLinkCodePayload, state: tauri::State<AppState>) -> Result<TelegramLinkInfo, String> {
     let db = state.0.lock().unwrap();
     let code = db.generate_telegram_link_code(&payload.actor_id, &payload.employee_id)?;
-    let employee = db.get_employee(&payload.employee_id).ok_or_else(|| "Сотрудник не найден".to_string())?;
     let settings = db.get_telegram_bot_settings_internal();
-    let role = if employee.is_partner {
-        settings.admin_partner_enabled.then_some(telegram::BotRole::AdminPartner)
+    let bot_configured = settings.enabled && settings.token.is_some();
+    let deep_link = if bot_configured {
+        db.get_telegram_bot_username("bot").map(|username| format!("https://t.me/{username}?start={code}"))
     } else {
-        telegram::effective_task_bot(&settings).map(|(role, _)| role)
+        None
     };
-    let bot_configured = role.is_some();
-    let deep_link = role
-        .and_then(|r| db.get_telegram_bot_username(r.key()))
-        .map(|username| format!("https://t.me/{username}?start={code}"));
     Ok(TelegramLinkInfo { code, deep_link, bot_configured })
 }
 
@@ -3554,26 +3505,6 @@ fn get_telegram_link_status(payload: GetTelegramLinkStatusPayload, state: tauri:
 fn unlink_telegram(payload: UnlinkTelegramPayload, state: tauri::State<AppState>) -> Result<(), String> {
     let db = state.0.lock().unwrap();
     db.unlink_telegram(&payload.actor_id, &payload.employee_id)
-}
-
-#[tauri::command]
-fn send_partner_telegram_notification(payload: SendPartnerTelegramNotificationPayload, state: tauri::State<AppState>) -> Result<(), String> {
-    let db = state.0.lock().unwrap();
-    if !db.is_admin(&payload.actor_id) {
-        return Err("Недостаточно прав".into());
-    }
-    let settings = db.get_telegram_bot_settings_internal();
-    if !settings.admin_partner_enabled {
-        return Err("Бот «Админ → Партнёр» не включён в Настройках".into());
-    }
-    let token = settings.admin_partner_token.filter(|t| !t.is_empty()).ok_or_else(|| "Не задан токен бота «Админ → Партнёр»".to_string())?;
-    let chat_ids = db.list_partner_telegram_chat_ids(&payload.partner_id);
-    if chat_ids.is_empty() {
-        return Err("У партнёра нет привязанного Telegram-аккаунта".into());
-    }
-    let partner_name = db.get_partner_name(&payload.partner_id).unwrap_or_default();
-    tauri::async_runtime::spawn(telegram::notify_partner(state.0.clone(), reqwest::Client::new(), token, chat_ids, partner_name, payload.title, payload.body));
-    Ok(())
 }
 
 #[tauri::command]
@@ -4061,7 +3992,6 @@ fn main() {
             generate_telegram_link_code,
             get_telegram_link_status,
             unlink_telegram,
-            send_partner_telegram_notification,
             get_notebook_settings,
             set_notebook_settings,
             list_notebook_notes,

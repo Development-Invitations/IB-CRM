@@ -167,27 +167,17 @@ export default function Settings({ employee }: { employee: Employee }) {
   const [copiedRadminId, setCopiedRadminId] = useState(false);
   const [copiedRadminPassword, setCopiedRadminPassword] = useState(false);
 
-  // Telegram-боты (v0.4.1) — три независимых бота, каждый со своим токеном
-  // (решение пользователя, не один общий бот). Реализовано пока только
-  // подключение/хранение токена в этой версии — сама отправка/приём
-  // сообщений через Telegram Bot API не реализована, это следующий шаг.
-  const [tgAdminTaskEnabled, setTgAdminTaskEnabled] = useState(false);
-  const [tgAdminTaskToken, setTgAdminTaskToken] = useState('');
-  const [tgTaskCloseEnabled, setTgTaskCloseEnabled] = useState(false);
-  const [tgTaskCloseToken, setTgTaskCloseToken] = useState('');
-  const [tgAdminPartnerEnabled, setTgAdminPartnerEnabled] = useState(false);
-  const [tgAdminPartnerToken, setTgAdminPartnerToken] = useState('');
+  // Telegram-бот (v0.6.3) — один бот на задачи (постановка + закрытие через
+  // «Готово»); ранее было 3 отдельных бота, объединены по просьбе пользователя.
+  const [tgEnabled, setTgEnabled] = useState(false);
+  const [tgToken, setTgToken] = useState('');
   const [tgBusy, setTgBusy] = useState(false);
 
   useEffect(() => {
     if (!employee.isAdmin) return;
     api.getTelegramBotSettings({ actorId: employee.id }).then((s) => {
-      setTgAdminTaskEnabled(s.adminTaskEnabled);
-      setTgAdminTaskToken(s.adminTaskToken ?? '');
-      setTgTaskCloseEnabled(s.taskCloseEnabled);
-      setTgTaskCloseToken(s.taskCloseToken ?? '');
-      setTgAdminPartnerEnabled(s.adminPartnerEnabled);
-      setTgAdminPartnerToken(s.adminPartnerToken ?? '');
+      setTgEnabled(s.enabled);
+      setTgToken(s.token ?? '');
     }).catch(() => {});
   }, [employee.isAdmin, employee.id]);
 
@@ -196,12 +186,8 @@ export default function Settings({ employee }: { employee: Employee }) {
     try {
       await api.setTelegramBotSettings({
         adminId: employee.id,
-        adminTaskEnabled: tgAdminTaskEnabled,
-        adminTaskToken: tgAdminTaskToken.trim() || null,
-        taskCloseEnabled: tgTaskCloseEnabled,
-        taskCloseToken: tgTaskCloseToken.trim() || null,
-        adminPartnerEnabled: tgAdminPartnerEnabled,
-        adminPartnerToken: tgAdminPartnerToken.trim() || null,
+        enabled: tgEnabled,
+        token: tgToken.trim() || null,
       });
       showToast('success', t('settings.telegramBots.saveSuccess'));
     } catch (err: any) {
@@ -919,39 +905,13 @@ export default function Settings({ employee }: { employee: Employee }) {
 
           <div className="telegram-bot-card">
             <div className="telegram-bot-card-head">
-              <Checkbox checked={tgAdminTaskEnabled} onChange={setTgAdminTaskEnabled} label={t('settings.telegramBots.adminTaskTitle')} />
+              <Checkbox checked={tgEnabled} onChange={setTgEnabled} label={t('settings.telegramBots.adminTaskTitle')} />
             </div>
             <p className="settings-hint">{t('settings.telegramBots.adminTaskDesc')}</p>
-            {tgAdminTaskEnabled && (
+            {tgEnabled && (
               <div className="field" style={{ maxWidth: 420 }}>
                 <label>{t('settings.telegramBots.tokenLabel')}</label>
-                <input value={tgAdminTaskToken} onChange={(e) => setTgAdminTaskToken(e.target.value)} placeholder={t('settings.telegramBots.tokenPlaceholder')} />
-              </div>
-            )}
-          </div>
-
-          <div className="telegram-bot-card">
-            <div className="telegram-bot-card-head">
-              <Checkbox checked={tgTaskCloseEnabled} onChange={setTgTaskCloseEnabled} label={t('settings.telegramBots.taskCloseTitle')} />
-            </div>
-            <p className="settings-hint">{t('settings.telegramBots.taskCloseDesc')}</p>
-            {tgTaskCloseEnabled && (
-              <div className="field" style={{ maxWidth: 420 }}>
-                <label>{t('settings.telegramBots.tokenLabel')}</label>
-                <input value={tgTaskCloseToken} onChange={(e) => setTgTaskCloseToken(e.target.value)} placeholder={t('settings.telegramBots.tokenPlaceholder')} />
-              </div>
-            )}
-          </div>
-
-          <div className="telegram-bot-card">
-            <div className="telegram-bot-card-head">
-              <Checkbox checked={tgAdminPartnerEnabled} onChange={setTgAdminPartnerEnabled} label={t('settings.telegramBots.adminPartnerTitle')} />
-            </div>
-            <p className="settings-hint">{t('settings.telegramBots.adminPartnerDesc')}</p>
-            {tgAdminPartnerEnabled && (
-              <div className="field" style={{ maxWidth: 420 }}>
-                <label>{t('settings.telegramBots.tokenLabel')}</label>
-                <input value={tgAdminPartnerToken} onChange={(e) => setTgAdminPartnerToken(e.target.value)} placeholder={t('settings.telegramBots.tokenPlaceholder')} />
+                <input value={tgToken} onChange={(e) => setTgToken(e.target.value)} placeholder={t('settings.telegramBots.tokenPlaceholder')} />
               </div>
             )}
           </div>

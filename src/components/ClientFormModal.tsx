@@ -1,5 +1,4 @@
 import { useEffect, useState, FormEvent } from 'react';
-import { Send } from 'lucide-react';
 import { api, type Client, type Employee, type Partner, type PartnerService } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
@@ -41,7 +40,6 @@ export default function ClientFormModal({
   const [serviceId, setServiceId] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [tgSendBusy, setTgSendBusy] = useState(false);
 
   const showPartnerSelect = !currentEmployee.isPartner && lockedPartnerId === undefined;
   // Услуга доступна только когда у клиента есть партнёр (свой у lockedPartnerId,
@@ -111,28 +109,6 @@ export default function ClientFormModal({
       setError(typeof err === 'string' ? err : t('clients.errorGeneric'));
     } finally {
       setBusy(false);
-    }
-  };
-
-  // Бот "Админ → Партнёр" (v0.5.3) — только для уже сохранённого клиента с
-  // привязанным партнёром, и только у админа (send_partner_telegram_notification
-  // сам это проверяет на бэкенде — гейт тут только чтобы не показывать кнопку,
-  // которая заведомо упадёт с "Недостаточно прав").
-  const handleSendTelegramNotification = async () => {
-    if (!client || !effectivePartnerId) return;
-    setTgSendBusy(true);
-    try {
-      await api.sendPartnerTelegramNotification({
-        actorId: currentEmployee.id,
-        partnerId: effectivePartnerId,
-        title: t('clients.telegramNotificationTitle', { name: client.name }),
-        body: notes.trim() || client.name,
-      });
-      showToast('success', t('clients.telegramNotificationSuccess'));
-    } catch (err: any) {
-      showToast('error', typeof err === 'string' ? err : t('clients.telegramNotificationError'));
-    } finally {
-      setTgSendBusy(false);
     }
   };
 
@@ -216,12 +192,6 @@ export default function ClientFormModal({
               onChange={setPartnerId}
             />
           </div>
-        )}
-
-        {client && effectivePartnerId && currentEmployee.isAdmin && (
-          <button type="button" className="modal-btn" onClick={handleSendTelegramNotification} disabled={tgSendBusy} style={{ marginTop: 4 }}>
-            <Send size={14} /> {tgSendBusy ? t('common.loading') : t('clients.sendTelegramNotificationBtn')}
-          </button>
         )}
       </form>
     </Modal>

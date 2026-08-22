@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.6.2';
+export const APP_VERSION = '0.6.3';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,13 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.6.3',
+      items: [
+        'Регламенты и проекты в CRM теперь обновляются сразу после закрытия задачи через Telegram (кнопка «Готово») — без ручной перезагрузки страницы',
+        'Три отдельных Telegram-бота объединены в один: он же уведомляет сотрудника о новой задаче, он же принимает «Готово» на закрытие. Бот «Админ → Партнёр» и кнопки отправки уведомлений партнёру (в карточке клиента и регламента) убраны — как и привязка Telegram в Настройках партнёра',
+      ],
+    },
     {
       version: '0.6.2',
       items: [
@@ -579,6 +586,13 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.6.3',
+      items: [
+        "CRM'dagi reglament va loyihalar endi Telegramda \"Bajarildi\" tugmasi bilan vazifa yopilgandan so'ng darhol yangilanadi — sahifani qo'lda qayta yuklash shart emas",
+        "Uchta alohida Telegram-bot bittaga birlashtirildi: u xodimga yangi vazifa haqida xabar beradi, u ham \"Bajarildi\"ni qabul qiladi. \"Admin → Hamkor\" boti va hamkorga bildirishnoma yuborish tugmalari (mijoz va reglament kartochkasida) olib tashlandi — hamkor Sozlamalaridagi Telegram bog'lash bilan birga",
+      ],
+    },
+    {
       version: '0.6.2',
       items: [
         "Xodim Telegramda \"Bajarildi\" tugmasi bilan vazifani yopganda, endi vazifa topshiruvchisiga ham Telegramda bildirishnoma keladi (o'sha bot orqali) — avval bu faqat CRM ichida ko'rinardi",
@@ -1141,6 +1155,13 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.6.3',
+      items: [
+        'CRM\'даги регламент ва лойиҳалар энди Telegramда "Бажарилди" тугмаси билан вазифа ёпилгандан сўнг дарҳол янгиланади — саҳифани қўлда қайта юклаш шарт эмас',
+        'Учта алоҳида Telegram-бот биттага бирлаштирилди: у ходимга янги вазифа ҳақида хабар беради, у ҳам "Бажарилди"ни қабул қилади. "Админ → Ҳамкор" боти ва ҳамкорга билдиришнома юбориш тугмалари (мижоз ва регламент карточкасида) олиб ташланди — ҳамкор Созламаларидаги Telegram боғлаш билан бирга',
+      ],
+    },
     {
       version: '0.6.2',
       items: [

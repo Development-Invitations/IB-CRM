@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useContext } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { listen } from '@tauri-apps/api/event';
 import { Plus, Search, Pencil, Trash2, Send, UserPlus, X, Repeat, CheckSquare, XSquare, RotateCcw, ChevronDown, ChevronRight, ArrowLeft, Link2, Check, Paperclip, Forward, CalendarClock } from 'lucide-react';
 import { api, type Employee, type Project, type ProjectMember, type ProjectChatMessage, type ProjectChatReply, type Client, type ProjectMemberRole, type RegulationEntryStatus } from '../lib/api';
 import { FullscreenContext } from './Dashboard';
@@ -490,6 +491,15 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
 
   useEffect(() => {
     loadDetail();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.id]);
+
+  // Живое обновление открытого проекта (v0.6.3) — см. тот же фикс в
+  // Regulations.tsx: тикер уведомлений теперь дополнительно шлётся при
+  // закрытии задачи через Telegram-кнопку "Готово".
+  useEffect(() => {
+    const unlisten = listen('notification-tick', () => loadDetail());
+    return () => { unlisten.then((f) => f()); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.id]);
 

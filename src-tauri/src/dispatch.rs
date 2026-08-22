@@ -680,28 +680,18 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
         }
         "set_telegram_bot_settings" => {
             let p: crate::SetTelegramBotSettingsPayload = from_payload(payload)?;
-            db.set_telegram_bot_settings(
-                &p.admin_id,
-                p.admin_task_enabled,
-                p.admin_task_token.as_deref(),
-                p.task_close_enabled,
-                p.task_close_token.as_deref(),
-                p.admin_partner_enabled,
-                p.admin_partner_token.as_deref(),
-            ).map(crate::to_telegram_bot_settings).map(to_json)
+            db.set_telegram_bot_settings(&p.admin_id, p.enabled, p.token.as_deref()).map(crate::to_telegram_bot_settings).map(to_json)
         }
         "generate_telegram_link_code" => {
             let p: crate::GenerateTelegramLinkCodePayload = from_payload(payload)?;
             let code = db.generate_telegram_link_code(&p.actor_id, &p.employee_id)?;
-            let employee = db.get_employee(&p.employee_id).ok_or_else(|| "Сотрудник не найден".to_string())?;
             let settings = db.get_telegram_bot_settings_internal();
-            let role = if employee.is_partner {
-                settings.admin_partner_enabled.then_some(crate::telegram::BotRole::AdminPartner)
+            let bot_configured = settings.enabled && settings.token.is_some();
+            let deep_link = if bot_configured {
+                db.get_telegram_bot_username("bot").map(|username| format!("https://t.me/{username}?start={code}"))
             } else {
-                crate::telegram::effective_task_bot(&settings).map(|(role, _)| role)
+                None
             };
-            let bot_configured = role.is_some();
-            let deep_link = role.and_then(|r| db.get_telegram_bot_username(r.key())).map(|username| format!("https://t.me/{username}?start={code}"));
             Ok(to_json(crate::TelegramLinkInfo { code, deep_link, bot_configured }))
         }
         "get_telegram_link_status" => {
@@ -714,24 +704,6 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
         "unlink_telegram" => {
             let p: crate::UnlinkTelegramPayload = from_payload(payload)?;
             db.unlink_telegram(&p.actor_id, &p.employee_id).map(to_json)
-        }
-        "send_partner_telegram_notification" => {
-            let p: crate::SendPartnerTelegramNotificationPayload = from_payload(payload)?;
-            if !db.is_admin(&p.actor_id) {
-                return Err("Недостаточно прав".into());
-            }
-            let settings = db.get_telegram_bot_settings_internal();
-            if !settings.admin_partner_enabled {
-                return Err("Бот «Админ → Партнёр» не включён в Настройках".into());
-            }
-            let token = settings.admin_partner_token.filter(|t| !t.is_empty()).ok_or_else(|| "Не задан токен бота «Админ → Партнёр»".to_string())?;
-            let chat_ids = db.list_partner_telegram_chat_ids(&p.partner_id);
-            if chat_ids.is_empty() {
-                return Err("У партнёра нет привязанного Telegram-аккаунта".into());
-            }
-            let partner_name = db.get_partner_name(&p.partner_id).unwrap_or_default();
-            tauri::async_runtime::spawn(crate::telegram::notify_partner(db_arc.clone(), reqwest::Client::new(), token, chat_ids, partner_name, p.title, p.body));
-            Ok(to_json(()))
         }
         "get_notebook_settings" => {
             let p: crate::GetNotebookSettingsPayload = from_payload(payload)?;

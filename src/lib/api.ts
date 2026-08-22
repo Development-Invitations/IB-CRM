@@ -488,12 +488,8 @@ export type RadminSettings = {
 };
 
 export type TelegramBotSettings = {
-  adminTaskEnabled: boolean;
-  adminTaskToken: string | null;
-  taskCloseEnabled: boolean;
-  taskCloseToken: string | null;
-  adminPartnerEnabled: boolean;
-  adminPartnerToken: string | null;
+  enabled: boolean;
+  token: string | null;
 };
 
 export type TelegramLinkInfo = {
@@ -984,23 +980,14 @@ export const api = {
   setRadminSettings: (payload: { adminId: string; networkId: string; networkPassword: string; note: string }) =>
     invoke<RadminSettings>('set_radmin_settings', { payload }),
   getTelegramBotSettings: (payload: { actorId: string }) => invoke<TelegramBotSettings>('get_telegram_bot_settings', { payload }),
-  setTelegramBotSettings: (payload: {
-    adminId: string;
-    adminTaskEnabled: boolean;
-    adminTaskToken?: string | null;
-    taskCloseEnabled: boolean;
-    taskCloseToken?: string | null;
-    adminPartnerEnabled: boolean;
-    adminPartnerToken?: string | null;
-  }) => invoke<TelegramBotSettings>('set_telegram_bot_settings', { payload }),
+  setTelegramBotSettings: (payload: { adminId: string; enabled: boolean; token?: string | null }) =>
+    invoke<TelegramBotSettings>('set_telegram_bot_settings', { payload }),
   generateTelegramLinkCode: (payload: { actorId: string; employeeId: string }) =>
     invoke<TelegramLinkInfo>('generate_telegram_link_code', { payload }),
   getTelegramLinkStatus: (payload: { actorId: string; employeeId: string }) =>
     invoke<boolean>('get_telegram_link_status', { payload }),
   unlinkTelegram: (payload: { actorId: string; employeeId: string }) =>
     invoke<void>('unlink_telegram', { payload }),
-  sendPartnerTelegramNotification: (payload: { actorId: string; partnerId: string; title: string; body: string }) =>
-    invoke<void>('send_partner_telegram_notification', { payload }),
 
   getNotebookSettings: (payload: { actorId: string; employeeId: string }) =>
     invoke<NotebookSettings>('get_notebook_settings', { payload }),

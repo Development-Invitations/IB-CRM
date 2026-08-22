@@ -4,6 +4,7 @@ import { primaryMonitor, LogicalPosition } from '@tauri-apps/api/window';
 import { emit, listen } from '@tauri-apps/api/event';
 import { api, type Employee, type Notification } from './api';
 import { getChatNotificationsMuted, getStoredToastPosition, type ToastPosition } from './chatNotificationPrefs';
+import { playNotificationSound } from './notificationSound';
 import type { ToastPayload, ToastKind } from '../pages/ToastWindow';
 
 // Куда ведёт клик по уведомлению — вычисляется вызывающей стороной
@@ -144,6 +145,7 @@ export function useNotifications({
   // что и самое первое уведомление после запуска), вместо того чтобы просто
   // сдаться.
   const showToastNow = async (n: Notification) => {
+    playNotificationSound();
     const target = await resolveTarget(n);
     const payload: ToastPayload = {
       notificationId: n.id,

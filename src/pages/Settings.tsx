@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { Copy, Check, FolderOpen, Upload, Eye, EyeOff, Download, Database, Image as ImageIcon, X, Bot, FileSpreadsheet } from 'lucide-react';
+import { Copy, Check, FolderOpen, Upload, Eye, EyeOff, Download, Database, Image as ImageIcon, X, Bot, FileSpreadsheet, Volume2, Play } from 'lucide-react';
 import { open as openFileDialog, save as saveFileDialog } from '@tauri-apps/plugin-dialog';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { relaunch } from '@tauri-apps/plugin-process';
@@ -12,6 +12,15 @@ import { connection } from '../lib/connection';
 import { session } from '../lib/session';
 import { ZOOM_LEVELS, getStoredZoom, applyZoom } from '../lib/zoom';
 import { getStoredWindowMode, applyWindowMode, type WindowMode } from '../lib/windowMode';
+import {
+  NOTIFICATION_SOUND_IDS,
+  getNotificationSoundEnabled,
+  setNotificationSoundEnabled,
+  getStoredNotificationSound,
+  setStoredNotificationSound,
+  playNotificationSound,
+  type NotificationSoundId,
+} from '../lib/notificationSound';
 import { compressLogoFile } from '../lib/photo';
 import { useAppLogo, setCachedAppLogo, applyRuntimeIcon, DEFAULT_LOGO } from '../lib/appLogo';
 import Select from '../components/Select';
@@ -39,6 +48,22 @@ export default function Settings({ employee }: { employee: Employee }) {
     const mode = v as WindowMode;
     setWindowModeState(mode);
     applyWindowMode(mode).catch(() => showToast('error', t('settings.errorGeneric')));
+  };
+
+  // Звук уведомлений (v0.5.2) — по-устройственная настройка, как масштаб/
+  // формат окна выше, применяется сразу, доступна любому пользователю (не
+  // только админу) — играет на любое уведомление, см. useNotifications.ts.
+  const [notificationSoundEnabled, setNotificationSoundEnabledState] = useState(getNotificationSoundEnabled());
+  const handleToggleNotificationSound = (enabled: boolean) => {
+    setNotificationSoundEnabledState(enabled);
+    setNotificationSoundEnabled(enabled);
+  };
+  const [notificationSound, setNotificationSoundState] = useState<NotificationSoundId>(getStoredNotificationSound());
+  const handleNotificationSoundChange = (v: string) => {
+    const id = v as NotificationSoundId;
+    setNotificationSoundState(id);
+    setStoredNotificationSound(id);
+    playNotificationSound(id);
   };
 
   const isClient = connection.isClient();
@@ -527,6 +552,27 @@ export default function Settings({ employee }: { employee: Employee }) {
       </section>
 
       <section className="settings-section">
+        <h2><Volume2 size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />{t('settings.notificationSound.title')}</h2>
+        <Checkbox checked={notificationSoundEnabled} onChange={handleToggleNotificationSound} label={t('settings.notificationSound.enableLabel')} />
+
+        {notificationSoundEnabled && (
+          <div style={{ marginTop: 14, display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+            <div style={{ flex: 1 }}>
+              <Select
+                value={notificationSound}
+                options={NOTIFICATION_SOUND_IDS.map((id) => ({ value: id, label: t(`settings.notificationSound.sounds.${id}`) }))}
+                onChange={handleNotificationSoundChange}
+              />
+            </div>
+            <button className="modal-btn" type="button" onClick={() => playNotificationSound(notificationSound)} title={t('settings.notificationSound.previewBtn')}>
+              <Play size={14} />
+            </button>
+          </div>
+        )}
+        <p className="settings-hint">{t('settings.notificationSound.hint')}</p>
+      </section>
+
+      <section className="settings-section">
         <h2>{t('settings.language')}</h2>
         <Select value={locale} options={languageOptions} onChange={(v) => setLocale(v as Locale)} />
         <p className="settings-hint">{t('settings.languageHint')}</p>
@@ -851,7 +897,7 @@ export default function Settings({ employee }: { employee: Employee }) {
 
             <div className="field" style={{ maxWidth: 420 }}>
               <label>{t('settings.reportExport.folderLabel')}</label>
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div className="report-folder-picker-row">
                 <input value={reportFolder} readOnly placeholder={t('settings.reportExport.folderLabel')} />
                 <button className="modal-btn" type="button" onClick={handlePickReportFolder}>
                   <FolderOpen size={14} /> {t('settings.reportExport.pickFolderBtn')}
@@ -865,28 +911,30 @@ export default function Settings({ employee }: { employee: Employee }) {
           </div>
 
           <h3 className="settings-subheading" style={{ marginTop: 20 }}>{t('settings.reportExport.generateNowTitle')}</h3>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <div className="field" style={{ maxWidth: 180 }}>
-              <label>{t('settings.reportExport.periodFromLabel')}</label>
-              <input type="date" value={genPeriodStart} onChange={(e) => setGenPeriodStart(e.target.value)} />
+          <div className="telegram-bot-card">
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <div className="field" style={{ maxWidth: 180 }}>
+                <label>{t('settings.reportExport.periodFromLabel')}</label>
+                <input type="date" value={genPeriodStart} onChange={(e) => setGenPeriodStart(e.target.value)} />
+              </div>
+              <div className="field" style={{ maxWidth: 180 }}>
+                <label>{t('settings.reportExport.periodToLabel')}</label>
+                <input type="date" value={genPeriodEnd} onChange={(e) => setGenPeriodEnd(e.target.value)} />
+              </div>
             </div>
-            <div className="field" style={{ maxWidth: 180 }}>
-              <label>{t('settings.reportExport.periodToLabel')}</label>
-              <input type="date" value={genPeriodEnd} onChange={(e) => setGenPeriodEnd(e.target.value)} />
-            </div>
+            <button className="modal-btn" onClick={handleGenerateReportNow} disabled={genBusy || !reportFolder} style={{ marginTop: 10 }}>
+              <FileSpreadsheet size={14} /> {genBusy ? t('settings.reportExport.generateBusy') : t('settings.reportExport.generateBtn')}
+            </button>
+            {!reportFolder && <p className="settings-hint">{t('settings.reportExport.folderRequiredHint')}</p>}
+            {genLastPath && (
+              <div className="account-row" style={{ marginTop: 10 }}>
+                <span className="settings-hint" style={{ wordBreak: 'break-all' }}>{genLastPath}</span>
+                <button className="reg-action-btn" onClick={handleOpenGeneratedFolder} title={t('settings.reportExport.openFolderBtn')}>
+                  <FolderOpen size={13} />
+                </button>
+              </div>
+            )}
           </div>
-          <button className="modal-btn" onClick={handleGenerateReportNow} disabled={genBusy || !reportFolder}>
-            <FileSpreadsheet size={14} /> {genBusy ? t('settings.reportExport.generateBusy') : t('settings.reportExport.generateBtn')}
-          </button>
-          {!reportFolder && <p className="settings-hint">{t('settings.reportExport.folderRequiredHint')}</p>}
-          {genLastPath && (
-            <div className="account-row" style={{ marginTop: 10 }}>
-              <span className="settings-hint" style={{ wordBreak: 'break-all' }}>{genLastPath}</span>
-              <button className="reg-action-btn" onClick={handleOpenGeneratedFolder} title={t('settings.reportExport.openFolderBtn')}>
-                <FolderOpen size={13} />
-              </button>
-            </div>
-          )}
         </section>
       )}
 

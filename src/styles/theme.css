@@ -876,6 +876,23 @@ button.primary:hover { filter: brightness(0.95); }
   flex: 1;
 }
 
+/* Строка "поле пути + кнопка выбора папки" (авто-выгрузка отчётов,
+   Settings.tsx) — без flex-shrink:0/white-space:nowrap на кнопке текст
+   "Выбрать папку" переносился на 2 строки, т.к. соседний input с flex:1
+   выдавливал кнопку уже её собственного содержимого. */
+.report-folder-picker-row {
+  display: flex;
+  gap: 6px;
+}
+.report-folder-picker-row input {
+  flex: 1;
+  min-width: 0;
+}
+.report-folder-picker-row .modal-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .settings-subheading {
   font-size: 13px;
   font-weight: 600;

@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.5.1';
+export const APP_VERSION = '0.5.2';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.5.2',
+      items: [
+        'В Настройках — новый раздел «Звук уведомлений»: включение/выключение и выбор одного из 5 тонов, с кнопкой «Прослушать»; звук теперь играет на любое новое уведомление (регламенты, проекты, чат, заявки, дни рождения)',
+        'Исправлена кнопка «Выбрать папку» в авто-выгрузке отчётов — текст переносился на 2 строки вместо одной',
+        'Блок «Сформировать отчёт сейчас» в Настройках получил такой же фон-карточку, как соседний блок авто-выгрузки — раньше выглядел «голым» на общем фоне',
+      ],
+    },
     {
       version: '0.5.1',
       items: [
@@ -540,6 +548,14 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.5.2',
+      items: [
+        "Sozlamalarda — yangi \"Bildirishnoma tovushi\" bo'limi: yoqish/o'chirish va 5 ta ohangdan birini tanlash, \"Tinglash\" tugmasi bilan; tovush endi har qanday yangi bildirishnomada eshitiladi (reglamentlar, loyihalar, chat, arizalar, tug'ilgan kunlar)",
+        "Hisobotlarni avto-yuklab olishdagi \"Papkani tanlash\" tugmasi tuzatildi — matn 2 qatorga bo'linib ketardi",
+        "Sozlamalardagi \"Hisobotni hozir shakllantirish\" bloki qo'shni avto-yuklab olish bloki bilan bir xil fon-kartaga ega bo'ldi — avval umumiy fonda \"yalang'och\" ko'rinardi",
+      ],
+    },
+    {
       version: '0.5.1',
       items: [
         "Blog izohlar ustuni endi IB Chatdagidek to'liq balandlikka cho'ziladi — izohlar ro'yxati skroll bo'ladi, yuborish formasi doim pastga mahkamlangan",
@@ -1063,6 +1079,14 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.5.2',
+      items: [
+        'Созламаларда — янги "Билдиришнома товуши" бўлими: ёқиш/ўчириш ва 5 та оҳангдан бирини танлаш, "Тинглаш" тугмаси билан; товуш энди ҳар қандай янги билдиришномада эшитилади (регламентлар, лойиҳалар, чат, аризалар, туғилган кунлар)',
+        'Ҳисоботларни авто-юклаб олишдаги "Папкани танлаш" тугмаси тузатилди — матн 2 қаторга бўлиниб кетарди',
+        'Созламалардаги "Ҳисоботни ҳозир шакллантириш" блоки қўшни авто-юклаб олиш блоки билан бир хил фон-картага эга бўлди — аввал умумий фонда "яланғоч" кўринарди',
+      ],
+    },
     {
       version: '0.5.1',
       items: [

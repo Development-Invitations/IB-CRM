@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.6.1';
+export const APP_VERSION = '0.6.2';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,12 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.6.2',
+      items: [
+        'Когда сотрудник закрывает задачу кнопкой «Готово» в Telegram, постановщику задачи теперь тоже приходит уведомление в Telegram (тем же ботом) — раньше это было видно только внутри CRM',
+      ],
+    },
     {
       version: '0.6.1',
       items: [
@@ -573,6 +579,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.6.2',
+      items: [
+        "Xodim Telegramda \"Bajarildi\" tugmasi bilan vazifani yopganda, endi vazifa topshiruvchisiga ham Telegramda bildirishnoma keladi (o'sha bot orqali) — avval bu faqat CRM ichida ko'rinardi",
+      ],
+    },
+    {
       version: '0.6.1',
       items: [
         "Telegram-bot tuzatildi: bot bilan chatda kodsiz shunchaki \"/start\" bosilsa, bot avval jim turardi — endi kodni qayerdan olish kerakligini aytadi (Sozlamalar → \"Telegram\" → \"Kod olish\")",
@@ -1129,6 +1141,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.6.2',
+      items: [
+        'Ходим Telegramда "Бажарилди" тугмаси билан вазифани ёпганда, энди вазифа топшируvчисига ҳам Telegramда билдиришнома келади (ўша бот орқали) — аввал бу фақат CRM ичида кўринарди',
+      ],
+    },
     {
       version: '0.6.1',
       items: [

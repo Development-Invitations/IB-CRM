@@ -286,6 +286,46 @@ async fn handle_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client, token: &st
             // Перевызываем уже существующий тикер уведомлений — открытые
             // окна CRM сами перечитают свежие данные (см. useNotifications.ts).
             let _ = app_handle.emit("notification-tick", ());
+            // Постановщику задачи — тоже в Telegram (best-effort, тем же
+            // ботом/токеном, что закрыл задачу; молча не сработает, если
+            // постановщик не привязал СВОЙ Telegram к этому же боту).
+            if let Some(entry_id) = data.strip_prefix("close_reg:") {
+                notify_task_closed_to_assigner(db, client, token, &actor_id, "reg", entry_id).await;
+            } else if let Some(message_id) = data.strip_prefix("close_proj:") {
+                notify_task_closed_to_assigner(db, client, token, &actor_id, "proj", message_id).await;
+            }
         }
+    }
+}
+
+// Уведомление постановщику задачи, когда исполнитель закрыл её кнопкой
+// "Готово" в Telegram (v0.6.2) — синхронный сбор данных короткий блок,
+// дропаем лок ДО await, как и везде в этом файле.
+async fn notify_task_closed_to_assigner(db: &Arc<Mutex<Db>>, client: &reqwest::Client, token: &str, closer_id: &str, kind: &str, id: &str) {
+    let info = {
+        let db_guard = db.lock().unwrap();
+        let closer_name = db_guard.get_employee(closer_id).map(|e| e.full_name).unwrap_or_default();
+        if kind == "reg" {
+            db_guard.get_regulation_entry(id).and_then(|entry| {
+                if entry.author_id == closer_id {
+                    return None; // сам себе задачу поставил и сам закрыл — уведомлять некого
+                }
+                let chat_id = db_guard.get_employee_telegram_chat_id(&entry.author_id)?;
+                let reg_title = db_guard.get_regulation(&entry.regulation_id).map(|r| r.title).unwrap_or_default();
+                Some((chat_id, format!("✅ {closer_name} закрыл(а) задачу в регламенте «{reg_title}»:\n{}", entry.content)))
+            })
+        } else {
+            db_guard.get_project_chat_message(id).and_then(|msg| {
+                if msg.sender_id == closer_id {
+                    return None;
+                }
+                let chat_id = db_guard.get_employee_telegram_chat_id(&msg.sender_id)?;
+                let project_name = db_guard.get_project(&msg.project_id).map(|p| p.name).unwrap_or_default();
+                Some((chat_id, format!("✅ {closer_name} закрыл(а) задачу в проекте «{project_name}»:\n{}", msg.content)))
+            })
+        }
+    };
+    if let Some((chat_id, text)) = info {
+        let _ = send_message(client, token, &chat_id, &text, None).await;
     }
 }

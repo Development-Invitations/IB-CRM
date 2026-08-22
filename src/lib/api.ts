@@ -502,6 +502,20 @@ export type TelegramLinkInfo = {
   botConfigured: boolean;
 };
 
+export type NotebookSettings = {
+  enabled: boolean;
+  name: string | null;
+};
+
+export type NotebookNote = {
+  id: string;
+  employeeId: string;
+  title: string;
+  content: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type EmployeeReportRow = {
   employeeId: string;
   fullName: string;
@@ -987,6 +1001,19 @@ export const api = {
     invoke<void>('unlink_telegram', { payload }),
   sendPartnerTelegramNotification: (payload: { actorId: string; partnerId: string; title: string; body: string }) =>
     invoke<void>('send_partner_telegram_notification', { payload }),
+
+  getNotebookSettings: (payload: { actorId: string; employeeId: string }) =>
+    invoke<NotebookSettings>('get_notebook_settings', { payload }),
+  setNotebookSettings: (payload: { actorId: string; employeeId: string; enabled: boolean; name: string | null }) =>
+    invoke<NotebookSettings>('set_notebook_settings', { payload }),
+  listNotebookNotes: (payload: { actorId: string; employeeId: string }) =>
+    invoke<NotebookNote[]>('list_notebook_notes', { payload }),
+  createNotebookNote: (payload: { actorId: string; employeeId: string; title: string; content: string | null }) =>
+    invoke<NotebookNote>('create_notebook_note', { payload }),
+  updateNotebookNote: (payload: { actorId: string; id: string; title: string; content: string | null }) =>
+    invoke<NotebookNote>('update_notebook_note', { payload }),
+  deleteNotebookNote: (payload: { actorId: string; id: string }) =>
+    invoke<void>('delete_notebook_note', { payload }),
 
   getEmployeeReport: (payload: { adminId: string; periodStart: string; periodEnd: string }) =>
     invoke<EmployeeReportRow[]>('get_employee_report', { payload }),

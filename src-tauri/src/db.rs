@@ -436,6 +436,20 @@ pub struct BlogCommentRecord {
     pub created_at: String,
 }
 
+pub struct NotebookSettingsRecord {
+    pub enabled: bool,
+    pub name: Option<String>,
+}
+
+pub struct NotebookNoteRecord {
+    pub id: String,
+    pub employee_id: String,
+    pub title: String,
+    pub content: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 // SQLite не умеет "ADD COLUMN IF NOT EXISTS" — просто пробуем добавить
 // колонку и молча игнорируем ошибку, если она уже есть (на свежей базе
 // сработает сразу через CREATE TABLE, на старой — домигрирует один раз).
@@ -910,6 +924,35 @@ impl Db {
                 joined_at TEXT NOT NULL DEFAULT (datetime('now')),
                 PRIMARY KEY (group_id, employee_id)
             );",
+        );
+
+        // Личная записная книжка сотрудника/партнёра (v0.6.0) — каждый
+        // employees-аккаунт может включить себе персональный блокнот для
+        // заметок/паролей. Явно БЕЗ пароля на сам блокнот (обсуждалось и
+        // отклонено пользователем) — доступ гейтится только тем же логином/
+        // сессией CRM, как и весь остальной личный кабинет. enabled/name —
+        // 1:1 с сотрудником, поэтому колонки прямо на employees (как
+        // is_partner/telegram_chat_id), а не в app_meta (та — для глобальных
+        // настроек приложения, не персональных).
+        add_column_if_missing(&conn, "employees", "notebook_enabled INTEGER NOT NULL DEFAULT 0");
+        add_column_if_missing(&conn, "employees", "notebook_name TEXT");
+
+        // Заметки — отдельная таблица (много строк на одного сотрудника), тот
+        // же паттерн, что notifications/absence_requests: employee_id FK +
+        // обычный CRUD. Без is_deleted/edited_at (в отличие от
+        // chat_messages/regulation_entries) — это не общий тред с несколькими
+        // читателями, которым нужен аудит правок, а единоличная сущность
+        // одного пользователя, поэтому DELETE — настоящий.
+        let _ = conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS notebook_notes (
+                id TEXT PRIMARY KEY,
+                employee_id TEXT NOT NULL REFERENCES employees(id),
+                title TEXT NOT NULL,
+                content TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_notebook_notes_employee ON notebook_notes(employee_id);",
         );
 
         let db = Db { conn };
@@ -5508,6 +5551,107 @@ impl Db {
 
     pub fn find_employee_id_by_chat_id(&self, chat_id: &str) -> Option<String> {
         self.conn.query_row("SELECT id FROM employees WHERE telegram_chat_id = ?1", params![chat_id], |row| row.get(0)).ok()
+    }
+
+    // ---- Записная книжка (v0.6.0) ----
+    // Строго личное — actor_id должен РАВНЯТЬСЯ employee_id, без обхода для
+    // админа (сознательное отличие от Telegram-привязки выше, где админ
+    // может править чужую) — заметки могут содержать пароли.
+    fn require_notebook_owner(&self, actor_id: &str, employee_id: &str) -> Result<(), String> {
+        if actor_id != employee_id {
+            return Err("Недостаточно прав".into());
+        }
+        Ok(())
+    }
+
+    pub fn get_notebook_settings(&self, actor_id: &str, employee_id: &str) -> Result<NotebookSettingsRecord, String> {
+        self.require_notebook_owner(actor_id, employee_id)?;
+        self.conn
+            .query_row(
+                "SELECT notebook_enabled, notebook_name FROM employees WHERE id = ?1",
+                params![employee_id],
+                |row| Ok(NotebookSettingsRecord { enabled: row.get::<_, i64>(0)? != 0, name: row.get(1)? }),
+            )
+            .map_err(|e| e.to_string())
+    }
+
+    pub fn set_notebook_settings(&self, actor_id: &str, employee_id: &str, enabled: bool, name: Option<&str>) -> Result<NotebookSettingsRecord, String> {
+        self.require_notebook_owner(actor_id, employee_id)?;
+        let trimmed = name.map(str::trim).filter(|s| !s.is_empty());
+        self.conn
+            .execute(
+                "UPDATE employees SET notebook_enabled = ?1, notebook_name = ?2 WHERE id = ?3",
+                params![enabled as i64, trimmed, employee_id],
+            )
+            .map_err(|e| e.to_string())?;
+        self.get_notebook_settings(actor_id, employee_id)
+    }
+
+    fn map_notebook_note_row(row: &rusqlite::Row) -> rusqlite::Result<NotebookNoteRecord> {
+        Ok(NotebookNoteRecord {
+            id: row.get(0)?,
+            employee_id: row.get(1)?,
+            title: row.get(2)?,
+            content: row.get(3)?,
+            created_at: row.get(4)?,
+            updated_at: row.get(5)?,
+        })
+    }
+
+    fn get_notebook_note_internal(&self, id: &str) -> Option<NotebookNoteRecord> {
+        self.conn
+            .query_row(
+                "SELECT id, employee_id, title, content, created_at, updated_at FROM notebook_notes WHERE id = ?1",
+                params![id],
+                Self::map_notebook_note_row,
+            )
+            .ok()
+    }
+
+    pub fn list_notebook_notes(&self, actor_id: &str, employee_id: &str) -> Result<Vec<NotebookNoteRecord>, String> {
+        self.require_notebook_owner(actor_id, employee_id)?;
+        let mut stmt = self.conn
+            .prepare("SELECT id, employee_id, title, content, created_at, updated_at FROM notebook_notes WHERE employee_id = ?1 ORDER BY updated_at DESC")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt.query_map(params![employee_id], Self::map_notebook_note_row).map_err(|e| e.to_string())?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    pub fn create_notebook_note(&self, actor_id: &str, employee_id: &str, title: &str, content: Option<&str>) -> Result<NotebookNoteRecord, String> {
+        self.require_notebook_owner(actor_id, employee_id)?;
+        if title.trim().is_empty() {
+            return Err("Укажите заголовок заметки".into());
+        }
+        let id = Uuid::new_v4().to_string();
+        self.conn
+            .execute(
+                "INSERT INTO notebook_notes (id, employee_id, title, content) VALUES (?1, ?2, ?3, ?4)",
+                params![id, employee_id, title.trim(), content],
+            )
+            .map_err(|e| e.to_string())?;
+        self.get_notebook_note_internal(&id).ok_or_else(|| "Заметка не найдена".to_string())
+    }
+
+    pub fn update_notebook_note(&self, actor_id: &str, id: &str, title: &str, content: Option<&str>) -> Result<NotebookNoteRecord, String> {
+        let existing = self.get_notebook_note_internal(id).ok_or_else(|| "Заметка не найдена".to_string())?;
+        self.require_notebook_owner(actor_id, &existing.employee_id)?;
+        if title.trim().is_empty() {
+            return Err("Укажите заголовок заметки".into());
+        }
+        self.conn
+            .execute(
+                "UPDATE notebook_notes SET title = ?1, content = ?2, updated_at = datetime('now') WHERE id = ?3",
+                params![title.trim(), content, id],
+            )
+            .map_err(|e| e.to_string())?;
+        self.get_notebook_note_internal(id).ok_or_else(|| "Заметка не найдена".to_string())
+    }
+
+    pub fn delete_notebook_note(&self, actor_id: &str, id: &str) -> Result<(), String> {
+        let existing = self.get_notebook_note_internal(id).ok_or_else(|| "Заметка не найдена".to_string())?;
+        self.require_notebook_owner(actor_id, &existing.employee_id)?;
+        self.conn.execute("DELETE FROM notebook_notes WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
+        Ok(())
     }
 
     // ---- Отчёты (v0.5.0) ----

@@ -1,9 +1,11 @@
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings as SettingsIcon, Home, MessageCircle } from 'lucide-react';
-import { type Employee, type Notification } from '../lib/api';
+import { Settings as SettingsIcon, Home, MessageCircle, NotebookText } from 'lucide-react';
+import { api, type Employee, type Notification } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useNotifications, type NotificationTarget } from '../lib/useNotifications';
 import NotificationsBell from './NotificationsBell';
+import NotebookPanel from './NotebookPanel';
 import type { ToastKind } from '../pages/ToastWindow';
 
 // Топбар партнёрской панели (v0.4.0) — облегчённая версия основного Topbar.tsx:
@@ -46,6 +48,18 @@ export default function PartnerTopbar({ employee }: { employee: Employee }) {
     fallbackPath: '/dashboard',
   });
 
+  // Записная книжка (v0.6.0) — та же логика, что в основном Topbar.tsx.
+  const [notebookEnabled, setNotebookEnabled] = useState(false);
+  const [notebookName, setNotebookName] = useState<string | null>(null);
+  const [notebookOpen, setNotebookOpen] = useState(false);
+  const notebookBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    api.getNotebookSettings({ actorId: employee.id, employeeId: employee.id })
+      .then((s) => { setNotebookEnabled(s.enabled); setNotebookName(s.name); })
+      .catch(() => {});
+  }, [employee.id]);
+
   return (
     <header className="topbar">
       <div className="topbar-title">{t('topbar.welcome', { name: employee.fullName || employee.login })}</div>
@@ -69,10 +83,18 @@ export default function PartnerTopbar({ employee }: { employee: Employee }) {
           loadNotifications={loadNotifications}
         />
 
+        {notebookEnabled && (
+          <button ref={notebookBtnRef} className="icon-btn" onClick={() => setNotebookOpen((o) => !o)} aria-label={t('topbar.notebook')}>
+            <NotebookText size={20} />
+          </button>
+        )}
+
         <button className="icon-btn" onClick={() => navigate('/dashboard/settings')} aria-label={t('topbar.settings')}>
           <SettingsIcon size={20} />
         </button>
       </div>
+
+      <NotebookPanel employee={employee} open={notebookOpen} onClose={() => setNotebookOpen(false)} anchorRef={notebookBtnRef} notebookName={notebookName} />
     </header>
   );
 }

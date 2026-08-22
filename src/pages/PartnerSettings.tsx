@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent, ChangeEvent, useRef } from 'react';
-import { Copy, Check, Eye, EyeOff, Send, Clock, Camera, RefreshCw, Bot, X } from 'lucide-react';
+import { Copy, Check, Eye, EyeOff, Send, Clock, Camera, RefreshCw, Bot, X, NotebookText } from 'lucide-react';
 import { api, type Employee } from '../lib/api';
 import { useLocale, LOCALE_LABELS, type Locale } from '../lib/i18n';
 import { useTheme, THEME_NAMES } from '../lib/theme';
@@ -227,6 +227,35 @@ export default function PartnerSettings({ employee: initialEmployee }: { employe
     }
   };
 
+  // Записная книжка (v0.6.0) — та же логика, что у сотрудника в Settings.tsx.
+  const [notebookEnabled, setNotebookEnabledState] = useState(false);
+  const [notebookName, setNotebookName] = useState('');
+  const [notebookBusy, setNotebookBusy] = useState(false);
+
+  useEffect(() => {
+    api.getNotebookSettings({ actorId: employee.id, employeeId: employee.id })
+      .then((s) => { setNotebookEnabledState(s.enabled); setNotebookName(s.name || ''); })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employee.id]);
+
+  const handleSaveNotebookSettings = async () => {
+    setNotebookBusy(true);
+    try {
+      const s = await api.setNotebookSettings({
+        actorId: employee.id, employeeId: employee.id,
+        enabled: notebookEnabled, name: notebookName.trim() || null,
+      });
+      setNotebookEnabledState(s.enabled);
+      setNotebookName(s.name || '');
+      showToast('success', t('settings.notebook.saveSuccess'));
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('settings.errorGeneric'));
+    } finally {
+      setNotebookBusy(false);
+    }
+  };
+
   const themeOptions = THEME_NAMES.map((value) => ({ value, label: t(`settings.theme.${value}`) }));
   const languageOptions = (Object.keys(LOCALE_LABELS) as Locale[]).map((value) => ({ value, label: LOCALE_LABELS[value] }));
 
@@ -411,6 +440,19 @@ export default function PartnerSettings({ employee: initialEmployee }: { employe
             </>
           )}
         </div>
+      </section>
+
+      <section className="settings-section">
+        <h2><NotebookText size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />{t('settings.notebook.title')}</h2>
+        <Checkbox checked={notebookEnabled} onChange={setNotebookEnabledState} label={t('settings.notebook.enableLabel')} />
+        <div className="field" style={{ marginTop: 10, maxWidth: 320 }}>
+          <label>{t('settings.notebook.nameLabel')}</label>
+          <input value={notebookName} onChange={(e) => setNotebookName(e.target.value)} placeholder={t('settings.notebook.namePlaceholder')} disabled={!notebookEnabled} />
+        </div>
+        <button className="modal-btn" onClick={handleSaveNotebookSettings} disabled={notebookBusy} style={{ marginTop: 10 }}>
+          {notebookBusy ? t('common.loading') : t('common.save')}
+        </button>
+        <p className="settings-hint">{t('settings.notebook.hint')}</p>
       </section>
     </div>
   );

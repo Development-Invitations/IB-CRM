@@ -733,6 +733,30 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
             tauri::async_runtime::spawn(crate::telegram::notify_partner(db_arc.clone(), reqwest::Client::new(), token, chat_ids, partner_name, p.title, p.body));
             Ok(to_json(()))
         }
+        "get_notebook_settings" => {
+            let p: crate::GetNotebookSettingsPayload = from_payload(payload)?;
+            db.get_notebook_settings(&p.actor_id, &p.employee_id).map(crate::to_notebook_settings).map(to_json)
+        }
+        "set_notebook_settings" => {
+            let p: crate::SetNotebookSettingsPayload = from_payload(payload)?;
+            db.set_notebook_settings(&p.actor_id, &p.employee_id, p.enabled, p.name.as_deref()).map(crate::to_notebook_settings).map(to_json)
+        }
+        "list_notebook_notes" => {
+            let p: crate::ListNotebookNotesPayload = from_payload(payload)?;
+            db.list_notebook_notes(&p.actor_id, &p.employee_id).map(|v| v.into_iter().map(crate::to_notebook_note).collect::<Vec<_>>()).map(to_json)
+        }
+        "create_notebook_note" => {
+            let p: crate::CreateNotebookNotePayload = from_payload(payload)?;
+            db.create_notebook_note(&p.actor_id, &p.employee_id, &p.title, p.content.as_deref()).map(crate::to_notebook_note).map(to_json)
+        }
+        "update_notebook_note" => {
+            let p: crate::UpdateNotebookNotePayload = from_payload(payload)?;
+            db.update_notebook_note(&p.actor_id, &p.id, &p.title, p.content.as_deref()).map(crate::to_notebook_note).map(to_json)
+        }
+        "delete_notebook_note" => {
+            let p: crate::DeleteNotebookNotePayload = from_payload(payload)?;
+            db.delete_notebook_note(&p.actor_id, &p.id).map(to_json)
+        }
         "get_employee_report" => {
             let p: crate::GetEmployeeReportPayload = from_payload(payload)?;
             db.list_employee_report_rows(&p.admin_id, &p.period_start, &p.period_end)

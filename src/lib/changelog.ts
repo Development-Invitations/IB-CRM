@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.5.3';
+export const APP_VERSION = '0.6.0';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,15 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.6.0',
+      items: [
+        'Новая «Записная книжка» — личный блокнот для напоминалок и паролей у каждого сотрудника и партнёра. Включается в Настройках (своё название, без пароля), открывается кнопкой в шапке',
+        'Записная книжка — плавающая панель: можно двигать и менять размер, пока не закреплена, а после «закрепить» остаётся на месте. Заметки — с заголовком и содержимым через тот же редактор, что и в Блоге',
+        'Поправлена читаемость статусов/тегов на тёмно-серой теме («Графит») — та же проблема, что раньше починили для тёмной и классической синей темы',
+        'В звуках уведомлений добавлено ещё 2 тона — «Современный» и «Классический»',
+      ],
+    },
     {
       version: '0.5.3',
       items: [
@@ -558,6 +567,15 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.6.0',
+      items: [
+        "Yangi \"Yozuv daftari\" — har bir xodim va hamkor uchun eslatmalar va parollar uchun shaxsiy daftar. Sozlamalarda yoqiladi (o'z nomi, parolsiz), shapkadagi tugma orqali ochiladi",
+        "Yozuv daftari — suzuvchi panel: mahkamlanmagan holda siljitish va o'lchamini o'zgartirish mumkin, \"mahkamlash\"dan keyin joyida qoladi. Yozuvlar — sarlavha va mazmun bilan, Blogdagi bilan bir xil muharrir orqali",
+        "Qorong'i kulrang (\"Grafit\") mavzudagi status/teglar o'qilishi tuzatildi — avval qorong'i va klassik ko'k mavzuda tuzatilgan xuddi shu muammo",
+        "Bildirishnoma tovushlariga yana 2 ta ohang qo'shildi — \"Zamonaviy\" va \"Klassik\"",
+      ],
+    },
+    {
       version: '0.5.3',
       items: [
         "Telegram-botlar endi haqiqatdan ishlaydi: \"Admin → Vazifa\" reglament yoki loyihada vazifa tayinlanganda xodimga matn va muddatni yuboradi, \"Xodim → Vazifani yopish\" — uni Telegramdan \"Bajarildi\" tugmasi bilan yopadi, \"Admin → Hamkor\" — tugma bosilganda hamkorga mijoz/reglament haqida bildirishnoma yuboradi",
@@ -1099,6 +1117,15 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.6.0',
+      items: [
+        'Янги "Ёзув дафтари" — ҳар бир ходим ва ҳамкор учун эслатмалар ва пароллар учун шахсий дафтар. Созламаларда ёқилади (ўз номи, паролсиз), шапкадаги тугма орқали очилади',
+        'Ёзув дафтари — сузувчи панель: маҳкамланмаган ҳолда силжитиш ва ўлчамини ўзгартириш мумкин, "маҳкамлаш"дан кейин жойида қолади. Ёзувлар — сарлавҳа ва мазмун билан, Блогдаги билан бир хил муҳаррир орқали',
+        'Қоронғи кулранг ("Графит") мавзудаги статус/тегларнинг ўқилиши тузатилди — аввал қоронғи ва классик кўк мавзуда тузатилган худди шу муаммо',
+        'Билдиришнома товушларига яна 2 та оҳанг қўшилди — "Замонавий" ва "Классик"',
+      ],
+    },
     {
       version: '0.5.3',
       items: [

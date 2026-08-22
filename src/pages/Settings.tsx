@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { Copy, Check, FolderOpen, Upload, Eye, EyeOff, Download, Database, Image as ImageIcon, X, Bot, FileSpreadsheet, Volume2, Play } from 'lucide-react';
+import { Copy, Check, FolderOpen, Upload, Eye, EyeOff, Download, Database, Image as ImageIcon, X, Bot, FileSpreadsheet, Volume2, Play, NotebookText } from 'lucide-react';
 import { open as openFileDialog, save as saveFileDialog } from '@tauri-apps/plugin-dialog';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { relaunch } from '@tauri-apps/plugin-process';
@@ -101,6 +101,36 @@ export default function Settings({ employee }: { employee: Employee }) {
       showToast('error', typeof err === 'string' ? err : t('settings.errorGeneric'));
     } finally {
       setTgLinkBusy(false);
+    }
+  };
+
+  // Записная книжка (v0.6.0) — личный модуль заметок, без пароля (сознательно
+  // отклонён пользователем после уточнения) — доступ уже гейтится обычным
+  // логином CRM. Открывается из шапки (Topbar.tsx), тут только вкл/выкл + имя.
+  const [notebookEnabled, setNotebookEnabledState] = useState(false);
+  const [notebookName, setNotebookName] = useState('');
+  const [notebookBusy, setNotebookBusy] = useState(false);
+
+  useEffect(() => {
+    api.getNotebookSettings({ actorId: employee.id, employeeId: employee.id })
+      .then((s) => { setNotebookEnabledState(s.enabled); setNotebookName(s.name || ''); })
+      .catch(() => {});
+  }, [employee.id]);
+
+  const handleSaveNotebookSettings = async () => {
+    setNotebookBusy(true);
+    try {
+      const s = await api.setNotebookSettings({
+        actorId: employee.id, employeeId: employee.id,
+        enabled: notebookEnabled, name: notebookName.trim() || null,
+      });
+      setNotebookEnabledState(s.enabled);
+      setNotebookName(s.name || '');
+      showToast('success', t('settings.notebook.saveSuccess'));
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('settings.errorGeneric'));
+    } finally {
+      setNotebookBusy(false);
     }
   };
 
@@ -654,6 +684,19 @@ export default function Settings({ employee }: { employee: Employee }) {
             </div>
           </>
         )}
+      </section>
+
+      <section className="settings-section">
+        <h2><NotebookText size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />{t('settings.notebook.title')}</h2>
+        <Checkbox checked={notebookEnabled} onChange={setNotebookEnabledState} label={t('settings.notebook.enableLabel')} />
+        <div className="field" style={{ marginTop: 10, maxWidth: 320 }}>
+          <label>{t('settings.notebook.nameLabel')}</label>
+          <input value={notebookName} onChange={(e) => setNotebookName(e.target.value)} placeholder={t('settings.notebook.namePlaceholder')} disabled={!notebookEnabled} />
+        </div>
+        <button className="modal-btn" onClick={handleSaveNotebookSettings} disabled={notebookBusy} style={{ marginTop: 10 }}>
+          {notebookBusy ? t('common.loading') : t('common.save')}
+        </button>
+        <p className="settings-hint">{t('settings.notebook.hint')}</p>
       </section>
 
       <section className="settings-section">

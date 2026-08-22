@@ -615,6 +615,33 @@ struct TelegramLinkInfo {
 }
 
 #[derive(Clone, serde::Serialize)]
+struct NotebookSettings {
+    enabled: bool,
+    name: Option<String>,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct NotebookNote {
+    id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+    title: String,
+    content: Option<String>,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+    #[serde(rename = "updatedAt")]
+    updated_at: String,
+}
+
+fn to_notebook_settings(s: db::NotebookSettingsRecord) -> NotebookSettings {
+    NotebookSettings { enabled: s.enabled, name: s.name }
+}
+
+fn to_notebook_note(n: db::NotebookNoteRecord) -> NotebookNote {
+    NotebookNote { id: n.id, employee_id: n.employee_id, title: n.title, content: n.content, created_at: n.created_at, updated_at: n.updated_at }
+}
+
+#[derive(Clone, serde::Serialize)]
 struct EmployeeReportRow {
     #[serde(rename = "employeeId")]
     employee_id: String,
@@ -1741,6 +1768,58 @@ struct SendPartnerTelegramNotificationPayload {
     partner_id: String,
     title: String,
     body: String,
+}
+
+#[derive(serde::Deserialize)]
+struct GetNotebookSettingsPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct SetNotebookSettingsPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+    enabled: bool,
+    name: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct ListNotebookNotesPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct CreateNotebookNotePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+    title: String,
+    content: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct UpdateNotebookNotePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    id: String,
+    title: String,
+    content: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct DeleteNotebookNotePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    id: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -3498,6 +3577,42 @@ fn send_partner_telegram_notification(payload: SendPartnerTelegramNotificationPa
 }
 
 #[tauri::command]
+fn get_notebook_settings(payload: GetNotebookSettingsPayload, state: tauri::State<AppState>) -> Result<NotebookSettings, String> {
+    let db = state.0.lock().unwrap();
+    db.get_notebook_settings(&payload.actor_id, &payload.employee_id).map(to_notebook_settings)
+}
+
+#[tauri::command]
+fn set_notebook_settings(payload: SetNotebookSettingsPayload, state: tauri::State<AppState>) -> Result<NotebookSettings, String> {
+    let db = state.0.lock().unwrap();
+    db.set_notebook_settings(&payload.actor_id, &payload.employee_id, payload.enabled, payload.name.as_deref()).map(to_notebook_settings)
+}
+
+#[tauri::command]
+fn list_notebook_notes(payload: ListNotebookNotesPayload, state: tauri::State<AppState>) -> Result<Vec<NotebookNote>, String> {
+    let db = state.0.lock().unwrap();
+    db.list_notebook_notes(&payload.actor_id, &payload.employee_id).map(|v| v.into_iter().map(to_notebook_note).collect())
+}
+
+#[tauri::command]
+fn create_notebook_note(payload: CreateNotebookNotePayload, state: tauri::State<AppState>) -> Result<NotebookNote, String> {
+    let db = state.0.lock().unwrap();
+    db.create_notebook_note(&payload.actor_id, &payload.employee_id, &payload.title, payload.content.as_deref()).map(to_notebook_note)
+}
+
+#[tauri::command]
+fn update_notebook_note(payload: UpdateNotebookNotePayload, state: tauri::State<AppState>) -> Result<NotebookNote, String> {
+    let db = state.0.lock().unwrap();
+    db.update_notebook_note(&payload.actor_id, &payload.id, &payload.title, payload.content.as_deref()).map(to_notebook_note)
+}
+
+#[tauri::command]
+fn delete_notebook_note(payload: DeleteNotebookNotePayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.delete_notebook_note(&payload.actor_id, &payload.id)
+}
+
+#[tauri::command]
 fn get_employee_report(payload: GetEmployeeReportPayload, state: tauri::State<AppState>) -> Result<Vec<EmployeeReportRow>, String> {
     let db = state.0.lock().unwrap();
     db.list_employee_report_rows(&payload.admin_id, &payload.period_start, &payload.period_end)
@@ -3947,6 +4062,12 @@ fn main() {
             get_telegram_link_status,
             unlink_telegram,
             send_partner_telegram_notification,
+            get_notebook_settings,
+            set_notebook_settings,
+            list_notebook_notes,
+            create_notebook_note,
+            update_notebook_note,
+            delete_notebook_note,
             get_employee_report,
             get_partner_report,
             get_report_export_settings,

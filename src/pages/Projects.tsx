@@ -548,7 +548,7 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
     ? [
         { value: '', label: t('employees.notSelected') },
         ...employees
-          .filter((e) => !members.some((m) => m.employeeId === e.id))
+          .filter((e) => !e.isPartner && !members.some((m) => m.employeeId === e.id))
           .map((e) => ({ value: e.id, label: e.fullName || e.login })),
       ]
     : [];

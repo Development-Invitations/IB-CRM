@@ -608,7 +608,7 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
   };
 
   const memberOptions = selected
-    ? [{ value: '', label: t('employees.notSelected') }, ...employees.filter((e) => !members.some((m) => m.employeeId === e.id)).map((e) => ({ value: e.id, label: e.fullName || e.login }))]
+    ? [{ value: '', label: t('employees.notSelected') }, ...employees.filter((e) => !e.isPartner && !members.some((m) => m.employeeId === e.id)).map((e) => ({ value: e.id, label: e.fullName || e.login }))]
     : [];
 
   const handleAddMember = async () => {

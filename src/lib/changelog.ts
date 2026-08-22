@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.5.0';
+export const APP_VERSION = '0.5.1';
 
 export type ChangelogEntry = {
   version: string;
@@ -16,13 +16,19 @@ export type ChangelogEntry = {
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
     {
+      version: '0.5.1',
+      items: [
+        'Колонка комментариев блога теперь растягивается на всю высоту, как в IB Чате — список комментариев скроллится, а форма отправки всегда прибита к низу',
+        'Исправлен баг: в регламенты и проекты CRM можно было добавить партнёра как участника — теперь партнёрские аккаунты туда не попадают ни в списке выбора, ни на уровне сервера, у партнёров свои отдельные регламенты',
+      ],
+    },
+    {
       version: '0.5.0',
       items: [
         'Новый отчёт по сотрудникам (Настройки → админ): часы на работе, заявки на отсутствие, число регламентов и проектов по каждому — экспорт в Excel',
         'Новый отчёт по партнёрам: сколько клиентов добавлено, сколько регламентов велось, финансовый итог по стоимости услуг — виден и админу в отчёте, и партнёру у себя на Главной',
         'В Настройках у админа — авто-выгрузка отчётов по расписанию (день месяца + время + папка назначения) и кнопка «Сформировать сейчас» с произвольным периодом',
         'Отчёт формируется в один Excel-файл с двумя листами ("Сотрудники" и "Партнёры"), стилизован под дизайн приложения, ширина колонок подгоняется под содержимое автоматически',
-        'Колонка комментариев блога теперь растягивается на всю высоту, как в IB Чате — список комментариев скроллится, а форма отправки всегда прибита к низу',
       ],
     },
     {
@@ -534,13 +540,19 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.5.1',
+      items: [
+        "Blog izohlar ustuni endi IB Chatdagidek to'liq balandlikka cho'ziladi — izohlar ro'yxati skroll bo'ladi, yuborish formasi doim pastga mahkamlangan",
+        "Xato tuzatildi: CRM reglamentlari va loyihalariga hamkorni ishtirokchi sifatida qo'shish mumkin edi — endi hamkor akkauntlari na tanlash ro'yxatida, na server darajasida u yerga tushmaydi, hamkorlarning o'z alohida reglamentlari bor",
+      ],
+    },
+    {
       version: '0.5.0',
       items: [
         "Xodimlar bo'yicha yangi hisobot (Sozlamalar → admin): ish vaqti, yo'qlik arizalari, har biri bo'yicha reglament va loyihalar soni — Excelga eksport",
         "Hamkorlar bo'yicha yangi hisobot: nechta mijoz qo'shilgan, nechta reglament olib borilgan, xizmatlar narxi bo'yicha moliyaviy yakun — hisobotda ham, hamkorning o'z Bosh sahifasida ham ko'rinadi",
         "Sozlamalarda admin uchun — hisobotlarni jadval bo'yicha avtomatik yuklab olish (oyning kuni + vaqt + maqsad papka) va istalgan davr uchun «Hozir shakllantirish» tugmasi",
         "Hisobot bitta Excel faylida ikkita varaq bilan shakllanadi (\"Xodimlar\" va \"Hamkorlar\"), ilova dizayniga moslashtirilgan, ustunlar kengligi mazmuniga qarab avtomatik moslashadi",
-        "Blog izohlar ustuni endi IB Chatdagidek to'liq balandlikka cho'ziladi — izohlar ro'yxati skroll bo'ladi, yuborish formasi doim pastga mahkamlangan",
       ],
     },
     {
@@ -1052,13 +1064,19 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   'uz-cyrl': [
     {
+      version: '0.5.1',
+      items: [
+        'Блог изоҳлар устуни энди IB Чатдагидек тўлиқ баландликка чўзилади — изоҳлар рўйхати скролл бўлади, юбориш формаси доим пастга маҳкамланган',
+        'Хато тузатилди: CRM регламентлари ва лойиҳаларига ҳамкорни иштирокчи сифатида қўшиш мумкин эди — энди ҳамкор аккаунтлари на танлаш рўйхатида, на сервер даражасида у ерга тушмайди, ҳамкорларнинг ўз алоҳида регламентлари бор',
+      ],
+    },
+    {
       version: '0.5.0',
       items: [
         'Ходимлар бўйича янги ҳисобот (Созламалар → админ): иш вақти, йўқлик аризалари, ҳар бири бўйича регламент ва лойиҳалар сони — Excelга экспорт',
         'Ҳамкорлар бўйича янги ҳисобот: нечта мижоз қўшилган, нечта регламент олиб борилган, хизматлар нархи бўйича молиявий якун — ҳисоботда ҳам, ҳамкорнинг ўз Бош саҳифасида ҳам кўринади',
         'Созламаларда админ учун — ҳисоботларни жадвал бўйича автоматик юклаб олиш (ойнинг куни + вақт + мақсад папка) ва исталган давр учун «Ҳозир шакллантириш» тугмаси',
         'Ҳисобот битта Excel файлида иккита варақ билан шаклланади ("Ходимлар" ва "Ҳамкорлар"), илова дизайнига мослаштирилган, устунлар кенглиги мазмунига қараб автоматик мослашади',
-        'Блог изоҳлар устуни энди IB Чатдагидек тўлиқ баландликка чўзилади — изоҳлар рўйхати скролл бўлади, юбориш формаси доим пастга маҳкамланган',
       ],
     },
     {

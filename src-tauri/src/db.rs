@@ -3306,6 +3306,14 @@ impl Db {
         if !["member", "assistant"].contains(&role) {
             return Err("Некорректная роль".into());
         }
+        // Партнёрские аккаунты работают только через свои отдельные
+        // partner_regulations — у обычных проектов/регламентов CRM свой
+        // состав участников, партнёра туда добавлять нельзя (см. также
+        // add_regulation_member).
+        let member = self.get_employee(employee_id).ok_or_else(|| "Сотрудник не найден".to_string())?;
+        if member.is_partner {
+            return Err("Партнёра нельзя добавить в проект — у партнёров свои отдельные регламенты".into());
+        }
         self.conn
             .execute(
                 "INSERT INTO project_members (project_id, employee_id, role_in_project, added_by)
@@ -3904,6 +3912,13 @@ impl Db {
         }
         if !["member", "assistant"].contains(&role) {
             return Err("Некорректная роль".into());
+        }
+        // Партнёрские аккаунты работают только через свои отдельные
+        // partner_regulations — у обычных регламентов CRM свой состав
+        // участников, партнёра туда добавлять нельзя.
+        let member = self.get_employee(employee_id).ok_or_else(|| "Сотрудник не найден".to_string())?;
+        if member.is_partner {
+            return Err("Партнёра нельзя добавить в регламент — у партнёров свои отдельные регламенты".into());
         }
         self.conn
             .execute(

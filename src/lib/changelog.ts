@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.6.0';
+export const APP_VERSION = '0.6.1';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,12 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '0.6.1',
+      items: [
+        'Исправлен Telegram-бот: если просто нажать «/start» в чате с ботом без кода привязки, бот раньше молчал — теперь подсказывает, где взять код (Настройки → «Telegram» → «Получить код»)',
+      ],
+    },
     {
       version: '0.6.0',
       items: [
@@ -567,6 +573,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '0.6.1',
+      items: [
+        "Telegram-bot tuzatildi: bot bilan chatda kodsiz shunchaki \"/start\" bosilsa, bot avval jim turardi — endi kodni qayerdan olish kerakligini aytadi (Sozlamalar → \"Telegram\" → \"Kod olish\")",
+      ],
+    },
+    {
       version: '0.6.0',
       items: [
         "Yangi \"Yozuv daftari\" — har bir xodim va hamkor uchun eslatmalar va parollar uchun shaxsiy daftar. Sozlamalarda yoqiladi (o'z nomi, parolsiz), shapkadagi tugma orqali ochiladi",
@@ -1117,6 +1129,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '0.6.1',
+      items: [
+        'Telegram-бот тузатилди: бот билан чатда кодсиз шунчаки "/start" босилса, бот аввал жим турарди — энди кодни қаердан олиш кераклигини айтади (Созламалар → "Telegram" → "Код олиш")',
+      ],
+    },
     {
       version: '0.6.0',
       items: [

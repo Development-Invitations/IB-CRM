@@ -229,14 +229,29 @@ async fn handle_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client, token: &st
         let text = msg.get("text").and_then(|v| v.as_str());
         let chat_id = msg.get("chat").and_then(|c| c.get("id")).map(|v| v.to_string());
         if let (Some(text), Some(chat_id)) = (text, chat_id) {
-            let code = text
-                .strip_prefix("/start ")
-                .map(|s| s.trim().to_string())
-                .or_else(|| (!text.starts_with('/')).then(|| text.trim().to_string()));
-            if let Some(code) = code.filter(|c| !c.is_empty()) {
-                let linked = db.lock().unwrap().link_telegram_chat_by_code(&code, &chat_id);
-                let reply = if linked.is_some() { "Аккаунт привязан ✅" } else { "Код неверен или истёк" };
-                let _ = send_message(client, token, &chat_id, reply, None).await;
+            let trimmed = text.trim();
+            // Голое "/start" (просто нажали кнопку в Telegram, без кода) —
+            // раньше молча ничего не делал, из-за чего выглядело, будто бот
+            // не отвечает вообще ничего. Теперь явно подсказывает, что делать.
+            if trimmed == "/start" {
+                let _ = send_message(
+                    client,
+                    token,
+                    &chat_id,
+                    "Здравствуйте! Чтобы привязать аккаунт, получите код в CRM (Настройки → «Telegram» → «Получить код») и отправьте его сюда.",
+                    None,
+                )
+                .await;
+            } else {
+                let code = trimmed
+                    .strip_prefix("/start ")
+                    .map(|s| s.trim().to_string())
+                    .or_else(|| (!trimmed.starts_with('/')).then(|| trimmed.to_string()));
+                if let Some(code) = code.filter(|c| !c.is_empty()) {
+                    let linked = db.lock().unwrap().link_telegram_chat_by_code(&code, &chat_id);
+                    let reply = if linked.is_some() { "Аккаунт привязан ✅" } else { "Код неверен или истёк" };
+                    let _ = send_message(client, token, &chat_id, reply, None).await;
+                }
             }
         }
         return;

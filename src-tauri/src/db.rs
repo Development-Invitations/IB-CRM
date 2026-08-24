@@ -1,6 +1,9 @@
 use chrono::NaiveDateTime;
 use rusqlite::{params, Connection};
+use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 // В v0.1.x работаем полностью локально (SQLite-файл в app data dir).
@@ -9,6 +12,14 @@ use uuid::Uuid;
 
 pub struct Db {
     conn: Connection,
+    // "Печатает…" в личных чатах (v1.4.0) — намеренно НЕ в SQLite: состояние
+    // живёт секунды, писать его на диск при каждом нажатии клавиши избыточно.
+    // Отдельный Mutex поверх — свой для этого поля, не пересекается с внешним
+    // Arc<Mutex<Db>>, которым уже обёрнута вся Db в AppState (никакого риска
+    // взаимной блокировки — это разные Mutex). Ключ — id канала (тот же
+    // "dm:a:b", что и в остальном чате), значение — (кто печатает, когда
+    // истечёт).
+    typing: Mutex<HashMap<String, (String, Instant)>>,
 }
 
 pub struct EmployeeRecord {
@@ -376,6 +387,7 @@ pub struct PartnerServiceRecord {
     pub partner_id: String,
     pub name: String,
     pub description: Option<String>,
+    pub code: Option<String>,
     pub price: Option<String>,
     pub reward_percent: Option<String>,
     pub created_by: Option<String>,
@@ -391,6 +403,7 @@ pub struct HouseServiceRecord {
     pub id: String,
     pub name: String,
     pub description: Option<String>,
+    pub code: Option<String>,
     pub price: Option<String>,
     pub reward_percent: Option<String>,
     pub created_by: Option<String>,
@@ -835,6 +848,10 @@ impl Db {
         // партнёр, или конкретный сотрудник этого партнёра, если создаёт админ.
         add_column_if_missing(&conn, "partner_regulations", "assistant_id TEXT REFERENCES employees(id)");
         add_column_if_missing(&conn, "partner_services", "description TEXT");
+        // Код/артикул услуги (v1.4.0) — свободный текст, для сверки с
+        // прайс-листом поставщика (например, код позиции 1С).
+        add_column_if_missing(&conn, "partner_services", "code TEXT");
+        add_column_if_missing(&conn, "house_services", "code TEXT");
         // NULL = тема видна только сотрудникам (как раньше); '*' = всем
         // партнёрам; иначе — id конкретного партнёра, см. v0.3.0.
         add_column_if_missing(&conn, "blog_topics", "partner_audience TEXT");
@@ -1019,7 +1036,7 @@ impl Db {
             CREATE INDEX IF NOT EXISTS idx_notebook_notes_employee ON notebook_notes(employee_id);",
         );
 
-        let db = Db { conn };
+        let db = Db { conn, typing: Mutex::new(HashMap::new()) };
         db.notify_todays_birthdays();
         db
     }
@@ -1653,6 +1670,29 @@ impl Db {
             })
             .map_err(|e| e.to_string())?;
         Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    // "Печатает…" (v1.4.0) — ping ставит метку "я печатаю" на 5 секунд
+    // вперёд, is_other_typing спрашивает "печатает ли СЕЙЧАС кто-то другой
+    // (не сам actor) в этом канале". Best-effort: если composer не успел
+    // пингануть перед закрытием — метка просто истечёт сама по себе, никакого
+    // "отписаться" не нужно.
+    const TYPING_TTL: Duration = Duration::from_secs(5);
+
+    pub fn ping_typing(&self, actor_id: &str, channel: &str) -> Result<(), String> {
+        self.can_access_chat_channel(actor_id, channel)?;
+        let mut map = self.typing.lock().unwrap();
+        map.insert(channel.to_string(), (actor_id.to_string(), Instant::now() + Self::TYPING_TTL));
+        Ok(())
+    }
+
+    pub fn is_other_typing(&self, actor_id: &str, channel: &str) -> Result<bool, String> {
+        self.can_access_chat_channel(actor_id, channel)?;
+        let map = self.typing.lock().unwrap();
+        Ok(match map.get(channel) {
+            Some((typer_id, expires_at)) => typer_id != actor_id && Instant::now() < *expires_at,
+            None => false,
+        })
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -4628,7 +4668,7 @@ impl Db {
     }
 
     const PARTNER_SERVICE_SELECT: &'static str = "SELECT
-            ps.id, ps.partner_id, ps.name, ps.description, ps.price, ps.reward_percent,
+            ps.id, ps.partner_id, ps.name, ps.description, ps.code, ps.price, ps.reward_percent,
             ps.created_by, cb.full_name, ps.created_at, ps.updated_at
         FROM partner_services ps
         LEFT JOIN employees cb ON cb.id = ps.created_by";
@@ -4639,12 +4679,13 @@ impl Db {
             partner_id: row.get(1)?,
             name: row.get(2)?,
             description: row.get(3)?,
-            price: row.get(4)?,
-            reward_percent: row.get(5)?,
-            created_by: row.get(6)?,
-            created_by_name: row.get(7)?,
-            created_at: row.get(8)?,
-            updated_at: row.get(9)?,
+            code: row.get(4)?,
+            price: row.get(5)?,
+            reward_percent: row.get(6)?,
+            created_by: row.get(7)?,
+            created_by_name: row.get(8)?,
+            created_at: row.get(9)?,
+            updated_at: row.get(10)?,
         })
     }
 
@@ -4723,7 +4764,7 @@ impl Db {
         Ok(rows.filter_map(|r| r.ok()).collect())
     }
 
-    pub fn create_partner_service(&self, actor_id: &str, partner_id: &str, name: &str, description: Option<&str>, price: Option<&str>, reward_percent: Option<&str>) -> Result<PartnerServiceRecord, String> {
+    pub fn create_partner_service(&self, actor_id: &str, partner_id: &str, name: &str, description: Option<&str>, code: Option<&str>, price: Option<&str>, reward_percent: Option<&str>) -> Result<PartnerServiceRecord, String> {
         self.can_access_partner_org(actor_id, partner_id)?;
         if name.trim().is_empty() {
             return Err("Укажите название услуги".into());
@@ -4731,14 +4772,14 @@ impl Db {
         let id = Uuid::new_v4().to_string();
         self.conn
             .execute(
-                "INSERT INTO partner_services (id, partner_id, name, description, price, reward_percent, created_by) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                params![id, partner_id, name.trim(), description, price, reward_percent, actor_id],
+                "INSERT INTO partner_services (id, partner_id, name, description, code, price, reward_percent, created_by) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![id, partner_id, name.trim(), description, code, price, reward_percent, actor_id],
             )
             .map_err(|e| e.to_string())?;
         self.get_partner_service(&id).ok_or_else(|| "Услуга не найдена".to_string())
     }
 
-    pub fn update_partner_service(&self, actor_id: &str, id: &str, name: &str, description: Option<&str>, price: Option<&str>, reward_percent: Option<&str>) -> Result<PartnerServiceRecord, String> {
+    pub fn update_partner_service(&self, actor_id: &str, id: &str, name: &str, description: Option<&str>, code: Option<&str>, price: Option<&str>, reward_percent: Option<&str>) -> Result<PartnerServiceRecord, String> {
         let existing = self.get_partner_service(id).ok_or_else(|| "Услуга не найдена".to_string())?;
         self.can_access_partner_org(actor_id, &existing.partner_id)?;
         if name.trim().is_empty() {
@@ -4746,8 +4787,8 @@ impl Db {
         }
         self.conn
             .execute(
-                "UPDATE partner_services SET name = ?1, description = ?2, price = ?3, reward_percent = ?4, updated_at = datetime('now') WHERE id = ?5",
-                params![name.trim(), description, price, reward_percent, id],
+                "UPDATE partner_services SET name = ?1, description = ?2, code = ?3, price = ?4, reward_percent = ?5, updated_at = datetime('now') WHERE id = ?6",
+                params![name.trim(), description, code, price, reward_percent, id],
             )
             .map_err(|e| e.to_string())?;
         self.get_partner_service(id).ok_or_else(|| "Услуга не найдена".to_string())
@@ -4767,7 +4808,7 @@ impl Db {
     // писать — только админ (это каталог самой компании, а не партнёра).
 
     const HOUSE_SERVICE_SELECT: &'static str = "SELECT
-            hs.id, hs.name, hs.description, hs.price, hs.reward_percent,
+            hs.id, hs.name, hs.description, hs.code, hs.price, hs.reward_percent,
             hs.created_by, cb.full_name, hs.created_at, hs.updated_at
         FROM house_services hs
         LEFT JOIN employees cb ON cb.id = hs.created_by";
@@ -4777,12 +4818,13 @@ impl Db {
             id: row.get(0)?,
             name: row.get(1)?,
             description: row.get(2)?,
-            price: row.get(3)?,
-            reward_percent: row.get(4)?,
-            created_by: row.get(5)?,
-            created_by_name: row.get(6)?,
-            created_at: row.get(7)?,
-            updated_at: row.get(8)?,
+            code: row.get(3)?,
+            price: row.get(4)?,
+            reward_percent: row.get(5)?,
+            created_by: row.get(6)?,
+            created_by_name: row.get(7)?,
+            created_at: row.get(8)?,
+            updated_at: row.get(9)?,
         })
     }
 
@@ -4807,7 +4849,7 @@ impl Db {
         rows.filter_map(|r| r.ok()).collect()
     }
 
-    pub fn create_house_service(&self, actor_id: &str, name: &str, description: Option<&str>, price: Option<&str>, reward_percent: Option<&str>) -> Result<HouseServiceRecord, String> {
+    pub fn create_house_service(&self, actor_id: &str, name: &str, description: Option<&str>, code: Option<&str>, price: Option<&str>, reward_percent: Option<&str>) -> Result<HouseServiceRecord, String> {
         if !self.is_admin(actor_id) {
             return Err("Недостаточно прав".into());
         }
@@ -4817,14 +4859,14 @@ impl Db {
         let id = Uuid::new_v4().to_string();
         self.conn
             .execute(
-                "INSERT INTO house_services (id, name, description, price, reward_percent, created_by) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![id, name.trim(), description, price, reward_percent, actor_id],
+                "INSERT INTO house_services (id, name, description, code, price, reward_percent, created_by) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![id, name.trim(), description, code, price, reward_percent, actor_id],
             )
             .map_err(|e| e.to_string())?;
         self.get_house_service(&id).ok_or_else(|| "Услуга не найдена".to_string())
     }
 
-    pub fn update_house_service(&self, actor_id: &str, id: &str, name: &str, description: Option<&str>, price: Option<&str>, reward_percent: Option<&str>) -> Result<HouseServiceRecord, String> {
+    pub fn update_house_service(&self, actor_id: &str, id: &str, name: &str, description: Option<&str>, code: Option<&str>, price: Option<&str>, reward_percent: Option<&str>) -> Result<HouseServiceRecord, String> {
         if !self.is_admin(actor_id) {
             return Err("Недостаточно прав".into());
         }
@@ -4833,8 +4875,8 @@ impl Db {
         }
         self.conn
             .execute(
-                "UPDATE house_services SET name = ?1, description = ?2, price = ?3, reward_percent = ?4, updated_at = datetime('now') WHERE id = ?5",
-                params![name.trim(), description, price, reward_percent, id],
+                "UPDATE house_services SET name = ?1, description = ?2, code = ?3, price = ?4, reward_percent = ?5, updated_at = datetime('now') WHERE id = ?6",
+                params![name.trim(), description, code, price, reward_percent, id],
             )
             .map_err(|e| e.to_string())?;
         self.get_house_service(id).ok_or_else(|| "Услуга не найдена".to_string())

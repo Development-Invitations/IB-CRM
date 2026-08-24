@@ -112,7 +112,7 @@ export default function Topbar({ employee }: { employee: Employee }) {
           </button>
         )}
 
-        <button className="icon-btn" onClick={() => navigate('/dashboard/chat')} aria-label={t('topbar.chat')}>
+        <button className="icon-btn" data-tour-id="topbar-chat" onClick={() => navigate('/dashboard/chat')} aria-label={t('topbar.chat')}>
           <MessageCircle size={20} />
         </button>
 

@@ -363,7 +363,7 @@ export default function PartnerSettings({ employee: initialEmployee }: { employe
           )}
         </div>
 
-        <button className="modal-btn" onClick={loadRadmin} disabled={radminLoading} style={{ marginTop: 12 }}>
+        <button className="modal-btn" onClick={loadRadmin} disabled={radminLoading} style={{ marginTop: 10 }}>
           <RefreshCw size={14} /> {t('partnerSettings.radminRefreshBtn')}
         </button>
       </section>

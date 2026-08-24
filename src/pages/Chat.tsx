@@ -77,6 +77,7 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [otherTyping, setOtherTyping] = useState(false);
 
   const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
   const [dmSummaries, setDmSummaries] = useState<DmChannelSummary[]>([]);
@@ -120,6 +121,10 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
   // последнее" и добавляется "написали новое — сразу видно его", без
   // отдельного стейта на каждый случай.
   const lastMessageIdRef = useRef<string | null>(null);
+  // Троттлинг пинга "печатаю" — не чаще раза в 2 сек, даже если человек
+  // печатает без остановки (сам пинг дешёвый, но незачем дёргать IPC на
+  // каждое нажатие клавиши).
+  const lastTypingPingRef = useRef(0);
 
   useEffect(() => {
     enterFullscreen();
@@ -151,13 +156,20 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
   // список сотрудников для поиска, ни список уже начатых переписок им не нужны.
   useEffect(() => {
     if (currentEmployee.isPartner) return;
-    api.listEmployees().then(setAllEmployees).catch(() => {});
+    // Сотрудников тоже обновляем по тому же тикеру, не только один раз при
+    // монтировании — иначе онлайн-статус собеседника в шапке переписки
+    // (isOnline/lastSeenAt) навсегда застывал бы на моменте открытия чата.
+    const loadEmployees = () => {
+      api.listEmployees().then(setAllEmployees).catch(() => {});
+    };
+    loadEmployees();
+    const employeesInterval = setInterval(loadEmployees, POLL_INTERVAL_MS);
     const loadDmSummaries = () => {
       api.listMyDmChannels(currentEmployee.id).then(setDmSummaries).catch(() => {});
     };
     loadDmSummaries();
     const interval = setInterval(loadDmSummaries, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
+    return () => { clearInterval(interval); clearInterval(employeesInterval); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEmployee.isPartner]);
 
@@ -254,6 +266,21 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
     loadMessages();
     if (!channel) return;
     const interval = setInterval(() => loadMessages(true), POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel]);
+
+  // "Печатает…" (v1.4.0) — только личка (см. can_access_chat_channel на
+  // бэкенде — групповой/общий "кто-то печатает" был бы куда менее полезен и
+  // куда более шумным, поэтому пока не делаем).
+  useEffect(() => {
+    setOtherTyping(false);
+    if (!channel || !channel.startsWith('dm:')) return;
+    const poll = () => {
+      api.getTypingStatus({ actorId: currentEmployee.id, channel }).then(setOtherTyping).catch(() => {});
+    };
+    poll();
+    const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel]);
@@ -460,6 +487,15 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
     }
   };
 
+  const handleTextChange = (value: string) => {
+    setText(value);
+    if (!channel || !channel.startsWith('dm:')) return;
+    const now = Date.now();
+    if (now - lastTypingPingRef.current < 2000) return;
+    lastTypingPingRef.current = now;
+    api.pingTyping({ actorId: currentEmployee.id, channel }).catch(() => {});
+  };
+
   const handleSend = async () => {
     if (!channel || !text.trim()) return;
     setSendBusy(true);
@@ -497,6 +533,7 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
   const wallpaperCss = CHAT_WALLPAPER_CSS[getStoredChatWallpaper()];
 
   const isDmChannel = !!channel && channel.startsWith('dm:');
+  const activeDmPeerEmployee = activeDmPeer ? allEmployees.find((e) => e.id === activeDmPeer.id) : undefined;
   const activePartnerName =
     partners.find((p) => p.id === channel)?.name ?? partnerChatSummaries.find((s) => s.partnerId === channel)?.partnerName;
   const activeChannelLabel = channels.find((c) => c.id === channel)?.label ?? activePartnerName ?? '';
@@ -705,7 +742,21 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
             {isDmChannel && activeDmPeer ? (
               <div className="chat-thread-peer">
                 <Avatar name={activeDmPeer.name} size={32} src={activeDmPeer.avatarData} />
-                <span className="department-members-title">{activeDmPeer.name}</span>
+                <div className="chat-thread-peer-text">
+                  <span className="department-members-title">{activeDmPeer.name}</span>
+                  {otherTyping ? (
+                    <span className="chat-thread-peer-status typing">{t('chat.typingNow')}</span>
+                  ) : activeDmPeerEmployee ? (
+                    <span className={`chat-thread-peer-status status-value ${activeDmPeerEmployee.isOnline ? 'online' : 'offline'}`}>
+                      <span className="status-dot" />
+                      {activeDmPeerEmployee.isOnline
+                        ? t('employees.onlineNow')
+                        : activeDmPeerEmployee.lastSeenAt
+                          ? t('employees.lastSeenLabel', { time: parseSqliteUtc(activeDmPeerEmployee.lastSeenAt).toLocaleString() })
+                          : t('employees.neverLoggedIn')}
+                    </span>
+                  ) : null}
+                </div>
               </div>
             ) : activeGroup ? (
               <div className="chat-thread-peer">
@@ -838,7 +889,7 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
                 rows={1}
                 className="chat-composer-input"
                 value={text}
-                onChange={(e) => setText(e.target.value)}
+                onChange={(e) => handleTextChange(e.target.value)}
                 placeholder={t('chat.composerPlaceholder')}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {

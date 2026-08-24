@@ -21,6 +21,7 @@ export default function HouseServices({ currentEmployee }: { currentEmployee: Em
   const [editing, setEditing] = useState<HouseService | undefined>(undefined);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [code, setCode] = useState('');
   const [price, setPrice] = useState('');
   const [rewardPercent, setRewardPercent] = useState('');
   const [error, setError] = useState('');
@@ -51,6 +52,7 @@ export default function HouseServices({ currentEmployee }: { currentEmployee: Em
     setEditing(undefined);
     setName('');
     setDescription('');
+    setCode('');
     setPrice('');
     setRewardPercent('');
     setError('');
@@ -61,6 +63,7 @@ export default function HouseServices({ currentEmployee }: { currentEmployee: Em
     setEditing(s);
     setName(s.name);
     setDescription(s.description ?? '');
+    setCode(s.code ?? '');
     setPrice(s.price ?? '');
     setRewardPercent(s.rewardPercent ?? '');
     setError('');
@@ -76,7 +79,7 @@ export default function HouseServices({ currentEmployee }: { currentEmployee: Em
     setBusy(true);
     setError('');
     try {
-      const shared = { name: name.trim(), description: description.trim() || null, price: price.trim() || null, rewardPercent: rewardPercent.trim() || null };
+      const shared = { name: name.trim(), description: description.trim() || null, code: code.trim() || null, price: price.trim() || null, rewardPercent: rewardPercent.trim() || null };
       if (editing) {
         await api.updateHouseService({ actorId: currentEmployee.id, id: editing.id, ...shared });
         showToast('success', t('houseServices.updated'));
@@ -136,17 +139,20 @@ export default function HouseServices({ currentEmployee }: { currentEmployee: Em
               <tr key={s.id} className="employees-row">
                 <td>
                   <div>{s.name}</div>
+                  {s.code && <div className="settings-hint">{t('houseServices.codeLabel')}: {s.code}</div>}
                   {s.description && <div className="settings-hint">{s.description}</div>}
                 </td>
                 <td>{s.price ? `${formatThousands(s.price)} сум` : '—'}</td>
                 <td>{s.rewardPercent ? `${s.rewardPercent}%` : '—'}</td>
                 <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                  <button className="icon-btn" onClick={() => openEdit(s)} aria-label={t('employees.editBtn')}>
-                    <Pencil size={14} />
-                  </button>
-                  <button className="icon-btn" onClick={() => setDeleteTarget(s)} aria-label={t('houseServices.deleteBtn')}>
-                    <Trash2 size={14} />
-                  </button>
+                  <div className="table-row-actions">
+                    <button className="icon-btn" onClick={() => openEdit(s)} aria-label={t('employees.editBtn')}>
+                      <Pencil size={14} />
+                    </button>
+                    <button className="icon-btn" onClick={() => setDeleteTarget(s)} aria-label={t('houseServices.deleteBtn')}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -178,6 +184,10 @@ export default function HouseServices({ currentEmployee }: { currentEmployee: Em
           <div className="field">
             <label>{t('houseServices.descriptionLabel')}</label>
             <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('houseServices.descriptionPlaceholder')} />
+          </div>
+          <div className="field">
+            <label>{t('houseServices.codeLabel')}</label>
+            <input value={code} onChange={(e) => setCode(e.target.value)} placeholder={t('houseServices.codePlaceholder')} />
           </div>
           <div className="field">
             <label>{t('houseServices.priceLabel')}</label>

@@ -107,6 +107,7 @@ export const dictionaries = {
       partnersEmpty: 'Пока нет начатых переписок с партнёрами — найдите партнёра выше.',
       partnerSearchPlaceholder: 'Поиск партнёра…',
       empty: 'Пока нет сообщений — напишите первым.',
+      typingNow: 'печатает…',
       composerPlaceholder: 'Написать сообщение…',
       sendBtn: 'Отправить',
       attachBtn: 'Прикрепить файл',
@@ -183,6 +184,8 @@ export const dictionaries = {
           'double-beep': 'Двойной сигнал',
           modern: 'Современный',
           classic: 'Классический',
+          soft: 'Мягкий',
+          pulse: 'Импульс',
         },
       },
       chatSectionTitle: 'Уведомления чата',
@@ -315,6 +318,10 @@ export const dictionaries = {
         namePlaceholder: 'Например, «Мои заметки»',
         hint: 'Личный блокнот для напоминалок и паролей — виден только вам, открывается кнопкой в шапке.',
         saveSuccess: 'Настройки записной книжки сохранены',
+      },
+      training: {
+        title: 'Обучение',
+        description: 'Краткое описание каждого раздела CRM — то же самое, что показывает интерактивный тур при первом входе, но в текстовом виде и доступно в любой момент. Нажмите на раздел, чтобы развернуть.',
       },
       reportExport: {
         title: 'Авто-выгрузка отчётов',
@@ -737,6 +744,8 @@ export const dictionaries = {
       namePlaceholder: 'Например, Бухгалтерское сопровождение',
       descriptionLabel: 'Описание',
       descriptionPlaceholder: 'Что входит в услугу, что получит клиент',
+      codeLabel: 'Код услуги',
+      codePlaceholder: 'Например, код позиции в 1С',
       priceLabel: 'Цена',
       pricePlaceholder: 'Например, 5 000 000 сум',
       rewardPercentLabel: 'Процент вознаграждения',
@@ -764,6 +773,8 @@ export const dictionaries = {
       namePlaceholder: 'Например, Бухгалтерское сопровождение',
       descriptionLabel: 'Описание',
       descriptionPlaceholder: 'Что входит в услугу, что получит клиент',
+      codeLabel: 'Код услуги',
+      codePlaceholder: 'Например, код позиции в 1С',
       priceLabel: 'Цена',
       pricePlaceholder: 'Например, 5 000 000 сум',
       rewardPercentLabel: 'Процент вознаграждения',
@@ -815,6 +826,10 @@ export const dictionaries = {
             title: 'Партнёры',
             body: 'Здесь заводятся организации-партнёры и создаются логины/пароли для их сотрудников.',
           },
+          houseServices: {
+            title: 'Наши услуги',
+            body: 'Общий каталог услуг компании — партнёры выбирают из него при создании своих клиентов.',
+          },
           departments: {
             title: 'Подразделения',
             body: 'Оргструктура компании — отделы, руководители и заместители.',
@@ -823,13 +838,33 @@ export const dictionaries = {
             title: 'Клиенты',
             body: 'Общая база клиентов — используется во всех модулях, включая регламенты и проекты.',
           },
+          projects: {
+            title: 'Проекты',
+            body: 'Проекты компании и задачи внутри них — с участниками и статусами.',
+          },
           regulations: {
             title: 'Регламенты',
             body: 'Задачи и поручения, которые вы ставите сотрудникам или партнёрам, с сроками и статусами.',
           },
+          blog: {
+            title: 'Блог',
+            body: 'Объявления, обсуждения и полезные материалы для сотрудников и партнёров.',
+          },
+          birthdays: {
+            title: 'Календарь дней рождений',
+            body: 'Кто и когда празднует — отсортировано по ближайшим датам.',
+          },
+          absenceRequests: {
+            title: 'Заявки',
+            body: 'Заявки сотрудников на отгул, отпуск или удалённую работу — согласование и отчёт.',
+          },
           topbarPartners: {
             title: 'Быстрый переход к партнёру',
             body: 'Отсюда можно сразу открыть рабочее пространство любого партнёра — его клиентов, регламенты и услуги.',
+          },
+          topbarChat: {
+            title: 'IB Чат',
+            body: 'Общий чат со всеми сотрудниками, личные переписки и группы.',
           },
           topbarNotifications: {
             title: 'Уведомления',
@@ -847,6 +882,10 @@ export const dictionaries = {
             title: 'Сотрудники',
             body: 'Справочник коллег компании — здесь же находится и ваш собственный профиль.',
           },
+          departments: {
+            title: 'Подразделения',
+            body: 'Оргструктура компании — отделы, руководители и заместители.',
+          },
           clients: {
             title: 'Клиенты',
             body: 'Общая база клиентов, с которой вы будете работать в задачах и регламентах.',
@@ -859,9 +898,21 @@ export const dictionaries = {
             title: 'Регламенты',
             body: 'Задачи, которые вам поручили или которые ставите вы сами, со сроками выполнения.',
           },
+          blog: {
+            title: 'Блог',
+            body: 'Объявления, обсуждения и полезные материалы компании.',
+          },
+          birthdays: {
+            title: 'Календарь дней рождений',
+            body: 'Кто и когда празднует — отсортировано по ближайшим датам.',
+          },
           absenceRequests: {
             title: 'Заявки',
             body: 'Заявка на отгул, отпуск или удалённую работу — и отслеживание её статуса.',
+          },
+          topbarChat: {
+            title: 'IB Чат',
+            body: 'Общий чат со всеми сотрудниками, личные переписки и группы.',
           },
           topbarCabinet: {
             title: 'Мой кабинет',
@@ -870,6 +921,10 @@ export const dictionaries = {
           topbarNotifications: {
             title: 'Уведомления',
             body: 'Новые задачи, согласования и упоминания приходят сюда.',
+          },
+          topbarSettings: {
+            title: 'Настройки',
+            body: 'Тема оформления, язык, звук уведомлений, записная книжка и привязка Telegram.',
           },
         },
       },
@@ -898,6 +953,10 @@ export const dictionaries = {
           topbarNotifications: {
             title: 'Уведомления',
             body: 'Новые сообщения, задачи и обновления по регламентам — всё здесь.',
+          },
+          topbarSettings: {
+            title: 'Настройки',
+            body: 'Тема оформления, язык, звук уведомлений, записная книжка и привязка Telegram.',
           },
         },
       },
@@ -1197,6 +1256,7 @@ export const dictionaries = {
       partnersEmpty: "Hozircha hamkorlar bilan boshlangan yozishmalar yo'q — yuqoridan hamkorni toping.",
       partnerSearchPlaceholder: 'Hamkorni qidirish…',
       empty: "Hozircha xabarlar yo'q — birinchi bo'lib yozing.",
+      typingNow: 'yozmoqda…',
       composerPlaceholder: 'Xabar yozish…',
       sendBtn: 'Yuborish',
       attachBtn: 'Fayl biriktirish',
@@ -1273,6 +1333,8 @@ export const dictionaries = {
           'double-beep': 'Ikki signal',
           modern: 'Zamonaviy',
           classic: 'Klassik',
+          soft: 'Yumshoq',
+          pulse: 'Impuls',
         },
       },
       chatSectionTitle: 'Chat bildirishnomalari',
@@ -1405,6 +1467,10 @@ export const dictionaries = {
         namePlaceholder: "Masalan, «Mening qaydlarim»",
         hint: "Eslatmalar va parollar uchun shaxsiy daftar — faqat sizga ko'rinadi, shapkadagi tugma orqali ochiladi.",
         saveSuccess: 'Yozuv daftari sozlamalari saqlandi',
+      },
+      training: {
+        title: "O'rgatish",
+        description: "CRM'ning har bir bo'limi haqida qisqacha ma'lumot — birinchi kirishda ko'rsatiladigan interaktiv tur bilan bir xil, lekin matn ko'rinishida va istalgan vaqtda ochiq. Bo'limni ochish uchun bosing.",
       },
       reportExport: {
         title: 'Hisobotlarni avtomatik yuklab olish',
@@ -1827,6 +1893,8 @@ export const dictionaries = {
       namePlaceholder: 'Masalan, Buxgalteriya hisobi yuritish',
       descriptionLabel: 'Tavsif',
       descriptionPlaceholder: "Xizmatga nima kiradi, mijoz nima oladi",
+      codeLabel: 'Xizmat kodi',
+      codePlaceholder: "Masalan, 1C'dagi mahsulot kodi",
       priceLabel: 'Narxi',
       pricePlaceholder: "Masalan, 5 000 000 so'm",
       rewardPercentLabel: "Mukofot foizi",
@@ -1854,6 +1922,8 @@ export const dictionaries = {
       namePlaceholder: 'Masalan, Buxgalteriya hisobi yuritish',
       descriptionLabel: 'Tavsif',
       descriptionPlaceholder: "Xizmatga nima kiradi, mijoz nima oladi",
+      codeLabel: 'Xizmat kodi',
+      codePlaceholder: "Masalan, 1C'dagi mahsulot kodi",
       priceLabel: 'Narxi',
       pricePlaceholder: "Masalan, 5 000 000 so'm",
       rewardPercentLabel: "Mukofot foizi",
@@ -1905,6 +1975,10 @@ export const dictionaries = {
             title: 'Hamkorlar',
             body: "Bu yerda hamkor tashkilotlar yaratiladi va ularning xodimlari uchun login/parollar beriladi.",
           },
+          houseServices: {
+            title: 'Bizning xizmatlar',
+            body: "Kompaniyaning umumiy xizmatlar katalogi — hamkorlar o'z mijozlarini yaratishda shu yerdan tanlaydi.",
+          },
           departments: {
             title: "Bo'limlar",
             body: "Kompaniyaning tashkiliy tuzilmasi — bo'limlar, rahbarlar va o'rinbosarlar.",
@@ -1913,13 +1987,33 @@ export const dictionaries = {
             title: 'Mijozlar',
             body: "Umumiy mijozlar bazasi — reglamentlar va loyihalar ham jumladan, barcha modullarda ishlatiladi.",
           },
+          projects: {
+            title: 'Loyihalar',
+            body: "Kompaniya loyihalari va ular ichidagi vazifalar — ishtirokchilar va statuslar bilan.",
+          },
           regulations: {
             title: 'Reglamentlar',
             body: "Siz xodimlarga yoki hamkorlarga tayinlaydigan vazifa va topshiriqlar, muddat va status bilan.",
           },
+          blog: {
+            title: 'Blog',
+            body: "Xodimlar va hamkorlar uchun e'lonlar, muhokamalar va foydali materiallar.",
+          },
+          birthdays: {
+            title: "Tug'ilgan kunlar taqvimi",
+            body: "Kim va qachon nishonlaydi — eng yaqin sanalar bo'yicha saralangan.",
+          },
+          absenceRequests: {
+            title: 'Arizalar',
+            body: "Xodimlarning dam olish, ta'til yoki masofadan ishlash arizalari — tasdiqlash va hisobot.",
+          },
           topbarPartners: {
             title: 'Hamkorga tezkor o\'tish',
             body: "Bu yerdan istalgan hamkorning ish maydonini — mijozlari, reglamentlari va xizmatlarini — darhol ochish mumkin.",
+          },
+          topbarChat: {
+            title: 'IB Chat',
+            body: "Barcha xodimlar bilan umumiy chat, shaxsiy yozishmalar va guruhlar.",
           },
           topbarNotifications: {
             title: 'Bildirishnomalar',
@@ -1937,6 +2031,10 @@ export const dictionaries = {
             title: 'Xodimlar',
             body: "Kompaniya hamkasblari ma'lumotnomasi — shu yerda sizning o'z profilingiz ham joylashgan.",
           },
+          departments: {
+            title: "Bo'limlar",
+            body: "Kompaniyaning tashkiliy tuzilmasi — bo'limlar, rahbarlar va o'rinbosarlar.",
+          },
           clients: {
             title: 'Mijozlar',
             body: "Vazifalar va reglamentlarda ishlaydigan umumiy mijozlar bazasi.",
@@ -1949,9 +2047,21 @@ export const dictionaries = {
             title: 'Reglamentlar',
             body: "Sizga topshirilgan yoki o'zingiz qo'ygan vazifalar, bajarish muddati bilan.",
           },
+          blog: {
+            title: 'Blog',
+            body: "Kompaniyaning e'lonlari, muhokamalari va foydali materiallari.",
+          },
+          birthdays: {
+            title: "Tug'ilgan kunlar taqvimi",
+            body: "Kim va qachon nishonlaydi — eng yaqin sanalar bo'yicha saralangan.",
+          },
           absenceRequests: {
             title: 'Arizalar',
             body: "Dam olish, ta'til yoki masofadan ishlash uchun ariza — va uning statusini kuzatish.",
+          },
+          topbarChat: {
+            title: 'IB Chat',
+            body: "Barcha xodimlar bilan umumiy chat, shaxsiy yozishmalar va guruhlar.",
           },
           topbarCabinet: {
             title: 'Mening kabinetim',
@@ -1960,6 +2070,10 @@ export const dictionaries = {
           topbarNotifications: {
             title: 'Bildirishnomalar',
             body: "Yangi vazifalar, tasdiqlashlar va eslatmalar shu yerga keladi.",
+          },
+          topbarSettings: {
+            title: 'Sozlamalar',
+            body: "Ko'rinish mavzusi, til, bildirishnoma tovushi, yozuv daftari va Telegram bog'lash.",
           },
         },
       },
@@ -2288,6 +2402,7 @@ export const dictionaries = {
       partnersEmpty: 'Ҳозирча ҳамкорлар билан бошланган ёзишмалар йўқ — юқоридан ҳамкорни топинг.',
       partnerSearchPlaceholder: 'Ҳамкорни қидириш…',
       empty: 'Ҳозирча хабарлар йўқ — биринчи бўлиб ёзинг.',
+      typingNow: 'ёзмоқда…',
       composerPlaceholder: 'Хабар ёзиш…',
       sendBtn: 'Юбориш',
       attachBtn: 'Файл бириктириш',
@@ -2364,6 +2479,8 @@ export const dictionaries = {
           'double-beep': 'Икки сигнал',
           modern: 'Замонавий',
           classic: 'Классик',
+          soft: 'Юмшоқ',
+          pulse: 'Импульс',
         },
       },
       chatSectionTitle: 'Чат билдиришномалари',
@@ -2496,6 +2613,10 @@ export const dictionaries = {
         namePlaceholder: 'Масалан, «Менинг қайдларим»',
         hint: 'Эслатмалар ва пароллар учун шахсий дафтар — фақат сизга кўринади, шапкадаги тугма орқали очилади.',
         saveSuccess: 'Ёзув дафтари созламалари сақланди',
+      },
+      training: {
+        title: "Ўргатиш",
+        description: "CRM'нинг ҳар бир бўлими ҳақида қисқача маълумот — биринчи киришда кўрсатиладиган интерактив тур билан бир хил, лекин матн кўринишида ва исталган вақтда очиқ. Бўлимни очиш учун босинг.",
       },
       reportExport: {
         title: 'Ҳисоботларни авто-юклаб олиш',
@@ -2918,6 +3039,8 @@ export const dictionaries = {
       namePlaceholder: 'Масалан, Бухгалтерия ҳисобини юритиш',
       descriptionLabel: 'Тавсиф',
       descriptionPlaceholder: 'Хизматга нима киради, мижоз нима олади',
+      codeLabel: 'Хизмат коди',
+      codePlaceholder: 'Масалан, 1С\'даги позиция коди',
       priceLabel: 'Нархи',
       pricePlaceholder: 'Масалан, 5 000 000 сўм',
       rewardPercentLabel: 'Мукофот фоизи',
@@ -2945,6 +3068,8 @@ export const dictionaries = {
       namePlaceholder: 'Масалан, Бухгалтерия ҳисобини юритиш',
       descriptionLabel: 'Тавсиф',
       descriptionPlaceholder: 'Хизматга нима киради, мижоз нима олади',
+      codeLabel: 'Хизмат коди',
+      codePlaceholder: 'Масалан, 1С\'даги позиция коди',
       priceLabel: 'Нархи',
       pricePlaceholder: 'Масалан, 5 000 000 сўм',
       rewardPercentLabel: 'Мукофот фоизи',
@@ -2996,6 +3121,10 @@ export const dictionaries = {
             title: 'Ҳамкорлар',
             body: 'Бу ерда ҳамкор ташкилотлар яратилади ва уларнинг ходимлари учун логин/паролллар берилади.',
           },
+          houseServices: {
+            title: 'Бизнинг хизматлар',
+            body: 'Компаниянинг умумий хизматлар каталоги — ҳамкорлар ўз мижозларини яратишда шу ердан танлайди.',
+          },
           departments: {
             title: 'Бўлимлар',
             body: 'Компаниянинг ташкилий тузилмаси — бўлимлар, раҳбарлар ва ўринбосарлар.',
@@ -3004,13 +3133,33 @@ export const dictionaries = {
             title: 'Мижозлар',
             body: 'Умумий мижозлар базаси — регламентлар ва лойиҳалар ҳам жумладан, барча модулларда ишлатилади.',
           },
+          projects: {
+            title: 'Лойиҳалар',
+            body: 'Компания лойиҳалари ва улар ичидаги вазифалар — иштирокчилар ва статуслар билан.',
+          },
           regulations: {
             title: 'Регламентлар',
             body: 'Сиз ходимларга ёки ҳамкорларга тайинлайдиган вазифа ва топшириқлар, муддат ва статус билан.',
           },
+          blog: {
+            title: 'Блог',
+            body: 'Ходимлар ва ҳамкорлар учун эълонлар, муҳокамалар ва фойдали материаллар.',
+          },
+          birthdays: {
+            title: 'Туғилган кунлар тақвими',
+            body: 'Ким ва қачон нишонлайди — энг яқин саналар бўйича саралаган.',
+          },
+          absenceRequests: {
+            title: 'Аризалар',
+            body: 'Ходимларнинг дам олиш, таътил ёки масофадан ишлаш аризалари — тасдиқлаш ва ҳисобот.',
+          },
           topbarPartners: {
             title: 'Ҳамкорга тезкор ўтиш',
             body: 'Бу ердан исталган ҳамкорнинг иш майдонини — мижозлари, регламентлари ва хизматларини — дарҳол очиш мумкин.',
+          },
+          topbarChat: {
+            title: 'IB Чат',
+            body: 'Барча ходимлар билан умумий чат, шахсий ёзишмалар ва гуруҳлар.',
           },
           topbarNotifications: {
             title: 'Билдиришномалар',
@@ -3028,6 +3177,10 @@ export const dictionaries = {
             title: 'Ходимлар',
             body: 'Компания ҳамкасблари маълумотномаси — шу ерда сизнинг ўз профилингиз ҳам жойлашган.',
           },
+          departments: {
+            title: 'Бўлимлар',
+            body: 'Компаниянинг ташкилий тузилмаси — бўлимлар, раҳбарлар ва ўринбосарлар.',
+          },
           clients: {
             title: 'Мижозлар',
             body: 'Вазифалар ва регламентларда ишлайдиган умумий мижозлар базаси.',
@@ -3040,9 +3193,21 @@ export const dictionaries = {
             title: 'Регламентлар',
             body: 'Сизга топширилган ёки ўзингиз қўйган вазифалар, бажариш муддати билан.',
           },
+          blog: {
+            title: 'Блог',
+            body: 'Компаниянинг эълонлари, муҳокамалари ва фойдали материаллари.',
+          },
+          birthdays: {
+            title: 'Туғилган кунлар тақвими',
+            body: 'Ким ва қачон нишонлайди — энг яқин саналар бўйича саралаган.',
+          },
           absenceRequests: {
             title: 'Аризалар',
             body: 'Дам олиш, таътил ёки масофадан ишлаш учун ариза — ва унинг статусини кузатиш.',
+          },
+          topbarChat: {
+            title: 'IB Чат',
+            body: 'Барча ходимлар билан умумий чат, шахсий ёзишмалар ва гуруҳлар.',
           },
           topbarCabinet: {
             title: 'Менинг кабинетим',
@@ -3051,6 +3216,10 @@ export const dictionaries = {
           topbarNotifications: {
             title: 'Билдиришномалар',
             body: 'Янги вазифалар, тасдиқлашлар ва эслатмалар шу ерга келади.',
+          },
+          topbarSettings: {
+            title: 'Созламалар',
+            body: 'Кўриниш мавзуси, тил, билдиришнома товуши, ёзув дафтари ва Telegram боғлаш.',
           },
         },
       },
@@ -3079,6 +3248,10 @@ export const dictionaries = {
           topbarNotifications: {
             title: 'Билдиришномалар',
             body: 'Янги хабарлар, вазифалар ва регламентлар бўйича янгиланишлар — барчаси шу ерда.',
+          },
+          topbarSettings: {
+            title: 'Созламалар',
+            body: 'Кўриниш мавзуси, тил, билдиришнома товуши ва профиль маълумотлари.',
           },
         },
       },

@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { Copy, Check, FolderOpen, Upload, Eye, EyeOff, Download, Database, Image as ImageIcon, X, Bot, FileSpreadsheet, Volume2, Play, NotebookText } from 'lucide-react';
+import { Copy, Check, FolderOpen, Upload, Eye, EyeOff, Download, Database, Image as ImageIcon, X, Bot, FileSpreadsheet, Volume2, Play, NotebookText, GraduationCap, ChevronDown } from 'lucide-react';
 import { open as openFileDialog, save as saveFileDialog } from '@tauri-apps/plugin-dialog';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { relaunch } from '@tauri-apps/plugin-process';
@@ -25,6 +25,7 @@ import { compressLogoFile } from '../lib/photo';
 import { useAppLogo, setCachedAppLogo, applyRuntimeIcon, DEFAULT_LOGO } from '../lib/appLogo';
 import Select from '../components/Select';
 import Checkbox from '../components/Checkbox';
+import { TOUR_STEPS, type TourRole } from '../lib/onboardingSteps';
 
 export default function Settings({ employee }: { employee: Employee }) {
   const { t, locale, setLocale } = useLocale();
@@ -562,6 +563,16 @@ export default function Settings({ employee }: { employee: Employee }) {
     }
   };
 
+  // Текстовое обучение (v1.4.0) — аккордеон в Настройках, доступен любой
+  // роли (в отличие от интерактивного тура, который проходится один раз при
+  // первом входе). Переиспользует те же тексты и тот же список разделов, что
+  // и OnboardingTour.tsx (namespace "onboarding" в translations.ts) — чтобы
+  // не дублировать формулировки в двух местах и не расходиться с ними при
+  // будущих правках.
+  const trainingRole: TourRole = employee.isPartner ? 'partner' : employee.isAdmin ? 'admin' : 'employee';
+  const trainingSteps = TOUR_STEPS[trainingRole].filter((s) => s.targetTourId !== null);
+  const [expandedTraining, setExpandedTraining] = useState<string | null>(null);
+
   const languageOptions = (Object.keys(LOCALE_LABELS) as Locale[]).map((value) => ({
     value,
     label: LOCALE_LABELS[value],
@@ -710,6 +721,31 @@ export default function Settings({ employee }: { employee: Employee }) {
         <p className="settings-hint">{t('settings.changePasswordHint')}</p>
       </section>
 
+      <section className="settings-section">
+        <h2><GraduationCap size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />{t('settings.training.title')}</h2>
+        <p className="settings-hint">{t('settings.training.description')}</p>
+        <div className="changelog-accordion" style={{ marginTop: 10 }}>
+          {trainingSteps.map((step) => {
+            const isOpen = expandedTraining === step.id;
+            return (
+              <div className="changelog-item" key={step.id}>
+                <button
+                  type="button"
+                  className="changelog-item-header"
+                  onClick={() => setExpandedTraining(isOpen ? null : step.id)}
+                >
+                  <span>{t(`onboarding.${trainingRole}.steps.${step.id}.title`)}</span>
+                  <ChevronDown size={16} className={`changelog-chevron ${isOpen ? 'open' : ''}`} />
+                </button>
+                {isOpen && (
+                  <div className="training-body">{t(`onboarding.${trainingRole}.steps.${step.id}.body`)}</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
       {isClient && (
         <section className="settings-section">
           <h2>{t('settings.server.title')}</h2>
@@ -727,7 +763,7 @@ export default function Settings({ employee }: { employee: Employee }) {
         <section className="settings-section">
           <h2>{t('settings.server.connectSectionTitle')}</h2>
           <p className="settings-hint">{t('settings.server.connectSectionHint')}</p>
-          <div className="field" style={{ maxWidth: 320, marginTop: 8 }}>
+          <div className="field" style={{ maxWidth: 320, marginTop: 10 }}>
             <label>{t('firstRun.serverUrlLabel')}</label>
             <input
               value={connectUrl}
@@ -754,7 +790,7 @@ export default function Settings({ employee }: { employee: Employee }) {
             </button>
           </div>
 
-          <div className="field" style={{ maxWidth: 160, marginTop: 12 }}>
+          <div className="field" style={{ maxWidth: 160, marginTop: 10 }}>
             <label>{t('settings.server.portLabel')}</label>
             <input value={portInput} onChange={(e) => setPortInput(e.target.value.replace(/\D/g, ''))} />
           </div>
@@ -764,7 +800,7 @@ export default function Settings({ employee }: { employee: Employee }) {
 
           {serverSettings.enabled && (
             <>
-              <div className="account-row" style={{ marginTop: 12 }}>
+              <div className="account-row" style={{ marginTop: 10 }}>
                 <span className="settings-hint">{t('settings.server.addressLabel')}</span>
                 <span>
                   {lanAddress ? `${lanAddress}:${serverSettings.port}` : t('settings.server.addressUnknown')}
@@ -779,7 +815,7 @@ export default function Settings({ employee }: { employee: Employee }) {
             </>
           )}
 
-          <div className="account-row" style={{ marginTop: 12, alignItems: 'flex-start' }}>
+          <div className="account-row" style={{ marginTop: 10, alignItems: 'flex-start' }}>
             <span className="settings-hint">{t('updates.serverInstallerHint')}</span>
             <span style={{ wordBreak: 'break-all' }}>
               {installerPath ?? '—'}
@@ -813,7 +849,7 @@ export default function Settings({ employee }: { employee: Employee }) {
           <p className="settings-hint">{t('settings.backup.hint')}</p>
 
           <h3 className="settings-subheading">{t('settings.backup.exportTitle')}</h3>
-          <div className="field" style={{ maxWidth: 320, marginTop: 8 }}>
+          <div className="field" style={{ maxWidth: 320, marginTop: 10 }}>
             <label>{t('settings.backup.exportPasswordLabel')}</label>
             <input type="password" value={exportPassword} onChange={(e) => setExportPassword(e.target.value)} placeholder="••••••••" />
           </div>
@@ -826,7 +862,7 @@ export default function Settings({ employee }: { employee: Employee }) {
           </button>
 
           <h3 className="settings-subheading" style={{ marginTop: 20 }}>{t('settings.backup.restoreTitle')}</h3>
-          <div className="field" style={{ maxWidth: 320, marginTop: 8 }}>
+          <div className="field" style={{ maxWidth: 320, marginTop: 10 }}>
             <label>{t('settings.backup.restorePasswordLabel')}</label>
             <input type="password" value={restorePassword} onChange={(e) => setRestorePassword(e.target.value)} placeholder="••••••••" />
           </div>
@@ -841,7 +877,7 @@ export default function Settings({ employee }: { employee: Employee }) {
           <h2>{t('settings.radmin.title')}</h2>
           <p className="settings-hint">{t('settings.radmin.hint')}</p>
 
-          <div className="field" style={{ maxWidth: 320, marginTop: 8 }}>
+          <div className="field" style={{ maxWidth: 320, marginTop: 10 }}>
             <label>{t('settings.radmin.networkIdLabel')}</label>
             <div style={{ display: 'flex', gap: 6 }}>
               <input value={radminNetworkId} onChange={(e) => setRadminNetworkId(e.target.value)} />
@@ -937,7 +973,7 @@ export default function Settings({ employee }: { employee: Employee }) {
               <Checkbox checked={reportEnabled} onChange={setReportEnabled} label={t('settings.reportExport.enableLabel')} />
             </div>
 
-            <div className="field" style={{ maxWidth: 280, marginTop: 8 }}>
+            <div className="field" style={{ maxWidth: 280, marginTop: 10 }}>
               <label>{t('settings.reportExport.dayModeLabel')}</label>
               <Select
                 value={reportDayMode}

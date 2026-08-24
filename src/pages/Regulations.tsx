@@ -494,9 +494,15 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
     if (reg) setSelected(reg);
   }, [regulations, location.state]);
 
-  const loadDetail = useCallback(() => {
+  // silent — при фоновом обновлении (тикер уведомлений каждые ~8 сек) не
+  // показываем спиннер поверх уже открытых записей: раньше detailLoading
+  // включался на каждый тик, список на секунду схлопывался в LoadingScreen
+  // и обратно — заметные "скачки" интерфейса, даже когда на самом деле
+  // ничего не изменилось. Спиннер нужен только на настоящей первой загрузке/
+  // переключении регламента.
+  const loadDetail = useCallback((silent = false) => {
     if (!selected) return;
-    setDetailLoading(true);
+    if (!silent) setDetailLoading(true);
     Promise.all([api.listRegulationMembers(selected.id), api.listRegulationEntries(selected.id)])
       .then(([m, e]) => {
         setMembers(m);
@@ -518,7 +524,7 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
   // открытый регламент не узнавал бы о таком изменении вообще — обновлялся
   // только заново открыв страницу.
   useEffect(() => {
-    const unlisten = listen('notification-tick', () => loadDetail());
+    const unlisten = listen('notification-tick', () => loadDetail(true));
     return () => { unlisten.then((f) => f()); };
   }, [loadDetail]);
 

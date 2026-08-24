@@ -8,9 +8,9 @@
 const ENABLED_KEY = 'ib-crm-notification-sound-enabled';
 const SOUND_KEY = 'ib-crm-notification-sound';
 
-export type NotificationSoundId = 'chime' | 'pop' | 'marimba' | 'bell' | 'double-beep' | 'modern' | 'classic';
+export type NotificationSoundId = 'chime' | 'pop' | 'marimba' | 'bell' | 'double-beep' | 'modern' | 'classic' | 'soft' | 'pulse';
 
-export const NOTIFICATION_SOUND_IDS: NotificationSoundId[] = ['chime', 'pop', 'marimba', 'bell', 'double-beep', 'modern', 'classic'];
+export const NOTIFICATION_SOUND_IDS: NotificationSoundId[] = ['chime', 'pop', 'marimba', 'bell', 'double-beep', 'modern', 'classic', 'soft', 'pulse'];
 
 const SOUND_FILES: Record<NotificationSoundId, string> = {
   chime: '/sounds/chime.wav',
@@ -18,12 +18,14 @@ const SOUND_FILES: Record<NotificationSoundId, string> = {
   marimba: '/sounds/marimba.wav',
   bell: '/sounds/bell.wav',
   'double-beep': '/sounds/double-beep.wav',
-  // "modern"/"classic" (v0.6.0) — тоже оригинальный синтез (см. header),
-  // НЕ копии и намеренно НЕ названы "iPhone"/"Samsung" — пользователь просил
-  // именно такие, но брендировать звук под чужую торговую марку нельзя, даже
-  // если сама запись своя (см. docs/TZ.md).
+  // "modern"/"classic" (v0.6.0), "soft"/"pulse" (v1.4.0) — тоже оригинальный
+  // синтез (см. header), НЕ копии и намеренно НЕ названы "iPhone"/"Samsung"/
+  // "Redmi"/"Nokia" — пользователь просил именно такие, но брендировать звук
+  // под чужую торговую марку нельзя, даже если сама запись своя (см. docs/TZ.md).
   modern: '/sounds/modern.wav',
   classic: '/sounds/classic.wav',
+  soft: '/sounds/soft.wav',
+  pulse: '/sounds/pulse.wav',
 };
 
 export function getNotificationSoundEnabled(): boolean {

@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '1.3.0';
+export const APP_VERSION = '1.4.0';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,19 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '1.4.0',
+      items: [
+        'В «Услугах» (общий каталог и каталог партнёра) добавлено поле «Код услуги» — необязательное, отображается прямо в таблице рядом с описанием',
+        'Исправлено: кнопки «Редактировать» и «Удалить» в таблице услуг стояли впритык друг к другу без отступа — теперь между ними нормальный зазор',
+        'В звуки уведомлений добавлено ещё 2 тона — «Мягкий» и «Импульс»',
+        'Обучающий тур при первом входе теперь показывает ВСЕ разделы бокового меню и шапки, а не только основные — для админа, сотрудника и партнёра отдельно',
+        'В Настройках — новый раздел «Обучение»: краткое текстовое описание каждого раздела CRM в виде аккордеона, доступно в любой момент, а не только при первом входе',
+        'Исправлены «скачки»/мигание содержимого в Проектах и Регламентах — фоновое обновление по уведомлению больше не показывает заново экран загрузки поверх уже открытой карточки',
+        'В IB Чате в личных переписках теперь видно, в сети собеседник или нет, а если не в сети — когда был в последний раз; во время набора текста собеседником в шапке чата показывается «печатает…»',
+        'Поправлены неровные отступы в нескольких блоках Настроек — приведены к единому значению',
+      ],
+    },
     {
       version: '1.3.0',
       items: [
@@ -613,6 +626,19 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '1.4.0',
+      items: [
+        "\"Xizmatlar\"da (umumiy katalog va hamkor katalogi) \"Xizmat kodi\" maydoni qo'shildi — ixtiyoriy, jadvalda tavsif yonida ko'rsatiladi",
+        "Tuzatildi: xizmatlar jadvalidagi \"Tahrirlash\" va \"O'chirish\" tugmalari bir-biriga yopishib turardi — endi orasida normal bo'shliq bor",
+        "Bildirishnoma tovushlariga yana 2 ta ohang qo'shildi — \"Yumshoq\" va \"Impuls\"",
+        "Birinchi kirishdagi o'quv turi endi yon menyu va shapkaning BARCHA bo'limlarini ko'rsatadi, faqat asosiylarini emas — admin, xodim va hamkor uchun alohida",
+        "Sozlamalarda — yangi \"O'rgatish\" bo'limi: CRM'ning har bir bo'limi haqida qisqacha matnli tavsif akkordeon ko'rinishida, istalgan vaqtda ochiq, faqat birinchi kirishda emas",
+        "Loyihalar va Reglamentlardagi \"sakrash\"/miltillash tuzatildi — bildirishnoma bo'yicha fon yangilanishi endi ochiq kartochka ustiga qayta yuklash ekranini ko'rsatmaydi",
+        "IB Chatda shaxsiy yozishmalarda endi suhbatdosh onlaynmi yoki yo'qmi ko'rinadi, agar onlayn bo'lmasa — oxirgi marta qachon bo'lgani; suhbatdosh yozayotganda chat shapkasida \"yozmoqda…\" ko'rsatiladi",
+        "Sozlamalarning bir nechta blokidagi notekis bo'shliqlar bir xil qiymatga keltirildi",
+      ],
+    },
+    {
       version: '1.3.0',
       items: [
         "Birinchi ishga tushirish ekranida (rejim tanlash, serverga ulanish, admin yaratish) o'ng yuqori burchakda til almashtirgich paydo bo'ldi — avval akkaunt yaratilmaguncha tilni o'zgartirib bo'lmasdi",
@@ -1209,6 +1235,19 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '1.4.0',
+      items: [
+        '"Хизматлар"да (умумий каталог ва ҳамкор каталоги) "Хизмат коди" майдони қўшилди — ихтиёрий, жадвалда тавсиф ёнида кўрсатилади',
+        'Тузатилди: хизматлар жадвалидаги "Таҳрирлаш" ва "Ўчириш" тугмалари бир-бирига ёпишиб турарди — энди орасида нормал бўшлиқ бор',
+        'Билдиришнома товушларига яна 2 та оҳанг қўшилди — "Юмшоқ" ва "Импулс"',
+        'Биринчи киришдаги ўқув тури энди ён меню ва шапканинг БАРЧА бўлимларини кўрсатади, фақат асосийларини эмас — админ, ходим ва ҳамкор учун алоҳида',
+        'Созламаларда — янги "Ўргатиш" бўлими: CRM\'нинг ҳар бир бўлими ҳақида қисқача матний тавсиф аккордеон кўринишида, исталган вақтда очиқ, фақат биринчи киришда эмас',
+        'Лойиҳалар ва Регламентлардаги "сакраш"/милтиллаш тузатилди — билдиришнома бўйича фон янгиланиши энди очиқ карточка устига қайта юклаш экранини кўрсатмайди',
+        'IB Чатда шахсий ёзишмаларда энди суҳбатдош онлайнми ёки йўқми кўринади, агар онлайн бўлмаса — охирги марта қачон бўлгани; суҳбатдош ёзаётганда чат шапкасида "ёзмоқда…" кўрсатилади',
+        'Созламаларнинг бир нечта блокидаги нотекис бўшлиқлар бир хил қийматга келтирилди',
+      ],
+    },
     {
       version: '1.3.0',
       items: [

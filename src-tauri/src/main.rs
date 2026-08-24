@@ -494,6 +494,7 @@ struct PartnerService {
     partner_id: String,
     name: String,
     description: Option<String>,
+    code: Option<String>,
     price: Option<String>,
     #[serde(rename = "rewardPercent")]
     reward_percent: Option<String>,
@@ -512,6 +513,7 @@ struct HouseService {
     id: String,
     name: String,
     description: Option<String>,
+    code: Option<String>,
     price: Option<String>,
     #[serde(rename = "rewardPercent")]
     reward_percent: Option<String>,
@@ -1421,6 +1423,7 @@ struct CreatePartnerServicePayload {
     partner_id: String,
     name: String,
     description: Option<String>,
+    code: Option<String>,
     price: Option<String>,
     #[serde(rename = "rewardPercent")]
     reward_percent: Option<String>,
@@ -1433,6 +1436,7 @@ struct UpdatePartnerServicePayload {
     id: String,
     name: String,
     description: Option<String>,
+    code: Option<String>,
     price: Option<String>,
     #[serde(rename = "rewardPercent")]
     reward_percent: Option<String>,
@@ -1457,6 +1461,7 @@ struct CreateHouseServicePayload {
     actor_id: String,
     name: String,
     description: Option<String>,
+    code: Option<String>,
     price: Option<String>,
     #[serde(rename = "rewardPercent")]
     reward_percent: Option<String>,
@@ -1469,6 +1474,7 @@ struct UpdateHouseServicePayload {
     id: String,
     name: String,
     description: Option<String>,
+    code: Option<String>,
     price: Option<String>,
     #[serde(rename = "rewardPercent")]
     reward_percent: Option<String>,
@@ -1812,6 +1818,20 @@ struct GetTelegramLinkStatusPayload {
     actor_id: String,
     #[serde(rename = "employeeId")]
     employee_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct PingTypingPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    channel: String,
+}
+
+#[derive(serde::Deserialize)]
+struct GetTypingStatusPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    channel: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -2304,6 +2324,7 @@ fn to_partner_service(s: db::PartnerServiceRecord) -> PartnerService {
         partner_id: s.partner_id,
         name: s.name,
         description: s.description,
+        code: s.code,
         price: s.price,
         reward_percent: s.reward_percent,
         created_by: s.created_by,
@@ -2318,6 +2339,7 @@ fn to_house_service(s: db::HouseServiceRecord) -> HouseService {
         id: s.id,
         name: s.name,
         description: s.description,
+        code: s.code,
         price: s.price,
         reward_percent: s.reward_percent,
         created_by: s.created_by,
@@ -3295,14 +3317,14 @@ fn list_partner_services(payload: ListPartnerServicesPayload, state: tauri::Stat
 #[tauri::command]
 fn create_partner_service(payload: CreatePartnerServicePayload, state: tauri::State<AppState>) -> Result<PartnerService, String> {
     let db = state.0.lock().unwrap();
-    db.create_partner_service(&payload.actor_id, &payload.partner_id, &payload.name, payload.description.as_deref(), payload.price.as_deref(), payload.reward_percent.as_deref())
+    db.create_partner_service(&payload.actor_id, &payload.partner_id, &payload.name, payload.description.as_deref(), payload.code.as_deref(), payload.price.as_deref(), payload.reward_percent.as_deref())
         .map(to_partner_service)
 }
 
 #[tauri::command]
 fn update_partner_service(payload: UpdatePartnerServicePayload, state: tauri::State<AppState>) -> Result<PartnerService, String> {
     let db = state.0.lock().unwrap();
-    db.update_partner_service(&payload.actor_id, &payload.id, &payload.name, payload.description.as_deref(), payload.price.as_deref(), payload.reward_percent.as_deref())
+    db.update_partner_service(&payload.actor_id, &payload.id, &payload.name, payload.description.as_deref(), payload.code.as_deref(), payload.price.as_deref(), payload.reward_percent.as_deref())
         .map(to_partner_service)
 }
 
@@ -3321,14 +3343,14 @@ fn list_house_services(payload: ListHouseServicesPayload, state: tauri::State<Ap
 #[tauri::command]
 fn create_house_service(payload: CreateHouseServicePayload, state: tauri::State<AppState>) -> Result<HouseService, String> {
     let db = state.0.lock().unwrap();
-    db.create_house_service(&payload.actor_id, &payload.name, payload.description.as_deref(), payload.price.as_deref(), payload.reward_percent.as_deref())
+    db.create_house_service(&payload.actor_id, &payload.name, payload.description.as_deref(), payload.code.as_deref(), payload.price.as_deref(), payload.reward_percent.as_deref())
         .map(to_house_service)
 }
 
 #[tauri::command]
 fn update_house_service(payload: UpdateHouseServicePayload, state: tauri::State<AppState>) -> Result<HouseService, String> {
     let db = state.0.lock().unwrap();
-    db.update_house_service(&payload.actor_id, &payload.id, &payload.name, payload.description.as_deref(), payload.price.as_deref(), payload.reward_percent.as_deref())
+    db.update_house_service(&payload.actor_id, &payload.id, &payload.name, payload.description.as_deref(), payload.code.as_deref(), payload.price.as_deref(), payload.reward_percent.as_deref())
         .map(to_house_service)
 }
 
@@ -3483,6 +3505,18 @@ fn add_blog_comment(payload: AddBlogCommentPayload, state: tauri::State<AppState
 fn list_chat_messages(employee_id: String, channel: String, state: tauri::State<AppState>) -> Result<Vec<ChatMessage>, String> {
     let db = state.0.lock().unwrap();
     db.list_chat_messages(&employee_id, &channel).map(|v| v.into_iter().map(to_chat_message).collect())
+}
+
+#[tauri::command]
+fn ping_typing(payload: PingTypingPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.ping_typing(&payload.actor_id, &payload.channel)
+}
+
+#[tauri::command]
+fn get_typing_status(payload: GetTypingStatusPayload, state: tauri::State<AppState>) -> Result<bool, String> {
+    let db = state.0.lock().unwrap();
+    db.is_other_typing(&payload.actor_id, &payload.channel)
 }
 
 #[tauri::command]
@@ -4136,6 +4170,8 @@ fn main() {
             list_blog_comments,
             add_blog_comment,
             list_chat_messages,
+            ping_typing,
+            get_typing_status,
             list_my_dm_channels,
             list_my_partner_chats,
             create_chat_group,

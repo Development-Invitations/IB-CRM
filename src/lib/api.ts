@@ -304,6 +304,7 @@ export type PartnerService = {
   partnerId: string;
   name: string;
   description: string | null;
+  code: string | null;
   price: string | null;
   rewardPercent: string | null;
   createdBy: string | null;
@@ -316,6 +317,7 @@ export type HouseService = {
   id: string;
   name: string;
   description: string | null;
+  code: string | null;
   price: string | null;
   rewardPercent: string | null;
   createdBy: string | null;
@@ -791,20 +793,20 @@ export const api = {
   listPartnerServices: (payload: { actorId: string; partnerId: string }) =>
     invoke<PartnerService[]>('list_partner_services', { payload }),
 
-  createPartnerService: (payload: { actorId: string; partnerId: string; name: string; description?: string | null; price?: string | null; rewardPercent?: string | null }) =>
+  createPartnerService: (payload: { actorId: string; partnerId: string; name: string; description?: string | null; code?: string | null; price?: string | null; rewardPercent?: string | null }) =>
     invoke<PartnerService>('create_partner_service', { payload }),
 
-  updatePartnerService: (payload: { actorId: string; id: string; name: string; description?: string | null; price?: string | null; rewardPercent?: string | null }) =>
+  updatePartnerService: (payload: { actorId: string; id: string; name: string; description?: string | null; code?: string | null; price?: string | null; rewardPercent?: string | null }) =>
     invoke<PartnerService>('update_partner_service', { payload }),
 
   deletePartnerService: (payload: { actorId: string; id: string }) => invoke<void>('delete_partner_service', { payload }),
 
   listHouseServices: (payload: { actorId: string }) => invoke<HouseService[]>('list_house_services', { payload }),
 
-  createHouseService: (payload: { actorId: string; name: string; description?: string | null; price?: string | null; rewardPercent?: string | null }) =>
+  createHouseService: (payload: { actorId: string; name: string; description?: string | null; code?: string | null; price?: string | null; rewardPercent?: string | null }) =>
     invoke<HouseService>('create_house_service', { payload }),
 
-  updateHouseService: (payload: { actorId: string; id: string; name: string; description?: string | null; price?: string | null; rewardPercent?: string | null }) =>
+  updateHouseService: (payload: { actorId: string; id: string; name: string; description?: string | null; code?: string | null; price?: string | null; rewardPercent?: string | null }) =>
     invoke<HouseService>('update_house_service', { payload }),
 
   deleteHouseService: (payload: { actorId: string; id: string }) => invoke<void>('delete_house_service', { payload }),
@@ -963,6 +965,8 @@ export const api = {
 
   listChatMessages: (employeeId: string, channel: string) =>
     invoke<ChatMessage[]>('list_chat_messages', { employeeId, channel }),
+  pingTyping: (payload: { actorId: string; channel: string }) => invoke<void>('ping_typing', { payload }),
+  getTypingStatus: (payload: { actorId: string; channel: string }) => invoke<boolean>('get_typing_status', { payload }),
   sendChatMessage: (payload: {
     actorId: string;
     channel: string;

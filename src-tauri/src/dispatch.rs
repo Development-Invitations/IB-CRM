@@ -512,12 +512,12 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
         }
         "create_partner_service" => {
             let p: crate::CreatePartnerServicePayload = from_payload(payload)?;
-            db.create_partner_service(&p.actor_id, &p.partner_id, &p.name, p.description.as_deref(), p.price.as_deref(), p.reward_percent.as_deref())
+            db.create_partner_service(&p.actor_id, &p.partner_id, &p.name, p.description.as_deref(), p.code.as_deref(), p.price.as_deref(), p.reward_percent.as_deref())
                 .map(crate::to_partner_service).map(to_json)
         }
         "update_partner_service" => {
             let p: crate::UpdatePartnerServicePayload = from_payload(payload)?;
-            db.update_partner_service(&p.actor_id, &p.id, &p.name, p.description.as_deref(), p.price.as_deref(), p.reward_percent.as_deref())
+            db.update_partner_service(&p.actor_id, &p.id, &p.name, p.description.as_deref(), p.code.as_deref(), p.price.as_deref(), p.reward_percent.as_deref())
                 .map(crate::to_partner_service).map(to_json)
         }
         "delete_partner_service" => {
@@ -532,12 +532,12 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
         }
         "create_house_service" => {
             let p: crate::CreateHouseServicePayload = from_payload(payload)?;
-            db.create_house_service(&p.actor_id, &p.name, p.description.as_deref(), p.price.as_deref(), p.reward_percent.as_deref())
+            db.create_house_service(&p.actor_id, &p.name, p.description.as_deref(), p.code.as_deref(), p.price.as_deref(), p.reward_percent.as_deref())
                 .map(crate::to_house_service).map(to_json)
         }
         "update_house_service" => {
             let p: crate::UpdateHouseServicePayload = from_payload(payload)?;
-            db.update_house_service(&p.actor_id, &p.id, &p.name, p.description.as_deref(), p.price.as_deref(), p.reward_percent.as_deref())
+            db.update_house_service(&p.actor_id, &p.id, &p.name, p.description.as_deref(), p.code.as_deref(), p.price.as_deref(), p.reward_percent.as_deref())
                 .map(crate::to_house_service).map(to_json)
         }
         "delete_house_service" => {
@@ -599,6 +599,14 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
             let channel = field(&payload, "channel")?;
             db.list_chat_messages(&employee_id, &channel)
                 .map(|v| to_json(v.into_iter().map(crate::to_chat_message).collect::<Vec<_>>()))
+        }
+        "ping_typing" => {
+            let p: crate::PingTypingPayload = from_payload(payload)?;
+            db.ping_typing(&p.actor_id, &p.channel).map(to_json)
+        }
+        "get_typing_status" => {
+            let p: crate::GetTypingStatusPayload = from_payload(payload)?;
+            db.is_other_typing(&p.actor_id, &p.channel).map(to_json)
         }
         "list_my_dm_channels" => {
             let employee_id = field(&payload, "employeeId")?;

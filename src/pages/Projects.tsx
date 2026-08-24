@@ -474,9 +474,15 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
     if (proj) setSelected(proj);
   }, [projects, location.state]);
 
-  const loadDetail = () => {
+  // silent — при фоновом обновлении (тикер уведомлений каждые ~8 сек) не
+  // показываем спиннер поверх уже открытого чата/участников: раньше
+  // detailLoading включался на каждый тик, содержимое на секунду
+  // схлопывалось в LoadingScreen и обратно — заметные "скачки" интерфейса,
+  // даже когда на самом деле ничего не изменилось. Спиннер нужен только на
+  // настоящей первой загрузке/переключении проекта.
+  const loadDetail = (silent = false) => {
     if (!selected) return;
-    setDetailLoading(true);
+    if (!silent) setDetailLoading(true);
     Promise.all([api.listProjectMembers(selected.id), api.listProjectChat(selected.id)])
       .then(([m, c]) => {
         setMembers(m);
@@ -498,7 +504,7 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
   // Regulations.tsx: тикер уведомлений теперь дополнительно шлётся при
   // закрытии задачи через Telegram-кнопку "Готово".
   useEffect(() => {
-    const unlisten = listen('notification-tick', () => loadDetail());
+    const unlisten = listen('notification-tick', () => loadDetail(true));
     return () => { unlisten.then((f) => f()); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.id]);

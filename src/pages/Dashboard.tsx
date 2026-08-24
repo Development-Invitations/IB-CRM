@@ -18,6 +18,7 @@ import {
   LogOut,
   ClipboardList,
   Handshake,
+  Briefcase,
 } from 'lucide-react';
 import Topbar from '../components/Topbar';
 import Modal from '../components/Modal';
@@ -38,6 +39,7 @@ import ChatPage from './Chat';
 import AdminPartners from './AdminPartners';
 import AdminPartnerWorkspace from './AdminPartnerWorkspace';
 import PartnerAccountsPage from './PartnerAccounts';
+import HouseServicesPage from './HouseServices';
 import type { Employee } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { APP_VERSION } from '../lib/changelog';
@@ -52,6 +54,7 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
   const modules = [
     { label: t('sidebar.employees'), icon: Users, path: 'employees' },
     ...(employee.isAdmin ? [{ label: t('partners.tabLabel'), icon: Handshake, path: 'partner-accounts' }] : []),
+    ...(employee.isAdmin ? [{ label: t('houseServices.navLabel'), icon: Briefcase, path: 'house-services' }] : []),
     { label: t('sidebar.departments'), icon: Building2, path: 'departments' },
     { label: t('sidebar.clients'), icon: Contact, path: 'clients' },
     { label: t('sidebar.projects'), icon: FolderKanban, path: 'projects' },
@@ -107,6 +110,7 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
             <Route path="employees" element={<EmployeesPage currentEmployee={employee} />} />
             <Route path="employees/:id" element={<EmployeeProfile currentEmployee={employee} />} />
             <Route path="partner-accounts" element={employee.isAdmin ? <PartnerAccountsPage currentEmployee={employee} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="house-services" element={employee.isAdmin ? <HouseServicesPage currentEmployee={employee} /> : <Navigate to="/dashboard" replace />} />
             <Route path="departments" element={<DepartmentsPage currentEmployee={employee} />} />
             <Route path="clients" element={<ClientsPage currentEmployee={employee} />} />
             <Route path="projects" element={<ProjectsPage currentEmployee={employee} />} />

@@ -1,5 +1,5 @@
 import { useEffect, useState, FormEvent } from 'react';
-import { api, type Client, type Employee, type Partner, type PartnerService } from '../lib/api';
+import { api, type Client, type Employee, type Partner, type PartnerService, type HouseService } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
 import { formatUzPhone } from '../lib/phone';
@@ -38,6 +38,8 @@ export default function ClientFormModal({
   const [partners, setPartners] = useState<Partner[]>([]);
   const [services, setServices] = useState<PartnerService[]>([]);
   const [serviceId, setServiceId] = useState('');
+  const [houseServices, setHouseServices] = useState<HouseService[]>([]);
+  const [houseServiceId, setHouseServiceId] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -46,6 +48,12 @@ export default function ClientFormModal({
   // либо выбранный в свободном селекте на общей странице Клиентов) — без
   // партнёра каталога услуг не существует, остаётся свободное поле "Стоимость".
   const effectivePartnerId = lockedPartnerId !== undefined ? (lockedPartnerId ?? null) : (partnerId || null);
+  // Партнёр создающий/редактирующий своего клиента — всегда каталог "Наши
+  // услуги" (общий, v0.7.0). Админ — каталог услуг партнёра, КРОМЕ случая,
+  // когда открыт на редактирование уже существующий клиент, у которого стоит
+  // houseServiceId (без serviceId) — тогда сохраняем "родной" каталог, чтобы
+  // не потерять привязку услуги при правке админом прочих полей.
+  const catalogIsHouse = currentEmployee.isPartner || (!!client?.houseServiceId && !client?.serviceId);
 
   useEffect(() => {
     if (!showPartnerSelect) return;
@@ -53,12 +61,20 @@ export default function ClientFormModal({
   }, [showPartnerSelect]);
 
   useEffect(() => {
-    if (!effectivePartnerId) {
+    if (!catalogIsHouse) {
+      setHouseServices([]);
+      return;
+    }
+    api.listHouseServices({ actorId: currentEmployee.id }).then(setHouseServices).catch(() => setHouseServices([]));
+  }, [catalogIsHouse, currentEmployee.id]);
+
+  useEffect(() => {
+    if (catalogIsHouse || !effectivePartnerId) {
       setServices([]);
       return;
     }
     api.listPartnerServices({ actorId: currentEmployee.id, partnerId: effectivePartnerId }).then(setServices).catch(() => setServices([]));
-  }, [effectivePartnerId, currentEmployee.id]);
+  }, [catalogIsHouse, effectivePartnerId, currentEmployee.id]);
 
   useEffect(() => {
     if (!open) return;
@@ -71,6 +87,7 @@ export default function ClientFormModal({
     setNotes(client?.notes ?? '');
     setDealValue(client?.dealValue ?? '');
     setServiceId(client?.serviceId ?? '');
+    setHouseServiceId(client?.houseServiceId ?? '');
     setPartnerId(lockedPartnerId !== undefined ? (lockedPartnerId ?? '') : (client?.partnerId ?? ''));
     setError('');
   }, [open, client, lockedPartnerId]);
@@ -94,7 +111,8 @@ export default function ClientFormModal({
         notes: notes.trim() || null,
         partnerId: lockedPartnerId !== undefined ? lockedPartnerId : (partnerId || null),
         dealValue: effectivePartnerId ? null : (dealValue.trim() || null),
-        serviceId: effectivePartnerId ? (serviceId || null) : null,
+        serviceId: !catalogIsHouse && effectivePartnerId ? (serviceId || null) : null,
+        houseServiceId: catalogIsHouse ? (houseServiceId || null) : null,
       };
       if (client) {
         await api.updateClient({ actorId: currentEmployee.id, id: client.id, ...shared });
@@ -171,9 +189,12 @@ export default function ClientFormModal({
           <div className="field">
             <label>{t('clients.serviceLabel')}</label>
             <Select
-              value={serviceId}
-              options={[{ value: '', label: t('clients.serviceNotSelected') }, ...services.map((s) => ({ value: s.id, label: s.name }))]}
-              onChange={setServiceId}
+              value={catalogIsHouse ? houseServiceId : serviceId}
+              options={[
+                { value: '', label: t('clients.serviceNotSelected') },
+                ...(catalogIsHouse ? houseServices : services).map((s) => ({ value: s.id, label: s.name })),
+              ]}
+              onChange={catalogIsHouse ? setHouseServiceId : setServiceId}
             />
           </div>
         ) : (

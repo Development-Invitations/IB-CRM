@@ -182,6 +182,10 @@ pub struct ClientRecord {
     pub deal_value: Option<String>,
     pub service_id: Option<String>,
     pub service_name: Option<String>,
+    pub house_service_id: Option<String>,
+    pub house_service_name: Option<String>,
+    pub origin_partner_id: Option<String>,
+    pub origin_partner_name: Option<String>,
 }
 
 pub struct ClientHistoryRecord {
@@ -370,6 +374,21 @@ pub struct PartnerRegulationRecord {
 pub struct PartnerServiceRecord {
     pub id: String,
     pub partner_id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub price: Option<String>,
+    pub reward_percent: Option<String>,
+    pub created_by: Option<String>,
+    pub created_by_name: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+// Общий каталог "Наши услуги" (v0.7.0) — без владельца-партнёра, один на всю
+// CRM, ведёт только админ (см. list_house_services/create_house_service и
+// т.д.). Выбирает партнёр при создании СВОЕГО клиента.
+pub struct HouseServiceRecord {
+    pub id: String,
     pub name: String,
     pub description: Option<String>,
     pub price: Option<String>,
@@ -744,6 +763,22 @@ impl Db {
             CREATE INDEX IF NOT EXISTS idx_partner_services_partner ON partner_services(partner_id);"
         );
 
+        // Общий каталог "Наши услуги" (v0.7.0) — в отличие от partner_services,
+        // не привязан к партнёру: один каталог на всю CRM, ведёт только админ.
+        // Выбирает партнёр при создании СВОЕГО клиента (см. clients.house_service_id).
+        let _ = conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS house_services (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT,
+                price TEXT,
+                reward_percent TEXT,
+                created_by TEXT REFERENCES employees(id),
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );"
+        );
+
         // Миграции для баз, созданных более ранними версиями.
         add_column_if_missing(&conn, "employees", "phone TEXT");
         add_column_if_missing(&conn, "employees", "position_id TEXT REFERENCES positions(id)");
@@ -781,6 +816,17 @@ impl Db {
         // deal_value подставляется сервером из service.price, поле "Стоимость"
         // в форме заменяется выбором услуги (см. create_client/update_client).
         add_column_if_missing(&conn, "clients", "service_id TEXT REFERENCES partner_services(id)");
+        // Услуга из общего каталога "Наши услуги" (v0.7.0) — выбирает партнёр
+        // при создании СВОЕГО клиента (в отличие от service_id/partner_services,
+        // который выбирает админ для клиента партнёра). Мутуально исключающе
+        // с service_id — см. resolve_client_service_selection.
+        add_column_if_missing(&conn, "clients", "house_service_id TEXT REFERENCES house_services(id)");
+        // Партнёр-источник (v0.7.0) — проставляется один раз при переносе
+        // клиента в общую базу CRM (move_client_to_crm_base), НЕ трогается
+        // обычным update_client. Нужен для истории/отчётности после отвязки
+        // partner_id (см. list_clients_for_partner_report).
+        add_column_if_missing(&conn, "clients", "origin_partner_id TEXT REFERENCES partners(id)");
+        let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_clients_origin_partner_id ON clients(origin_partner_id)", []);
         // "Помощник" по регламенту партнёра (v0.4.0) — админ, если создаёт
         // партнёр, или конкретный сотрудник этого партнёра, если создаёт админ.
         add_column_if_missing(&conn, "partner_regulations", "assistant_id TEXT REFERENCES employees(id)");
@@ -2924,11 +2970,15 @@ impl Db {
             c.phone, c.email, c.address, c.notes,
             c.created_by, e.full_name, c.created_at,
             c.partner_id, p.name, c.deal_value,
-            c.service_id, sv.name
+            c.service_id, sv.name,
+            c.house_service_id, hsv.name,
+            c.origin_partner_id, op.name
         FROM clients c
         LEFT JOIN employees e ON e.id = c.created_by
         LEFT JOIN partners p ON p.id = c.partner_id
-        LEFT JOIN partner_services sv ON sv.id = c.service_id";
+        LEFT JOIN partner_services sv ON sv.id = c.service_id
+        LEFT JOIN house_services hsv ON hsv.id = c.house_service_id
+        LEFT JOIN partners op ON op.id = c.origin_partner_id";
 
     fn map_client_row(row: &rusqlite::Row) -> rusqlite::Result<ClientRecord> {
         Ok(ClientRecord {
@@ -2949,6 +2999,10 @@ impl Db {
             deal_value: row.get(14)?,
             service_id: row.get(15)?,
             service_name: row.get(16)?,
+            house_service_id: row.get(17)?,
+            house_service_name: row.get(18)?,
+            origin_partner_id: row.get(19)?,
+            origin_partner_name: row.get(20)?,
         })
     }
 
@@ -2992,6 +3046,23 @@ impl Db {
         rows.map(|r| r.filter_map(|x| x.ok()).collect()).unwrap_or_default()
     }
 
+    // Для отчёта по партнёру (v0.7.0) — в отличие от list_clients, включает
+    // ещё и клиентов, которых у партнёра больше нет (перенесены в общую базу
+    // CRM через move_client_to_crm_base), но которые у него ИЗНАЧАЛЬНО были
+    // — иначе перенос молча вычёркивал бы клиента и его сумму из отчёта.
+    fn list_clients_for_partner_report(&self, partner_id: &str) -> Vec<ClientRecord> {
+        let sql = format!(
+            "{} WHERE c.partner_id = ?1 OR (c.origin_partner_id = ?1 AND c.partner_id IS NULL) ORDER BY c.created_at DESC",
+            Self::CLIENT_SELECT
+        );
+        let mut stmt = match self.conn.prepare(&sql) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        let rows = stmt.query_map(params![partner_id], Self::map_client_row);
+        rows.map(|r| r.filter_map(|x| x.ok()).collect()).unwrap_or_default()
+    }
+
     pub fn get_client(&self, actor_id: &str, id: &str) -> Option<ClientRecord> {
         let employee = self.get_employee(actor_id)?;
         let sql = format!("{} WHERE c.id = ?1", Self::CLIENT_SELECT);
@@ -3015,6 +3086,7 @@ impl Db {
         partner_id: Option<&str>,
         deal_value: Option<&str>,
         service_id: Option<&str>,
+        house_service_id: Option<&str>,
     ) -> Result<ClientRecord, String> {
         if name.trim().is_empty() {
             return Err("Укажите название/имя клиента".into());
@@ -3028,39 +3100,56 @@ impl Db {
         } else {
             partner_id.map(str::to_string)
         };
-        // Услуга заменяет свободный ввод "Стоимости" (v0.4.0) — если задана,
-        // сервер сам подставляет цену из каталога, а не доверяет deal_value с
-        // фронта; без партнёра услугу выбрать нельзя, деньги остаются
+        // Услуга заменяет свободный ввод "Стоимости" (v0.4.0, расширено в
+        // v0.7.0 общим каталогом "Наши услуги") — если задана, сервер сам
+        // подставляет цену из каталога, а не доверяет deal_value с фронта;
+        // без партнёра услугу партнёра выбрать нельзя, деньги остаются
         // свободным текстом как раньше.
-        let (effective_deal_value, effective_service_id) =
-            self.resolve_client_service(effective_partner_id.as_deref(), service_id, deal_value)?;
+        let (effective_deal_value, effective_service_id, effective_house_service_id) =
+            self.resolve_client_service_selection(effective_partner_id.as_deref(), service_id, house_service_id, deal_value)?;
         let id = Uuid::new_v4().to_string();
         let client_number = self.next_client_number();
         self.conn
             .execute(
-                "INSERT INTO clients (id, client_number, name, contact_person, contact_position, phone, email, address, notes, created_by, partner_id, deal_value, service_id)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
-                params![id, client_number, name.trim(), contact_person, contact_position, phone, email, address, notes, actor_id, effective_partner_id, effective_deal_value, effective_service_id],
+                "INSERT INTO clients (id, client_number, name, contact_person, contact_position, phone, email, address, notes, created_by, partner_id, deal_value, service_id, house_service_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                params![id, client_number, name.trim(), contact_person, contact_position, phone, email, address, notes, actor_id, effective_partner_id, effective_deal_value, effective_service_id, effective_house_service_id],
             )
             .map_err(|e| e.to_string())?;
         self.get_client(actor_id, &id).ok_or_else(|| "Клиент не найден".to_string())
     }
 
-    // Общая логика для create_client/update_client: если передан service_id,
-    // проверяет принадлежность услуги тому же партнёру и подставляет цену из
-    // каталога; иначе оставляет deal_value как свободный текст без изменений.
-    fn resolve_client_service(&self, effective_partner_id: Option<&str>, service_id: Option<&str>, deal_value: Option<&str>) -> Result<(Option<String>, Option<String>), String> {
-        match service_id {
-            Some(sid) => {
-                let svc = self.get_partner_service(sid).ok_or_else(|| "Услуга не найдена".to_string())?;
-                let target = effective_partner_id.ok_or_else(|| "Услугу можно выбрать только для клиента партнёра".to_string())?;
-                if svc.partner_id != target {
-                    return Err("Услуга принадлежит другому партнёру".into());
-                }
-                Ok((svc.price.clone(), Some(sid.to_string())))
-            }
-            None => Ok((deal_value.map(str::to_string), None)),
+    // Общая логика для create_client/update_client: service_id (каталог
+    // конкретного партнёра) и house_service_id (общий каталог "Наши услуги",
+    // v0.7.0) взаимно исключающие. Если задан любой из них — сервер сам
+    // подставляет цену из каталога, а не доверяет deal_value с фронта.
+    // house_service_id не гейтится по роли актора — это UX-решение фронтенда
+    // (какой каталог показать), не вопрос прав: house_services общий, без
+    // владельца, поэтому нечего проверять на принадлежность (в отличие от
+    // service_id, который обязан совпадать с effective_partner_id).
+    fn resolve_client_service_selection(
+        &self,
+        effective_partner_id: Option<&str>,
+        service_id: Option<&str>,
+        house_service_id: Option<&str>,
+        deal_value: Option<&str>,
+    ) -> Result<(Option<String>, Option<String>, Option<String>), String> {
+        if service_id.is_some() && house_service_id.is_some() {
+            return Err("Нельзя одновременно выбрать услугу партнёра и услугу из общего каталога".into());
         }
+        if let Some(hsid) = house_service_id {
+            let svc = self.get_house_service(hsid).ok_or_else(|| "Услуга не найдена".to_string())?;
+            return Ok((svc.price.clone(), None, Some(hsid.to_string())));
+        }
+        if let Some(sid) = service_id {
+            let svc = self.get_partner_service(sid).ok_or_else(|| "Услуга не найдена".to_string())?;
+            let target = effective_partner_id.ok_or_else(|| "Услугу можно выбрать только для клиента партнёра".to_string())?;
+            if svc.partner_id != target {
+                return Err("Услуга принадлежит другому партнёру".into());
+            }
+            return Ok((svc.price.clone(), Some(sid.to_string()), None));
+        }
+        Ok((deal_value.map(str::to_string), None, None))
     }
 
     pub fn update_client(
@@ -3077,6 +3166,7 @@ impl Db {
         partner_id: Option<&str>,
         deal_value: Option<&str>,
         service_id: Option<&str>,
+        house_service_id: Option<&str>,
     ) -> Result<ClientRecord, String> {
         if name.trim().is_empty() {
             return Err("Укажите название/имя клиента".into());
@@ -3091,12 +3181,12 @@ impl Db {
         } else {
             partner_id.map(str::to_string)
         };
-        let (effective_deal_value, effective_service_id) =
-            self.resolve_client_service(effective_partner_id.as_deref(), service_id, deal_value)?;
+        let (effective_deal_value, effective_service_id, effective_house_service_id) =
+            self.resolve_client_service_selection(effective_partner_id.as_deref(), service_id, house_service_id, deal_value)?;
         self.conn
             .execute(
-                "UPDATE clients SET name = ?1, contact_person = ?2, contact_position = ?3, phone = ?4, email = ?5, address = ?6, notes = ?7, partner_id = ?8, deal_value = ?9, service_id = ?10 WHERE id = ?11",
-                params![name.trim(), contact_person, contact_position, phone, email, address, notes, effective_partner_id, effective_deal_value, effective_service_id, id],
+                "UPDATE clients SET name = ?1, contact_person = ?2, contact_position = ?3, phone = ?4, email = ?5, address = ?6, notes = ?7, partner_id = ?8, deal_value = ?9, service_id = ?10, house_service_id = ?11 WHERE id = ?12",
+                params![name.trim(), contact_person, contact_position, phone, email, address, notes, effective_partner_id, effective_deal_value, effective_service_id, effective_house_service_id, id],
             )
             .map_err(|e| e.to_string())?;
         self.get_client(actor_id, id).ok_or_else(|| "Клиент не найден".to_string())
@@ -3109,6 +3199,30 @@ impl Db {
         self.conn.execute("DELETE FROM client_history WHERE client_id = ?1", params![id]).map_err(|e| e.to_string())?;
         self.conn.execute("DELETE FROM clients WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
         Ok(())
+    }
+
+    // Перенос клиента партнёра в общую базу CRM (v0.7.0) — необратимо из UI:
+    // partner_id обнуляется (клиент пропадает из личного кабинета партнёра),
+    // origin_partner_id запоминает, откуда клиент пришёл (для пометки в
+    // интерфейсе и учёта в отчёте партнёра, см. list_clients_for_partner_report).
+    // service_id/house_service_id тоже обнуляются: деньги уже зафиксированы в
+    // deal_value (снимок цены на момент выбора услуги), а держать ссылку на
+    // каталог услуг партнёра, от которого клиент отвязан, не нужно — это же
+    // предотвращает ошибку "Услугу можно выбрать только для клиента партнёра"
+    // при следующем обычном update_client, если поле не передать явно как null.
+    pub fn move_client_to_crm_base(&self, admin_id: &str, id: &str) -> Result<ClientRecord, String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        let existing = self.get_client(admin_id, id).ok_or_else(|| "Клиент не найден".to_string())?;
+        let origin_partner_id = existing.partner_id.clone().ok_or_else(|| "Клиент уже в базе CRM".to_string())?;
+        self.conn
+            .execute(
+                "UPDATE clients SET partner_id = NULL, service_id = NULL, house_service_id = NULL, origin_partner_id = ?1 WHERE id = ?2",
+                params![origin_partner_id, id],
+            )
+            .map_err(|e| e.to_string())?;
+        self.get_client(admin_id, id).ok_or_else(|| "Клиент не найден".to_string())
     }
 
     pub fn list_client_history(&self, actor_id: &str, client_id: &str) -> Vec<ClientHistoryRecord> {
@@ -4629,6 +4743,94 @@ impl Db {
         Ok(())
     }
 
+    // ---- "Наши услуги" (v0.7.0) ----
+    // Общий каталог без владельца-партнёра. Читать может любой авторизованный
+    // сотрудник (нужно партнёру для выбора при создании своего клиента),
+    // писать — только админ (это каталог самой компании, а не партнёра).
+
+    const HOUSE_SERVICE_SELECT: &'static str = "SELECT
+            hs.id, hs.name, hs.description, hs.price, hs.reward_percent,
+            hs.created_by, cb.full_name, hs.created_at, hs.updated_at
+        FROM house_services hs
+        LEFT JOIN employees cb ON cb.id = hs.created_by";
+
+    fn map_house_service_row(row: &rusqlite::Row) -> rusqlite::Result<HouseServiceRecord> {
+        Ok(HouseServiceRecord {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            description: row.get(2)?,
+            price: row.get(3)?,
+            reward_percent: row.get(4)?,
+            created_by: row.get(5)?,
+            created_by_name: row.get(6)?,
+            created_at: row.get(7)?,
+            updated_at: row.get(8)?,
+        })
+    }
+
+    fn get_house_service(&self, id: &str) -> Option<HouseServiceRecord> {
+        let sql = format!("{} WHERE hs.id = ?1", Self::HOUSE_SERVICE_SELECT);
+        self.conn.query_row(&sql, params![id], Self::map_house_service_row).ok()
+    }
+
+    pub fn list_house_services(&self, actor_id: &str) -> Vec<HouseServiceRecord> {
+        if self.get_employee(actor_id).is_none() {
+            return Vec::new();
+        }
+        let sql = format!("{} ORDER BY hs.name ASC", Self::HOUSE_SERVICE_SELECT);
+        let mut stmt = match self.conn.prepare(&sql) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        let rows = match stmt.query_map([], Self::map_house_service_row) {
+            Ok(r) => r,
+            Err(_) => return Vec::new(),
+        };
+        rows.filter_map(|r| r.ok()).collect()
+    }
+
+    pub fn create_house_service(&self, actor_id: &str, name: &str, description: Option<&str>, price: Option<&str>, reward_percent: Option<&str>) -> Result<HouseServiceRecord, String> {
+        if !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        if name.trim().is_empty() {
+            return Err("Укажите название услуги".into());
+        }
+        let id = Uuid::new_v4().to_string();
+        self.conn
+            .execute(
+                "INSERT INTO house_services (id, name, description, price, reward_percent, created_by) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![id, name.trim(), description, price, reward_percent, actor_id],
+            )
+            .map_err(|e| e.to_string())?;
+        self.get_house_service(&id).ok_or_else(|| "Услуга не найдена".to_string())
+    }
+
+    pub fn update_house_service(&self, actor_id: &str, id: &str, name: &str, description: Option<&str>, price: Option<&str>, reward_percent: Option<&str>) -> Result<HouseServiceRecord, String> {
+        if !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        if name.trim().is_empty() {
+            return Err("Укажите название услуги".into());
+        }
+        self.conn
+            .execute(
+                "UPDATE house_services SET name = ?1, description = ?2, price = ?3, reward_percent = ?4, updated_at = datetime('now') WHERE id = ?5",
+                params![name.trim(), description, price, reward_percent, id],
+            )
+            .map_err(|e| e.to_string())?;
+        self.get_house_service(id).ok_or_else(|| "Услуга не найдена".to_string())
+    }
+
+    pub fn delete_house_service(&self, actor_id: &str, id: &str) -> Result<(), String> {
+        if !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn.execute("UPDATE clients SET house_service_id = NULL WHERE house_service_id = ?1", params![id]).map_err(|e| e.to_string())?;
+        self.conn.execute("DELETE FROM house_services WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
     pub fn create_partner_regulation(
         &self,
         actor_id: &str,
@@ -5749,7 +5951,7 @@ impl Db {
 
         let mut rows = Vec::with_capacity(partners.len());
         for partner in partners {
-            let clients = self.list_clients(actor_id, Some(&partner.id));
+            let clients = self.list_clients_for_partner_report(&partner.id);
             let clients_in_period: Vec<&ClientRecord> = clients
                 .iter()
                 .filter(|c| {

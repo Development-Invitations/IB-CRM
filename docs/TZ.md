@@ -4037,3 +4037,68 @@ Telegram" (у карточки клиента и в форме регламен�
 
 `cargo check --offline`, `npx tsc --noEmit`, `npx vite build` — все чисто. Версия поднята до 0.6.3
 (patch — по объёму скорее рефакторинг существующей фичи + точечный багфикс, не новый модуль).
+
+### v1.0.0 — Каталог "Наши услуги" + перенос клиента в Базу CRM
+
+Пользователь прислал скриншот страницы "Услуги" (партнёрский каталог) с двумя просьбами: (1) маска
+на цену/процент — на скрине "4500000"/"10" без форматирования; (2) разделить каталоги услуг — партнёр
+при создании своего клиента должен выбирать из общего каталога "Наши услуги", а админ при создании
+клиента в пространстве партнёра — по-прежнему из каталога услуг этого партнёра, плюс возможность
+перенести клиента в общую базу CRM с сохранением пометки о партнёре-источнике и без потери отчётности.
+
+**Маска (сделана отдельно, до входа в Plan Mode).** Новый `src/lib/format.ts` —
+`formatThousands`/`formatPercentInput`, тот же "мягкий" паттерн, что `formatUzPhone` (не мешает
+редактированию, просто группирует уже введённые цифры). Применено в `PartnerServices.tsx` — и на
+инпуты (`onChange`), и на отображение в таблице (`${formatThousands(s.price)} сум`, `${s.rewardPercent}%`).
+
+**Разделение каталогов — реализовано через Plan Mode** (после 2 исследовательских Explore-агентов —
+один по бэкенду `db.rs`/`main.rs`/`dispatch.rs`, другой по фронтенду `ClientFormModal.tsx`/`Clients.tsx`
+— и 3 уточняющих `AskUserQuestion`, все ответы — рекомендованный вариант).
+
+Бэкенд: новая таблица `house_services` — копия `partner_services`, но БЕЗ `partner_id` (общий каталог
+на всю CRM). `HouseServiceRecord`/`HOUSE_SERVICE_SELECT` зеркалят `PartnerServiceRecord`. Читать может
+любой сотрудник (`list_house_services` — нужен партнёру для выбора), писать — только админ
+(`create_house_service`/`update_house_service`/`delete_house_service`, гейт `is_admin`, без
+`can_access_partner_org` — тут нет владельца-партнёра, проверять нечего). `clients` получил 2 новые
+колонки: `house_service_id` (FK на `house_services`) и `origin_partner_id` (FK на `partners`,
+проставляется один раз при переносе). `resolve_client_service` переименован и расширен в
+`resolve_client_service_selection` — принимает и `service_id`, и `house_service_id`, мутуально
+исключающе; **важное решение**: `house_service_id` НЕ гейтится по роли актора на бэкенде (только
+проверка существования) — если бы гейтили "только партнёр может выбрать", админ не смог бы сохранить
+прочие поля уже существующего партнёрского клиента, у которого `house_service_id` уже стоит, не сломав
+привязку (а `house_services` глобальный — ownership-конфликта в принципе нет). То, какой каталог
+показать по умолчанию — решение фронтенда, не прав доступа.
+
+`move_client_to_crm_base(admin_id, id)` — новый метод: `partner_id = NULL`, `origin_partner_id =
+<был partner_id>`, `service_id`/`house_service_id` тоже обнуляются (сумма уже зафиксирована в
+`deal_value` как снимок цены на момент выбора услуги; висящая ссылка на каталог услуг партнёра, от
+которого клиент отвязан, не нужна и потенциально ломает инвариант `resolve_client_service_selection`
+при следующем обычном `update_client`, если поле явно не передать как `null`).
+
+Отчёт по партнёру (`list_partner_report_rows`) брал клиентов через `list_clients(actor_id,
+Some(&partner.id))` (`WHERE partner_id = ?1`) — после переноса клиент молча выпадал из
+`clients_added_count`/`financial_total` этого партнёра. Добавлен приватный `list_clients_for_partner_report`
+— `WHERE partner_id = ?1 OR (origin_partner_id = ?1 AND partner_id IS NULL)`, включает и текущих, и
+бывших клиентов партнёра. `EmployeeReportRow` клиентов не касается — не тронут.
+
+Фронтенд: новая страница `src/pages/HouseServices.tsx` (копия `PartnerServices.tsx` без `partnerId`),
+новый пункт в сайдбаре "Наши услуги" (только у админа, паттерн `partner-accounts` — сплайс в массив
+`modules` + `<Route>` с `Navigate` фоллбэком для не-админов, `Dashboard.tsx`). В `ClientFormModal.tsx`
+— новый derived-конст `catalogIsHouse = currentEmployee.isPartner || (!!client?.houseServiceId &&
+!client?.serviceId)` — партнёр всегда видит "Наши услуги"; админ — каталог партнёра, КРОМЕ правки уже
+существующего клиента с `houseServiceId` (тогда сохраняем родной каталог, чтобы правка прочих полей
+админом не обнулила привязку услуги). Один и тот же `<Select>` переключает источник опций/value/onChange
+по этому флагу. В `Clients.tsx`: (а) пометка "клиент партнёра «Х»" рядом с бейджем "CRM" — и в строке
+таблицы, и в детальной карточке, когда `!partnerId && originPartnerId`; (б) **важный фикс**: секция
+"Регламенты с партнёром" в карточке клиента раньше грузилась только если `selected.partnerId` truthy —
+после переноса молча пропадала бы, хотя пользователь явно просил не терять отчётность; исправлено —
+запрос `listPartnerRegulations` берёт `selected.partnerId || selected.originPartnerId`; (в) кнопка
+"Перенести в Базу CRM" в футере Drawer (админ + `selected.partnerId`, доступна и с общей страницы
+Клиенты, и из `AdminPartnerWorkspace`) с confirm-модалкой 1:1 по паттерну существующего удаления;
+после успешного переноса Drawer закрывается (`setSelected(null)`) осознанно — из
+`AdminPartnerWorkspace` клиент выпадает из текущего отфильтрованного списка, держать карточку открытой
+было бы confusing.
+
+`cargo check --offline`, `npx tsc --noEmit`, `npx vite build` — все чисто. Версия поднята до 1.0.0 по
+прямой просьбе пользователя (по объёму сама фича тянула на minor — новый каталог услуг + новая
+страница/роут, не точечный фикс).

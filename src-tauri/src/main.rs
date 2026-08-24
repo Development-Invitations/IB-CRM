@@ -208,6 +208,14 @@ struct Client {
     service_id: Option<String>,
     #[serde(rename = "serviceName")]
     service_name: Option<String>,
+    #[serde(rename = "houseServiceId")]
+    house_service_id: Option<String>,
+    #[serde(rename = "houseServiceName")]
+    house_service_name: Option<String>,
+    #[serde(rename = "originPartnerId")]
+    origin_partner_id: Option<String>,
+    #[serde(rename = "originPartnerName")]
+    origin_partner_name: Option<String>,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -484,6 +492,24 @@ struct PartnerService {
     id: String,
     #[serde(rename = "partnerId")]
     partner_id: String,
+    name: String,
+    description: Option<String>,
+    price: Option<String>,
+    #[serde(rename = "rewardPercent")]
+    reward_percent: Option<String>,
+    #[serde(rename = "createdBy")]
+    created_by: Option<String>,
+    #[serde(rename = "createdByName")]
+    created_by_name: Option<String>,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+    #[serde(rename = "updatedAt")]
+    updated_at: String,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct HouseService {
+    id: String,
     name: String,
     description: Option<String>,
     price: Option<String>,
@@ -1069,6 +1095,8 @@ struct CreateClientPayload {
     deal_value: Option<String>,
     #[serde(rename = "serviceId")]
     service_id: Option<String>,
+    #[serde(rename = "houseServiceId")]
+    house_service_id: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -1091,6 +1119,8 @@ struct UpdateClientPayload {
     deal_value: Option<String>,
     #[serde(rename = "serviceId")]
     service_id: Option<String>,
+    #[serde(rename = "houseServiceId")]
+    house_service_id: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -1403,6 +1433,49 @@ struct UpdatePartnerServicePayload {
 struct DeletePartnerServicePayload {
     #[serde(rename = "actorId")]
     actor_id: String,
+    id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct ListHouseServicesPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct CreateHouseServicePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    name: String,
+    description: Option<String>,
+    price: Option<String>,
+    #[serde(rename = "rewardPercent")]
+    reward_percent: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct UpdateHouseServicePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    id: String,
+    name: String,
+    description: Option<String>,
+    price: Option<String>,
+    #[serde(rename = "rewardPercent")]
+    reward_percent: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct DeleteHouseServicePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct MoveClientToCrmBasePayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
     id: String,
 }
 
@@ -2049,6 +2122,10 @@ fn to_client(c: db::ClientRecord) -> Client {
         deal_value: c.deal_value,
         service_id: c.service_id,
         service_name: c.service_name,
+        house_service_id: c.house_service_id,
+        house_service_name: c.house_service_name,
+        origin_partner_id: c.origin_partner_id,
+        origin_partner_name: c.origin_partner_name,
     }
 }
 
@@ -2200,6 +2277,20 @@ fn to_partner_service(s: db::PartnerServiceRecord) -> PartnerService {
     PartnerService {
         id: s.id,
         partner_id: s.partner_id,
+        name: s.name,
+        description: s.description,
+        price: s.price,
+        reward_percent: s.reward_percent,
+        created_by: s.created_by,
+        created_by_name: s.created_by_name,
+        created_at: s.created_at,
+        updated_at: s.updated_at,
+    }
+}
+
+fn to_house_service(s: db::HouseServiceRecord) -> HouseService {
+    HouseService {
+        id: s.id,
         name: s.name,
         description: s.description,
         price: s.price,
@@ -2724,6 +2815,7 @@ fn create_client(payload: CreateClientPayload, state: tauri::State<AppState>) ->
         payload.partner_id.as_deref(),
         payload.deal_value.as_deref(),
         payload.service_id.as_deref(),
+        payload.house_service_id.as_deref(),
     )
     .map(to_client)
 }
@@ -2744,6 +2836,7 @@ fn update_client(payload: UpdateClientPayload, state: tauri::State<AppState>) ->
         payload.partner_id.as_deref(),
         payload.deal_value.as_deref(),
         payload.service_id.as_deref(),
+        payload.house_service_id.as_deref(),
     )
     .map(to_client)
 }
@@ -2752,6 +2845,12 @@ fn update_client(payload: UpdateClientPayload, state: tauri::State<AppState>) ->
 fn delete_client(payload: DeleteClientPayload, state: tauri::State<AppState>) -> Result<(), String> {
     let db = state.0.lock().unwrap();
     db.delete_client(&payload.admin_id, &payload.id)
+}
+
+#[tauri::command]
+fn move_client_to_crm_base(payload: MoveClientToCrmBasePayload, state: tauri::State<AppState>) -> Result<Client, String> {
+    let db = state.0.lock().unwrap();
+    db.move_client_to_crm_base(&payload.admin_id, &payload.id).map(to_client)
 }
 
 #[tauri::command]
@@ -3186,6 +3285,32 @@ fn update_partner_service(payload: UpdatePartnerServicePayload, state: tauri::St
 fn delete_partner_service(payload: DeletePartnerServicePayload, state: tauri::State<AppState>) -> Result<(), String> {
     let db = state.0.lock().unwrap();
     db.delete_partner_service(&payload.actor_id, &payload.id)
+}
+
+#[tauri::command]
+fn list_house_services(payload: ListHouseServicesPayload, state: tauri::State<AppState>) -> Vec<HouseService> {
+    let db = state.0.lock().unwrap();
+    db.list_house_services(&payload.actor_id).into_iter().map(to_house_service).collect()
+}
+
+#[tauri::command]
+fn create_house_service(payload: CreateHouseServicePayload, state: tauri::State<AppState>) -> Result<HouseService, String> {
+    let db = state.0.lock().unwrap();
+    db.create_house_service(&payload.actor_id, &payload.name, payload.description.as_deref(), payload.price.as_deref(), payload.reward_percent.as_deref())
+        .map(to_house_service)
+}
+
+#[tauri::command]
+fn update_house_service(payload: UpdateHouseServicePayload, state: tauri::State<AppState>) -> Result<HouseService, String> {
+    let db = state.0.lock().unwrap();
+    db.update_house_service(&payload.actor_id, &payload.id, &payload.name, payload.description.as_deref(), payload.price.as_deref(), payload.reward_percent.as_deref())
+        .map(to_house_service)
+}
+
+#[tauri::command]
+fn delete_house_service(payload: DeleteHouseServicePayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.delete_house_service(&payload.actor_id, &payload.id)
 }
 
 #[tauri::command]
@@ -3897,6 +4022,7 @@ fn main() {
             create_client,
             update_client,
             delete_client,
+            move_client_to_crm_base,
             list_client_history,
             add_client_history,
             list_projects,
@@ -3956,6 +4082,10 @@ fn main() {
             create_partner_service,
             update_partner_service,
             delete_partner_service,
+            list_house_services,
+            create_house_service,
+            update_house_service,
+            delete_house_service,
             list_admin_employees,
             list_partner_org_employees,
             add_regulation_reminder,

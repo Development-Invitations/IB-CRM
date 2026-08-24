@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '0.6.3';
+export const APP_VERSION = '1.0.0';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,15 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '1.0.0',
+      items: [
+        'Новый общий каталог «Наши услуги» (Настройки → раздел в боковом меню, только у админа) — партнёр при создании СВОЕГО клиента теперь выбирает услугу из него, а не из своего старого каталога',
+        'Каталог услуг конкретного партнёра остался прежним — им по-прежнему пользуется админ при создании клиента внутри рабочего пространства партнёра',
+        'Админ может перенести клиента партнёра в общую базу CRM (кнопка в карточке клиента) — клиент отвязывается от партнёра, но в списке остаётся пометка «клиент партнёра …», регламенты с партнёром и отчёт по партнёру по-прежнему учитывают такого клиента',
+        'В «Услугах» цена и процент вознаграждения теперь показываются с разделителями тысяч и знаком % — раньше было просто "4500000" и "10"',
+      ],
+    },
     {
       version: '0.6.3',
       items: [
@@ -586,6 +595,15 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '1.0.0',
+      items: [
+        "Yangi umumiy \"Bizning xizmatlar\" katalogi (yon menyu, faqat admin) — hamkor endi O'Z mijozini yaratganda shu yerdan xizmat tanlaydi, o'zining eski katalogidan emas",
+        "Muayyan hamkorning o'z xizmatlar katalogi o'zgarmadi — admin hamkor ish maydonida mijoz yaratganda hali ham undan foydalanadi",
+        "Admin hamkor mijozini umumiy CRM bazasiga o'tkazishi mumkin (mijoz kartochkasidagi tugma) — mijoz hamkordan uziladi, lekin ro'yxatda \"... hamkorining mijozi\" belgisi qoladi, hamkor bilan reglamentlar va hamkor hisoboti bu mijozni hisobga olishda davom etadi",
+        "\"Xizmatlar\"da narx va mukofot foizi endi minglik ajratgichlar va % belgisi bilan ko'rsatiladi — avval oddiy \"4500000\" va \"10\" edi",
+      ],
+    },
+    {
       version: '0.6.3',
       items: [
         "CRM'dagi reglament va loyihalar endi Telegramda \"Bajarildi\" tugmasi bilan vazifa yopilgandan so'ng darhol yangilanadi — sahifani qo'lda qayta yuklash shart emas",
@@ -1155,6 +1173,15 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '1.0.0',
+      items: [
+        'Янги умумий "Бизнинг хизматлар" каталоги (ён меню, фақат админ) — ҳамкор энди Ўз мижозини яратганда шу ердан хизмат танлайди, ўзининг эски каталогидан эмас',
+        'Муайян ҳамкорнинг ўз хизматлар каталоги ўзгармади — админ ҳамкор иш майдонида мижоз яратганда ҳали ҳам ундан фойдаланади',
+        'Админ ҳамкор мижозини умумий CRM базасига ўтказиши мумкин (мижоз карточкасидаги тугма) — мижоз ҳамкордан узилади, лекин рўйхатда "... ҳамкорининг мижози" белгиси қолади, ҳамкор билан регламентлар ва ҳамкор ҳисоботи бу мижозни ҳисобга олишда давом этади',
+        '"Хизматлар"да нарх ва мукофот фоизи энди минглик ажратгичлар ва % белгиси билан кўрсатилади — аввал оддий "4500000" ва "10" эди',
+      ],
+    },
     {
       version: '0.6.3',
       items: [

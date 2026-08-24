@@ -1,24 +1,24 @@
 import { useEffect, useState, FormEvent } from 'react';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
-import { api, type Employee, type PartnerService } from '../lib/api';
+import { api, type Employee, type HouseService } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
 import Modal from '../components/Modal';
 import LoadingScreen from '../components/LoadingScreen';
 import { formatThousands, formatPercentInput } from '../lib/format';
 
-// Каталог услуг партнёра (v0.4.0) — общий, редактируется и партнёром (в
-// своей панели), и админом (в AdminPartnerWorkspace, та же страница). Выбор
-// услуги при создании клиента заменяет свободный ввод "Стоимости" — цена
-// подставляется сервером из price этой услуги (см. ClientFormModal.tsx).
-export default function PartnerServices({ currentEmployee, partnerId }: { currentEmployee: Employee; partnerId: string }) {
+// Общий каталог "Наши услуги" (v0.7.0) — в отличие от PartnerServices.tsx, не
+// привязан к партнёру: один каталог на всю CRM, ведёт только админ (страница
+// доступна только ему — гейт на уровне роута в Dashboard.tsx). Выбирает
+// партнёр при создании СВОЕГО клиента (см. ClientFormModal.tsx).
+export default function HouseServices({ currentEmployee }: { currentEmployee: Employee }) {
   const { t } = useLocale();
   const { showToast } = useToast();
-  const [services, setServices] = useState<PartnerService[]>([]);
+  const [services, setServices] = useState<HouseService[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<PartnerService | undefined>(undefined);
+  const [editing, setEditing] = useState<HouseService | undefined>(undefined);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
@@ -26,12 +26,12 @@ export default function PartnerServices({ currentEmployee, partnerId }: { curren
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const [deleteTarget, setDeleteTarget] = useState<PartnerService | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<HouseService | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
   const load = () => {
     setLoading(true);
-    api.listPartnerServices({ actorId: currentEmployee.id, partnerId })
+    api.listHouseServices({ actorId: currentEmployee.id })
       .then((list) => {
         setServices(list);
         setLoading(false);
@@ -45,7 +45,7 @@ export default function PartnerServices({ currentEmployee, partnerId }: { curren
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [partnerId]);
+  }, []);
 
   const openCreate = () => {
     setEditing(undefined);
@@ -57,7 +57,7 @@ export default function PartnerServices({ currentEmployee, partnerId }: { curren
     setFormOpen(true);
   };
 
-  const openEdit = (s: PartnerService) => {
+  const openEdit = (s: HouseService) => {
     setEditing(s);
     setName(s.name);
     setDescription(s.description ?? '');
@@ -70,7 +70,7 @@ export default function PartnerServices({ currentEmployee, partnerId }: { curren
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault();
     if (!name.trim()) {
-      setError(t('partnerServices.errorRequired'));
+      setError(t('houseServices.errorRequired'));
       return;
     }
     setBusy(true);
@@ -78,16 +78,16 @@ export default function PartnerServices({ currentEmployee, partnerId }: { curren
     try {
       const shared = { name: name.trim(), description: description.trim() || null, price: price.trim() || null, rewardPercent: rewardPercent.trim() || null };
       if (editing) {
-        await api.updatePartnerService({ actorId: currentEmployee.id, id: editing.id, ...shared });
-        showToast('success', t('partnerServices.updated'));
+        await api.updateHouseService({ actorId: currentEmployee.id, id: editing.id, ...shared });
+        showToast('success', t('houseServices.updated'));
       } else {
-        await api.createPartnerService({ actorId: currentEmployee.id, partnerId, ...shared });
-        showToast('success', t('partnerServices.added'));
+        await api.createHouseService({ actorId: currentEmployee.id, ...shared });
+        showToast('success', t('houseServices.added'));
       }
       setFormOpen(false);
       load();
     } catch (err: any) {
-      setError(typeof err === 'string' ? err : t('partnerServices.errorGeneric'));
+      setError(typeof err === 'string' ? err : t('houseServices.errorGeneric'));
     } finally {
       setBusy(false);
     }
@@ -97,12 +97,12 @@ export default function PartnerServices({ currentEmployee, partnerId }: { curren
     if (!deleteTarget) return;
     setDeleteBusy(true);
     try {
-      await api.deletePartnerService({ actorId: currentEmployee.id, id: deleteTarget.id });
-      showToast('success', t('partnerServices.deleted'));
+      await api.deleteHouseService({ actorId: currentEmployee.id, id: deleteTarget.id });
+      showToast('success', t('houseServices.deleted'));
       setDeleteTarget(null);
       load();
     } catch (err: any) {
-      showToast('error', typeof err === 'string' ? err : t('partnerServices.errorGeneric'));
+      showToast('error', typeof err === 'string' ? err : t('houseServices.errorGeneric'));
     } finally {
       setDeleteBusy(false);
     }
@@ -111,23 +111,23 @@ export default function PartnerServices({ currentEmployee, partnerId }: { curren
   return (
     <div className="employees-page">
       <div className="employees-header">
-        <h1>{t('partnerServices.title')}</h1>
+        <h1>{t('houseServices.title')}</h1>
         <button className="primary employees-add-btn" onClick={openCreate}>
-          <Plus size={16} /> {t('partnerServices.addBtn')}
+          <Plus size={16} /> {t('houseServices.addBtn')}
         </button>
       </div>
 
       {loading ? (
         <LoadingScreen compact />
       ) : services.length === 0 ? (
-        <p className="settings-hint">{t('partnerServices.empty')}</p>
+        <p className="settings-hint">{t('houseServices.empty')}</p>
       ) : (
         <table className="employees-table">
           <thead>
             <tr>
-              <th>{t('partnerServices.colName')}</th>
-              <th>{t('partnerServices.colPrice')}</th>
-              <th>{t('partnerServices.colReward')}</th>
+              <th>{t('houseServices.colName')}</th>
+              <th>{t('houseServices.colPrice')}</th>
+              <th>{t('houseServices.colReward')}</th>
               <th />
             </tr>
           </thead>
@@ -144,7 +144,7 @@ export default function PartnerServices({ currentEmployee, partnerId }: { curren
                   <button className="icon-btn" onClick={() => openEdit(s)} aria-label={t('employees.editBtn')}>
                     <Pencil size={14} />
                   </button>
-                  <button className="icon-btn" onClick={() => setDeleteTarget(s)} aria-label={t('partnerServices.deleteBtn')}>
+                  <button className="icon-btn" onClick={() => setDeleteTarget(s)} aria-label={t('houseServices.deleteBtn')}>
                     <Trash2 size={14} />
                   </button>
                 </td>
@@ -156,7 +156,7 @@ export default function PartnerServices({ currentEmployee, partnerId }: { curren
 
       <Modal
         open={formOpen}
-        title={editing ? t('partnerServices.editTitle') : t('partnerServices.addTitle')}
+        title={editing ? t('houseServices.editTitle') : t('houseServices.addTitle')}
         onClose={() => setFormOpen(false)}
         actions={
           <>
@@ -172,27 +172,27 @@ export default function PartnerServices({ currentEmployee, partnerId }: { curren
         <form onSubmit={handleSubmit}>
           {error && <div className="error-text">{error}</div>}
           <div className="field">
-            <label>{t('partnerServices.nameLabel')}</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('partnerServices.namePlaceholder')} />
+            <label>{t('houseServices.nameLabel')}</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('houseServices.namePlaceholder')} />
           </div>
           <div className="field">
-            <label>{t('partnerServices.descriptionLabel')}</label>
-            <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('partnerServices.descriptionPlaceholder')} />
+            <label>{t('houseServices.descriptionLabel')}</label>
+            <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('houseServices.descriptionPlaceholder')} />
           </div>
           <div className="field">
-            <label>{t('partnerServices.priceLabel')}</label>
-            <input value={price} onChange={(e) => setPrice(formatThousands(e.target.value))} placeholder={t('partnerServices.pricePlaceholder')} />
+            <label>{t('houseServices.priceLabel')}</label>
+            <input value={price} onChange={(e) => setPrice(formatThousands(e.target.value))} placeholder={t('houseServices.pricePlaceholder')} />
           </div>
           <div className="field">
-            <label>{t('partnerServices.rewardPercentLabel')}</label>
-            <input value={rewardPercent} onChange={(e) => setRewardPercent(formatPercentInput(e.target.value))} placeholder={t('partnerServices.rewardPercentPlaceholder')} />
+            <label>{t('houseServices.rewardPercentLabel')}</label>
+            <input value={rewardPercent} onChange={(e) => setRewardPercent(formatPercentInput(e.target.value))} placeholder={t('houseServices.rewardPercentPlaceholder')} />
           </div>
         </form>
       </Modal>
 
       <Modal
         open={!!deleteTarget}
-        title={t('partnerServices.deleteConfirmTitle')}
+        title={t('houseServices.deleteConfirmTitle')}
         onClose={() => setDeleteTarget(null)}
         actions={
           <>
@@ -200,12 +200,12 @@ export default function PartnerServices({ currentEmployee, partnerId }: { curren
               {t('common.cancel')}
             </button>
             <button className="modal-btn danger" onClick={handleDelete} disabled={deleteBusy}>
-              {deleteBusy ? t('employees.savingBusy') : t('partnerServices.deleteBtn')}
+              {deleteBusy ? t('employees.savingBusy') : t('houseServices.deleteBtn')}
             </button>
           </>
         }
       >
-        <p>{t('partnerServices.deleteConfirmBody')}</p>
+        <p>{t('houseServices.deleteConfirmBody')}</p>
       </Modal>
     </div>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Search, Pencil, Contact, Trash2, Send, ExternalLink } from 'lucide-react';
+import { Plus, Search, Pencil, Contact, Trash2, Send, ExternalLink, ArrowRightLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api, type Employee, type Client, type ClientHistoryEntry, type Regulation, type PartnerRegulation, type Partner } from '../lib/api';
 import { useLocale } from '../lib/i18n';
@@ -45,6 +45,8 @@ export default function Clients({
   const [editingClient, setEditingClient] = useState<Client | undefined>(undefined);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [moveConfirmOpen, setMoveConfirmOpen] = useState(false);
+  const [moveBusy, setMoveBusy] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -78,11 +80,16 @@ export default function Clients({
       return;
     }
     setHistoryLoading(true);
+    // Партнёр-источник для запроса регламентов — берём либо текущего
+    // (partnerId), либо, если клиента уже перенесли в Базу CRM, того, из чьей
+    // панели он пришёл (originPartnerId) — иначе "Регламенты с партнёром"
+    // молча пропадали бы из карточки клиента сразу после переноса.
+    const regPartnerId = selected.partnerId || selected.originPartnerId;
     Promise.all([
       api.listClientHistory({ actorId: currentEmployee.id, clientId: selected.id }),
       api.listRegulations(),
-      selected.partnerId && (currentEmployee.isAdmin || currentEmployee.isPartner)
-        ? api.listPartnerRegulations({ actorId: currentEmployee.id, partnerId: selected.partnerId }).catch(() => [])
+      regPartnerId && (currentEmployee.isAdmin || currentEmployee.isPartner)
+        ? api.listPartnerRegulations({ actorId: currentEmployee.id, partnerId: regPartnerId }).catch(() => [])
         : Promise.resolve([]),
     ])
       .then(([entries, allRegs, partnerRegs]) => {
@@ -120,6 +127,25 @@ export default function Clients({
       showToast('error', typeof err === 'string' ? err : t('clients.errorGeneric'));
     } finally {
       setDeleteBusy(false);
+    }
+  };
+
+  const handleMoveToCrm = async () => {
+    if (!selected) return;
+    setMoveBusy(true);
+    try {
+      await api.moveClientToCrmBase({ adminId: currentEmployee.id, id: selected.id });
+      showToast('success', t('clients.moveToCrmSuccess'));
+      setMoveConfirmOpen(false);
+      // Закрываем карточку осознанно: после переноса клиент выпадает из
+      // текущего отфильтрованного списка (особенно если открыт из
+      // AdminPartnerWorkspace) — держать её открытой было бы confusing.
+      setSelected(null);
+      load();
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('clients.errorGeneric'));
+    } finally {
+      setMoveBusy(false);
     }
   };
 
@@ -203,7 +229,14 @@ export default function Clients({
                 <td>{c.email || '—'}</td>
                 {scopedPartnerId === undefined && (
                   <td>
-                    {c.partnerId ? <span className="absence-status">{c.partnerName}</span> : <span className="settings-hint">{t('clients.originCrm')}</span>}
+                    {c.partnerId ? (
+                      <span className="absence-status">{c.partnerName}</span>
+                    ) : (
+                      <span className="settings-hint">
+                        {t('clients.originCrm')}
+                        {c.originPartnerId ? ` · ${t('clients.originPartnerNote', { name: c.originPartnerName ?? '' })}` : ''}
+                      </span>
+                    )}
                   </td>
                 )}
                 <td>{parseSqliteUtc(c.createdAt).toLocaleDateString()}</td>
@@ -223,6 +256,11 @@ export default function Clients({
               <button className="modal-btn" onClick={() => selected && openEdit(selected)}>
                 <Pencil size={14} /> {t('employees.editBtn')}
               </button>
+              {currentEmployee.isAdmin && selected.partnerId && (
+                <button className="modal-btn" onClick={() => setMoveConfirmOpen(true)}>
+                  <ArrowRightLeft size={14} /> {t('clients.moveToCrmBtn')}
+                </button>
+              )}
               {currentEmployee.isAdmin && (
                 <button className="modal-btn danger" onClick={() => setDeleteConfirmOpen(true)}>
                   <Trash2 size={14} /> {t('clients.deleteBtn')}
@@ -291,6 +329,12 @@ export default function Clients({
               <div className="employee-card-row">
                 <span className="settings-hint">{t('clients.originLabel')}</span>
                 <span>{selected.partnerId ? selected.partnerName : t('clients.originCrm')}</span>
+              </div>
+            )}
+            {scopedPartnerId === undefined && !selected.partnerId && selected.originPartnerId && (
+              <div className="employee-card-row">
+                <span className="settings-hint" />
+                <span className="settings-hint">{t('clients.originPartnerNote', { name: selected.originPartnerName ?? '' })}</span>
               </div>
             )}
             <div className="employee-card-row">
@@ -415,6 +459,24 @@ export default function Clients({
         }
       >
         {t('clients.deleteConfirmBody', { name: selected?.name ?? '' })}
+      </Modal>
+
+      <Modal
+        open={moveConfirmOpen}
+        title={t('clients.moveToCrmConfirmTitle')}
+        onClose={() => setMoveConfirmOpen(false)}
+        actions={
+          <>
+            <button className="modal-btn" onClick={() => setMoveConfirmOpen(false)} disabled={moveBusy}>
+              {t('common.cancel')}
+            </button>
+            <button className="modal-btn danger" onClick={handleMoveToCrm} disabled={moveBusy}>
+              {moveBusy ? t('common.loading') : t('clients.moveToCrmBtn')}
+            </button>
+          </>
+        }
+      >
+        {t('clients.moveToCrmConfirmBody', { name: selected?.name ?? '' })}
       </Modal>
     </div>
   );

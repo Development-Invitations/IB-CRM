@@ -120,6 +120,10 @@ export type Client = {
   dealValue: string | null;
   serviceId: string | null;
   serviceName: string | null;
+  houseServiceId: string | null;
+  houseServiceName: string | null;
+  originPartnerId: string | null;
+  originPartnerName: string | null;
 };
 
 export type ClientHistoryEntry = {
@@ -298,6 +302,18 @@ export type PartnerRegulation = {
 export type PartnerService = {
   id: string;
   partnerId: string;
+  name: string;
+  description: string | null;
+  price: string | null;
+  rewardPercent: string | null;
+  createdBy: string | null;
+  createdByName: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type HouseService = {
+  id: string;
   name: string;
   description: string | null;
   price: string | null;
@@ -727,6 +743,7 @@ export const api = {
     partnerId?: string | null;
     dealValue?: string | null;
     serviceId?: string | null;
+    houseServiceId?: string | null;
   }) => invoke<Client>('create_client', { payload }),
 
   updateClient: (payload: {
@@ -742,9 +759,12 @@ export const api = {
     partnerId?: string | null;
     dealValue?: string | null;
     serviceId?: string | null;
+    houseServiceId?: string | null;
   }) => invoke<Client>('update_client', { payload }),
 
   deleteClient: (payload: { adminId: string; id: string }) => invoke<void>('delete_client', { payload }),
+
+  moveClientToCrmBase: (payload: { adminId: string; id: string }) => invoke<Client>('move_client_to_crm_base', { payload }),
 
   listClientHistory: (payload: { actorId: string; clientId: string }) => invoke<ClientHistoryEntry[]>('list_client_history', { payload }),
 
@@ -774,6 +794,16 @@ export const api = {
     invoke<PartnerService>('update_partner_service', { payload }),
 
   deletePartnerService: (payload: { actorId: string; id: string }) => invoke<void>('delete_partner_service', { payload }),
+
+  listHouseServices: (payload: { actorId: string }) => invoke<HouseService[]>('list_house_services', { payload }),
+
+  createHouseService: (payload: { actorId: string; name: string; description?: string | null; price?: string | null; rewardPercent?: string | null }) =>
+    invoke<HouseService>('create_house_service', { payload }),
+
+  updateHouseService: (payload: { actorId: string; id: string; name: string; description?: string | null; price?: string | null; rewardPercent?: string | null }) =>
+    invoke<HouseService>('update_house_service', { payload }),
+
+  deleteHouseService: (payload: { actorId: string; id: string }) => invoke<void>('delete_house_service', { payload }),
 
   listAdminEmployees: () => invoke<Employee[]>('list_admin_employees'),
 

@@ -214,7 +214,7 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
             db.create_client(
                 &p.actor_id, &p.name, p.contact_person.as_deref(), p.contact_position.as_deref(),
                 p.phone.as_deref(), p.email.as_deref(), p.address.as_deref(), p.notes.as_deref(),
-                p.partner_id.as_deref(), p.deal_value.as_deref(), p.service_id.as_deref(),
+                p.partner_id.as_deref(), p.deal_value.as_deref(), p.service_id.as_deref(), p.house_service_id.as_deref(),
             ).map(crate::to_client).map(to_json)
         }
         "update_client" => {
@@ -222,12 +222,16 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
             db.update_client(
                 &p.actor_id, &p.id, &p.name, p.contact_person.as_deref(), p.contact_position.as_deref(),
                 p.phone.as_deref(), p.email.as_deref(), p.address.as_deref(), p.notes.as_deref(),
-                p.partner_id.as_deref(), p.deal_value.as_deref(), p.service_id.as_deref(),
+                p.partner_id.as_deref(), p.deal_value.as_deref(), p.service_id.as_deref(), p.house_service_id.as_deref(),
             ).map(crate::to_client).map(to_json)
         }
         "delete_client" => {
             let p: crate::DeleteClientPayload = from_payload(payload)?;
             db.delete_client(&p.admin_id, &p.id).map(to_json)
+        }
+        "move_client_to_crm_base" => {
+            let p: crate::MoveClientToCrmBasePayload = from_payload(payload)?;
+            db.move_client_to_crm_base(&p.admin_id, &p.id).map(crate::to_client).map(to_json)
         }
         "list_client_history" => {
             let p: crate::ListClientHistoryPayload = from_payload(payload)?;
@@ -520,6 +524,27 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
             let p: crate::DeletePartnerServicePayload = from_payload(payload)?;
             db.delete_partner_service(&p.actor_id, &p.id).map(to_json)
         }
+
+        // ---- "Наши услуги" (v0.7.0) ----
+        "list_house_services" => {
+            let p: crate::ListHouseServicesPayload = from_payload(payload)?;
+            Ok(to_json(db.list_house_services(&p.actor_id).into_iter().map(crate::to_house_service).collect::<Vec<_>>()))
+        }
+        "create_house_service" => {
+            let p: crate::CreateHouseServicePayload = from_payload(payload)?;
+            db.create_house_service(&p.actor_id, &p.name, p.description.as_deref(), p.price.as_deref(), p.reward_percent.as_deref())
+                .map(crate::to_house_service).map(to_json)
+        }
+        "update_house_service" => {
+            let p: crate::UpdateHouseServicePayload = from_payload(payload)?;
+            db.update_house_service(&p.actor_id, &p.id, &p.name, p.description.as_deref(), p.price.as_deref(), p.reward_percent.as_deref())
+                .map(crate::to_house_service).map(to_json)
+        }
+        "delete_house_service" => {
+            let p: crate::DeleteHouseServicePayload = from_payload(payload)?;
+            db.delete_house_service(&p.actor_id, &p.id).map(to_json)
+        }
+
         "list_admin_employees" => Ok(to_json(db.list_admin_employees().into_iter().map(crate::to_employee).collect::<Vec<_>>())),
         "list_partner_org_employees" => {
             let p: crate::ListPartnerOrgEmployeesPayload = from_payload(payload)?;

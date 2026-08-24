@@ -754,6 +754,14 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
             let p: crate::DeleteNotebookNotePayload = from_payload(payload)?;
             db.delete_notebook_note(&p.actor_id, &p.id).map(to_json)
         }
+        "get_onboarding_status" => {
+            let p: crate::GetOnboardingStatusPayload = from_payload(payload)?;
+            db.get_onboarding_status(&p.actor_id, &p.employee_id).map(crate::to_onboarding_status).map(to_json)
+        }
+        "set_onboarding_completed" => {
+            let p: crate::SetOnboardingCompletedPayload = from_payload(payload)?;
+            db.set_onboarding_completed(&p.actor_id, &p.employee_id).map(crate::to_onboarding_status).map(to_json)
+        }
         "get_employee_report" => {
             let p: crate::GetEmployeeReportPayload = from_payload(payload)?;
             db.list_employee_report_rows(&p.admin_id, &p.period_start, &p.period_end)

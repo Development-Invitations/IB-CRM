@@ -65,7 +65,7 @@ export default function PartnerTopbar({ employee }: { employee: Employee }) {
       <div className="topbar-title">{t('topbar.welcome', { name: employee.fullName || employee.login })}</div>
 
       <div className="topbar-actions">
-        <button className="icon-btn" onClick={() => navigate('/dashboard/chat')} aria-label={t('topbar.chat')}>
+        <button className="icon-btn" data-tour-id="topbar-chat" onClick={() => navigate('/dashboard/chat')} aria-label={t('topbar.chat')}>
           <MessageCircle size={20} />
         </button>
 
@@ -89,7 +89,7 @@ export default function PartnerTopbar({ employee }: { employee: Employee }) {
           </button>
         )}
 
-        <button className="icon-btn" onClick={() => navigate('/dashboard/settings')} aria-label={t('topbar.settings')}>
+        <button className="icon-btn" data-tour-id="topbar-settings" onClick={() => navigate('/dashboard/settings')} aria-label={t('topbar.settings')}>
           <SettingsIcon size={20} />
         </button>
       </div>

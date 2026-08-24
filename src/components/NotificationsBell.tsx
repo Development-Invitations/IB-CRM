@@ -25,7 +25,7 @@ export default function NotificationsBell({
   const { t } = useLocale();
 
   return (
-    <div className="topbar-icon-wrap" ref={wrapRef}>
+    <div className="topbar-icon-wrap" data-tour-id="topbar-notifications" ref={wrapRef}>
       <button
         className="icon-btn"
         onClick={() => {

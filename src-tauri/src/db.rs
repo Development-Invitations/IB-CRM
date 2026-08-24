@@ -460,6 +460,10 @@ pub struct NotebookSettingsRecord {
     pub name: Option<String>,
 }
 
+pub struct OnboardingStatusRecord {
+    pub completed: bool,
+}
+
 pub struct NotebookNoteRecord {
     pub id: String,
     pub employee_id: String,
@@ -983,6 +987,20 @@ impl Db {
         add_column_if_missing(&conn, "employees", "notebook_enabled INTEGER NOT NULL DEFAULT 0");
         add_column_if_missing(&conn, "employees", "notebook_name TEXT");
 
+        // Интерактивный обучающий тур (v1.2.0) — показывается один раз при
+        // первом входе нового сотрудника/партнёра. DEFAULT 1 ("уже пройден")
+        // — намеренно НЕ 0: ALTER TABLE ADD COLUMN бэкфиллит ВСЕХ уже
+        // существующих сотрудников одним значением, отличить "существовал до
+        // апдейта" от "никогда не логинился" через голый backfill нельзя. Раз
+        // тур сильнее раздражает тех, кто уже знает интерфейс, чем помогает —
+        // грандфазерим существующих сотрудников в "пройден" значением по
+        // умолчанию колонки. Новые сотрудники получают onboarding_completed=0
+        // явно в самом INSERT (см. create_employee/create_admin) —
+        // единственное сознательное отличие от паттерна notebook_enabled
+        // выше, который просто опускает колонку из INSERT и полагается на
+        // DEFAULT.
+        add_column_if_missing(&conn, "employees", "onboarding_completed INTEGER NOT NULL DEFAULT 1");
+
         // Заметки — отдельная таблица (много строк на одного сотрудника), тот
         // же паттерн, что notifications/absence_requests: employee_id FK +
         // обычный CRUD. Без is_deleted/edited_at (в отличие от
@@ -1171,8 +1189,8 @@ impl Db {
 
         self.conn
             .execute(
-                "INSERT INTO employees (id, employee_number, login, password_hash, full_name, is_admin)
-                 VALUES (?1, ?2, ?3, ?4, ?5, 1)",
+                "INSERT INTO employees (id, employee_number, login, password_hash, full_name, is_admin, onboarding_completed)
+                 VALUES (?1, ?2, ?3, ?4, ?5, 1, 0)",
                 params![id, employee_number, login, password_hash, full_name],
             )
             .map_err(|e| e.to_string())?;
@@ -1322,8 +1340,8 @@ impl Db {
 
         self.conn
             .execute(
-                "INSERT INTO employees (id, employee_number, login, password_hash, full_name, is_admin, phone, position_id, manager_id, deputy_id, department_id, avatar_data, birth_date, is_partner, partner_id)
-                 VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                "INSERT INTO employees (id, employee_number, login, password_hash, full_name, is_admin, phone, position_id, manager_id, deputy_id, department_id, avatar_data, birth_date, is_partner, partner_id, onboarding_completed)
+                 VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, 0)",
                 params![id, employee_number, login, password_hash, full_name, phone, position_id, resolved_manager_id, deputy_id, department_id, avatar_data, birth_date, is_partner, partner_id],
             )
             .map_err(|e| {
@@ -5823,6 +5841,38 @@ impl Db {
         self.require_notebook_owner(actor_id, &existing.employee_id)?;
         self.conn.execute("DELETE FROM notebook_notes WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
         Ok(())
+    }
+
+    // ---- Обучающий тур (v1.2.0) ----
+    // Строго личное — actor_id должен РАВНЯТЬСЯ employee_id, без обхода для
+    // админа (тот же гейт, что у записной книжки).
+    fn require_onboarding_owner(&self, actor_id: &str, employee_id: &str) -> Result<(), String> {
+        if actor_id != employee_id {
+            return Err("Недостаточно прав".into());
+        }
+        Ok(())
+    }
+
+    pub fn get_onboarding_status(&self, actor_id: &str, employee_id: &str) -> Result<OnboardingStatusRecord, String> {
+        self.require_onboarding_owner(actor_id, employee_id)?;
+        self.conn
+            .query_row(
+                "SELECT onboarding_completed FROM employees WHERE id = ?1",
+                params![employee_id],
+                |row| Ok(OnboardingStatusRecord { completed: row.get::<_, i64>(0)? != 0 }),
+            )
+            .map_err(|e| e.to_string())
+    }
+
+    // Единственный осмысленный переход — "не пройден" → "пройден" (и Skip, и
+    // Finish в туре зовут один и тот же сеттер) — без bool-параметра,
+    // "показать тур заново" в интерфейсе не предусмотрено.
+    pub fn set_onboarding_completed(&self, actor_id: &str, employee_id: &str) -> Result<OnboardingStatusRecord, String> {
+        self.require_onboarding_owner(actor_id, employee_id)?;
+        self.conn
+            .execute("UPDATE employees SET onboarding_completed = 1 WHERE id = ?1", params![employee_id])
+            .map_err(|e| e.to_string())?;
+        self.get_onboarding_status(actor_id, employee_id)
     }
 
     // ---- Отчёты (v0.5.0) ----

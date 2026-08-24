@@ -24,6 +24,7 @@ import Topbar from '../components/Topbar';
 import Modal from '../components/Modal';
 import UpdatesButton from '../components/UpdatesButton';
 import UpdateNotifier from '../components/UpdateNotifier';
+import OnboardingTour from '../components/OnboardingTour';
 import Home from './Home';
 import SettingsPage from './Settings';
 import EmployeesPage from './Employees';
@@ -71,7 +72,7 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
         <nav>
           {modules.map((m) =>
             m.path ? (
-              <NavLink key={m.label} to={m.path} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <NavLink key={m.label} to={m.path} data-tour-id={`nav-${m.path}`} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                 <m.icon size={16} className="nav-icon" />
                 {m.label}
               </NavLink>
@@ -83,7 +84,7 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
               </span>
             )
           )}
-          <NavLink to="absence-requests" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <NavLink to="absence-requests" data-tour-id="nav-absence-requests" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             <ClipboardList size={16} className="nav-icon" />
             {t('sidebar.absenceRequests')}
           </NavLink>
@@ -147,6 +148,7 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
       </Modal>
 
       <UpdateNotifier />
+      <OnboardingTour employee={employee} />
     </div>
     </FullscreenContext.Provider>
   );

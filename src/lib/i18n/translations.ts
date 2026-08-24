@@ -795,6 +795,113 @@ export const dictionaries = {
       radminHint: 'Данные для подключения через Radmin VPN — задаёт администратор, здесь только для просмотра.',
       radminRefreshBtn: 'Обновить',
     },
+    onboarding: {
+      next: 'Далее',
+      back: 'Назад',
+      skip: 'Пропустить',
+      finish: 'Готово',
+      stepCounter: '{current} из {total}',
+      welcome: {
+        title: 'Добро пожаловать в IB CRM!',
+        body: 'Короткий тур по интерфейсу — покажем, где что находится. Можно пропустить в любой момент.',
+      },
+      admin: {
+        steps: {
+          employees: {
+            title: 'Сотрудники',
+            body: 'Общий справочник сотрудников и партнёрских аккаунтов компании — карточки, должности, подразделения.',
+          },
+          partnerAccounts: {
+            title: 'Партнёры',
+            body: 'Здесь заводятся организации-партнёры и создаются логины/пароли для их сотрудников.',
+          },
+          departments: {
+            title: 'Подразделения',
+            body: 'Оргструктура компании — отделы, руководители и заместители.',
+          },
+          clients: {
+            title: 'Клиенты',
+            body: 'Общая база клиентов — используется во всех модулях, включая регламенты и проекты.',
+          },
+          regulations: {
+            title: 'Регламенты',
+            body: 'Задачи и поручения, которые вы ставите сотрудникам или партнёрам, с сроками и статусами.',
+          },
+          topbarPartners: {
+            title: 'Быстрый переход к партнёру',
+            body: 'Отсюда можно сразу открыть рабочее пространство любого партнёра — его клиентов, регламенты и услуги.',
+          },
+          topbarNotifications: {
+            title: 'Уведомления',
+            body: 'Заявки на согласование, назначенные задачи и упоминания — всё собирается здесь.',
+          },
+          topbarSettings: {
+            title: 'Настройки',
+            body: 'Оформление, сервер, Telegram-бот, резервные копии и автовыгрузка отчётов — всё для админа в одном месте.',
+          },
+        },
+      },
+      employee: {
+        steps: {
+          employees: {
+            title: 'Сотрудники',
+            body: 'Справочник коллег компании — здесь же находится и ваш собственный профиль.',
+          },
+          clients: {
+            title: 'Клиенты',
+            body: 'Общая база клиентов, с которой вы будете работать в задачах и регламентах.',
+          },
+          projects: {
+            title: 'Проекты',
+            body: 'Проекты компании и задачи внутри них — с участниками и статусами.',
+          },
+          regulations: {
+            title: 'Регламенты',
+            body: 'Задачи, которые вам поручили или которые ставите вы сами, со сроками выполнения.',
+          },
+          absenceRequests: {
+            title: 'Заявки',
+            body: 'Заявка на отгул, отпуск или удалённую работу — и отслеживание её статуса.',
+          },
+          topbarCabinet: {
+            title: 'Мой кабинет',
+            body: 'Личный профиль: контакты, рабочий статус, заявки на изменение данных.',
+          },
+          topbarNotifications: {
+            title: 'Уведомления',
+            body: 'Новые задачи, согласования и упоминания приходят сюда.',
+          },
+        },
+      },
+      partner: {
+        steps: {
+          clients: {
+            title: 'Клиенты',
+            body: 'Клиенты вашей организации — карточки, история и услуги.',
+          },
+          regulations: {
+            title: 'Регламенты',
+            body: 'Совместные задачи и переписка с командой IB CRM.',
+          },
+          employees: {
+            title: 'Сотрудники',
+            body: 'Аккаунты сотрудников вашей организации в этой CRM.',
+          },
+          services: {
+            title: 'Услуги',
+            body: 'Каталог услуг вашей организации — цена и процент вознаграждения по каждой.',
+          },
+          topbarChat: {
+            title: 'IB Чат',
+            body: 'Прямая переписка с командой IB CRM.',
+          },
+          topbarNotifications: {
+            title: 'Уведомления',
+            body: 'Новые сообщения, задачи и обновления по регламентам — всё здесь.',
+          },
+        },
+      },
+    },
     notebook: {
       defaultTitle: 'Записная книжка',
       createBtn: 'Создать заметку',
@@ -1777,6 +1884,113 @@ export const dictionaries = {
     partnerSettings: {
       radminHint: "Radmin VPN orqali ulanish uchun ma'lumotlar — administrator belgilaydi, bu yerda faqat ko'rish uchun.",
       radminRefreshBtn: 'Yangilash',
+    },
+    onboarding: {
+      next: 'Keyingisi',
+      back: 'Orqaga',
+      skip: "O'tkazib yuborish",
+      finish: 'Tayyor',
+      stepCounter: "{total} tadan {current}-si",
+      welcome: {
+        title: "IB CRM'ga xush kelibsiz!",
+        body: "Interfeys bo'yicha qisqa tur — nima qayerda joylashganini ko'rsatamiz. Istalgan vaqtda o'tkazib yuborishingiz mumkin.",
+      },
+      admin: {
+        steps: {
+          employees: {
+            title: 'Xodimlar',
+            body: "Kompaniya xodimlari va hamkor akkauntlarining umumiy ma'lumotnomasi — kartochkalar, lavozimlar, bo'limlar.",
+          },
+          partnerAccounts: {
+            title: 'Hamkorlar',
+            body: "Bu yerda hamkor tashkilotlar yaratiladi va ularning xodimlari uchun login/parollar beriladi.",
+          },
+          departments: {
+            title: "Bo'limlar",
+            body: "Kompaniyaning tashkiliy tuzilmasi — bo'limlar, rahbarlar va o'rinbosarlar.",
+          },
+          clients: {
+            title: 'Mijozlar',
+            body: "Umumiy mijozlar bazasi — reglamentlar va loyihalar ham jumladan, barcha modullarda ishlatiladi.",
+          },
+          regulations: {
+            title: 'Reglamentlar',
+            body: "Siz xodimlarga yoki hamkorlarga tayinlaydigan vazifa va topshiriqlar, muddat va status bilan.",
+          },
+          topbarPartners: {
+            title: 'Hamkorga tezkor o\'tish',
+            body: "Bu yerdan istalgan hamkorning ish maydonini — mijozlari, reglamentlari va xizmatlarini — darhol ochish mumkin.",
+          },
+          topbarNotifications: {
+            title: 'Bildirishnomalar',
+            body: "Tasdiqlash arizalari, tayinlangan vazifalar va eslatmalar — barchasi shu yerda to'planadi.",
+          },
+          topbarSettings: {
+            title: 'Sozlamalar',
+            body: "Ko'rinish, server, Telegram-bot, zaxira nusxalar va hisobotlarni avto-yuklab olish — admin uchun hammasi bir joyda.",
+          },
+        },
+      },
+      employee: {
+        steps: {
+          employees: {
+            title: 'Xodimlar',
+            body: "Kompaniya hamkasblari ma'lumotnomasi — shu yerda sizning o'z profilingiz ham joylashgan.",
+          },
+          clients: {
+            title: 'Mijozlar',
+            body: "Vazifalar va reglamentlarda ishlaydigan umumiy mijozlar bazasi.",
+          },
+          projects: {
+            title: 'Loyihalar',
+            body: "Kompaniya loyihalari va ular ichidagi vazifalar — ishtirokchilar va statuslar bilan.",
+          },
+          regulations: {
+            title: 'Reglamentlar',
+            body: "Sizga topshirilgan yoki o'zingiz qo'ygan vazifalar, bajarish muddati bilan.",
+          },
+          absenceRequests: {
+            title: 'Arizalar',
+            body: "Dam olish, ta'til yoki masofadan ishlash uchun ariza — va uning statusini kuzatish.",
+          },
+          topbarCabinet: {
+            title: 'Mening kabinetim',
+            body: "Shaxsiy profil: aloqalar, ish statusi, ma'lumotlarni o'zgartirish arizalari.",
+          },
+          topbarNotifications: {
+            title: 'Bildirishnomalar',
+            body: "Yangi vazifalar, tasdiqlashlar va eslatmalar shu yerga keladi.",
+          },
+        },
+      },
+      partner: {
+        steps: {
+          clients: {
+            title: 'Mijozlar',
+            body: "Tashkilotingiz mijozlari — kartochkalar, tarix va xizmatlar.",
+          },
+          regulations: {
+            title: 'Reglamentlar',
+            body: "IB CRM jamoasi bilan birgalikdagi vazifalar va yozishmalar.",
+          },
+          employees: {
+            title: 'Xodimlar',
+            body: "Tashkilotingiz xodimlarining ushbu CRM'dagi akkauntlari.",
+          },
+          services: {
+            title: 'Xizmatlar',
+            body: "Tashkilotingiz xizmatlari katalogi — har biri uchun narx va mukofot foizi.",
+          },
+          topbarChat: {
+            title: 'IB Chat',
+            body: "IB CRM jamoasi bilan to'g'ridan-to'g'ri yozishma.",
+          },
+          topbarNotifications: {
+            title: 'Bildirishnomalar',
+            body: "Yangi xabarlar, vazifalar va reglamentlar bo'yicha yangilanishlar — barchasi shu yerda.",
+          },
+        },
+      },
     },
     notebook: {
       defaultTitle: 'Yozuv daftari',
@@ -2761,6 +2975,113 @@ export const dictionaries = {
     partnerSettings: {
       radminHint: 'Radmin VPN орқали уланиш учун маълумотлар — администратор белгилайди, бу ерда фақат кўриш учун.',
       radminRefreshBtn: 'Янгилаш',
+    },
+    onboarding: {
+      next: 'Кейингиси',
+      back: 'Орқага',
+      skip: 'Ўтказиб юбориш',
+      finish: 'Тайёр',
+      stepCounter: '{total} тадан {current}-си',
+      welcome: {
+        title: 'IB CRM\'га хуш келибсиз!',
+        body: 'Интерфейс бўйича қисқа тур — нима қаерда жойлашганини кўрсатамиз. Исталган вақтда ўтказиб юборишингиз мумкин.',
+      },
+      admin: {
+        steps: {
+          employees: {
+            title: 'Ходимлар',
+            body: 'Компания ходимлари ва ҳамкор аккаунтларининг умумий маълумотномаси — карточкалар, лавозимлар, бўлимлар.',
+          },
+          partnerAccounts: {
+            title: 'Ҳамкорлар',
+            body: 'Бу ерда ҳамкор ташкилотлар яратилади ва уларнинг ходимлари учун логин/паролллар берилади.',
+          },
+          departments: {
+            title: 'Бўлимлар',
+            body: 'Компаниянинг ташкилий тузилмаси — бўлимлар, раҳбарлар ва ўринбосарлар.',
+          },
+          clients: {
+            title: 'Мижозлар',
+            body: 'Умумий мижозлар базаси — регламентлар ва лойиҳалар ҳам жумладан, барча модулларда ишлатилади.',
+          },
+          regulations: {
+            title: 'Регламентлар',
+            body: 'Сиз ходимларга ёки ҳамкорларга тайинлайдиган вазифа ва топшириқлар, муддат ва статус билан.',
+          },
+          topbarPartners: {
+            title: 'Ҳамкорга тезкор ўтиш',
+            body: 'Бу ердан исталган ҳамкорнинг иш майдонини — мижозлари, регламентлари ва хизматларини — дарҳол очиш мумкин.',
+          },
+          topbarNotifications: {
+            title: 'Билдиришномалар',
+            body: 'Тасдиқлаш аризалари, тайинланган вазифалар ва эслатмалар — барчаси шу ерда тўпланади.',
+          },
+          topbarSettings: {
+            title: 'Созламалар',
+            body: 'Кўриниш, сервер, Telegram-бот, захира нусхалар ва ҳисоботларни авто-юклаб олиш — админ учун ҳаммаси бир жойда.',
+          },
+        },
+      },
+      employee: {
+        steps: {
+          employees: {
+            title: 'Ходимлар',
+            body: 'Компания ҳамкасблари маълумотномаси — шу ерда сизнинг ўз профилингиз ҳам жойлашган.',
+          },
+          clients: {
+            title: 'Мижозлар',
+            body: 'Вазифалар ва регламентларда ишлайдиган умумий мижозлар базаси.',
+          },
+          projects: {
+            title: 'Лойиҳалар',
+            body: 'Компания лойиҳалари ва улар ичидаги вазифалар — иштирокчилар ва статуслар билан.',
+          },
+          regulations: {
+            title: 'Регламентлар',
+            body: 'Сизга топширилган ёки ўзингиз қўйган вазифалар, бажариш муддати билан.',
+          },
+          absenceRequests: {
+            title: 'Аризалар',
+            body: 'Дам олиш, таътил ёки масофадан ишлаш учун ариза — ва унинг статусини кузатиш.',
+          },
+          topbarCabinet: {
+            title: 'Менинг кабинетим',
+            body: 'Шахсий профиль: алоқалар, иш статуси, маълумотларни ўзгартириш аризалари.',
+          },
+          topbarNotifications: {
+            title: 'Билдиришномалар',
+            body: 'Янги вазифалар, тасдиқлашлар ва эслатмалар шу ерга келади.',
+          },
+        },
+      },
+      partner: {
+        steps: {
+          clients: {
+            title: 'Мижозлар',
+            body: 'Ташкилотингиз мижозлари — карточкалар, тарих ва хизматлар.',
+          },
+          regulations: {
+            title: 'Регламентлар',
+            body: 'IB CRM жамоаси билан биргаликдаги вазифалар ва ёзишмалар.',
+          },
+          employees: {
+            title: 'Ходимлар',
+            body: 'Ташкилотингиз ходимларининг ушбу CRM\'даги аккаунтлари.',
+          },
+          services: {
+            title: 'Хизматлар',
+            body: 'Ташкилотингиз хизматлари каталоги — ҳар бири учун нарх ва мукофот фоизи.',
+          },
+          topbarChat: {
+            title: 'IB Чат',
+            body: 'IB CRM жамоаси билан тўғридан-тўғри ёзишма.',
+          },
+          topbarNotifications: {
+            title: 'Билдиришномалар',
+            body: 'Янги хабарлар, вазифалар ва регламентлар бўйича янгиланишлар — барчаси шу ерда.',
+          },
+        },
+      },
     },
     notebook: {
       defaultTitle: 'Ёзув дафтари',

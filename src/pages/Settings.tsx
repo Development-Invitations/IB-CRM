@@ -763,17 +763,20 @@ export default function Settings({ employee }: { employee: Employee }) {
           </button>
 
           {serverSettings.enabled && (
-            <div className="account-row" style={{ marginTop: 12 }}>
-              <span className="settings-hint">{t('settings.server.addressLabel')}</span>
-              <span>
-                {lanAddress ? `${lanAddress}:${serverSettings.port}` : t('settings.server.addressUnknown')}
-                {lanAddress && (
-                  <button className="reg-action-btn" style={{ marginLeft: 8 }} onClick={handleCopyAddress} title={t('settings.server.copyAddress')}>
-                    {copiedAddress ? <Check size={13} /> : <Copy size={13} />}
-                  </button>
-                )}
-              </span>
-            </div>
+            <>
+              <div className="account-row" style={{ marginTop: 12 }}>
+                <span className="settings-hint">{t('settings.server.addressLabel')}</span>
+                <span>
+                  {lanAddress ? `${lanAddress}:${serverSettings.port}` : t('settings.server.addressUnknown')}
+                  {lanAddress && (
+                    <button className="reg-action-btn" style={{ marginLeft: 8 }} onClick={handleCopyAddress} title={t('settings.server.copyAddress')}>
+                      {copiedAddress ? <Check size={13} /> : <Copy size={13} />}
+                    </button>
+                  )}
+                </span>
+              </div>
+              <p className="settings-hint">{t('settings.server.restartHint')}</p>
+            </>
           )}
 
           <div className="account-row" style={{ marginTop: 12, alignItems: 'flex-start' }}>

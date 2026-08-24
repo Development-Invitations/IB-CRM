@@ -519,6 +519,10 @@ export type NotebookSettings = {
   name: string | null;
 };
 
+export type OnboardingStatus = {
+  completed: boolean;
+};
+
 export type NotebookNote = {
   id: string;
   employeeId: string;
@@ -1031,6 +1035,11 @@ export const api = {
     invoke<NotebookNote>('update_notebook_note', { payload }),
   deleteNotebookNote: (payload: { actorId: string; id: string }) =>
     invoke<void>('delete_notebook_note', { payload }),
+
+  getOnboardingStatus: (payload: { actorId: string; employeeId: string }) =>
+    invoke<OnboardingStatus>('get_onboarding_status', { payload }),
+  setOnboardingCompleted: (payload: { actorId: string; employeeId: string }) =>
+    invoke<OnboardingStatus>('set_onboarding_completed', { payload }),
 
   getEmployeeReport: (payload: { adminId: string; periodStart: string; periodEnd: string }) =>
     invoke<EmployeeReportRow[]>('get_employee_report', { payload }),

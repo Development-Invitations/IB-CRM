@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '1.0.0';
+export const APP_VERSION = '1.2.0';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,18 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '1.2.0',
+      items: [
+        'Новый интерактивный обучающий тур — каждый сотрудник и партнёр при первом входе видит короткую подсказку по интерфейсу: реальные пункты меню подсвечиваются по очереди, с описанием, что где находится. Набор шагов свой для админа, сотрудника и партнёра — у них разные разделы. Тур можно пропустить в любой момент и он больше не появится',
+      ],
+    },
+    {
+      version: '1.1.0',
+      items: [
+        'В Настройках у админа — постоянная подсказка «Изменения вступят в силу после перезапуска приложения» рядом с адресом сервера, а не только исчезающее уведомление в момент включения. Реальная причина ошибки «Не удалось подключиться к серверу»: адрес показывается сразу после нажатия «Включить», но сам сервер начинает слушать порт только после перезапуска приложения — теперь это видно, не только в toast, который легко пропустить',
+      ],
+    },
     {
       version: '1.0.0',
       items: [
@@ -595,6 +607,18 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '1.2.0',
+      items: [
+        "Yangi interaktiv o'quv turi — har bir xodim va hamkor birinchi kirishda interfeys bo'yicha qisqa yo'riqnoma ko'radi: menyudagi haqiqiy bandlar navbat bilan yoritiladi, har biri nima ekani tushuntiriladi. Qadamlar ro'yxati admin, xodim va hamkor uchun har xil — ularning bo'limlari farq qiladi. Turni istalgan vaqtda o'tkazib yuborish mumkin, keyin u boshqa ko'rinmaydi",
+      ],
+    },
+    {
+      version: '1.1.0',
+      items: [
+        "Admin Sozlamalarida — server manzili yonida doimiy eslatma \"O'zgarishlar ilovani qayta ishga tushirgandan so'ng kuchga kiradi\", faqat yoqilgan paytdagi o'tkinchi bildirishnoma emas. \"Serverga ulanib bo'lmadi\" xatosining haqiqiy sababi: manzil \"Yoqish\"ni bosgandan darhol keyin ko'rsatiladi, lekin server portni tinglashni faqat ilova qayta ishga tushirilgandan keyin boshlaydi — endi bu ko'rinadi, faqat oson o'tkazib yuboriladigan toast'da emas",
+      ],
+    },
+    {
       version: '1.0.0',
       items: [
         "Yangi umumiy \"Bizning xizmatlar\" katalogi (yon menyu, faqat admin) — hamkor endi O'Z mijozini yaratganda shu yerdan xizmat tanlaydi, o'zining eski katalogidan emas",
@@ -1173,6 +1197,18 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '1.2.0',
+      items: [
+        'Янги интерактив ўқув тури — ҳар бир ходим ва ҳамкор биринчи киришда интерфейс бўйича қисқа йўриқнома кўради: менюдаги ҳақиқий бандлар навбат билан ёритилади, ҳар бири нима экани тушунтирилади. Қадамлар рўйхати админ, ходим ва ҳамкор учун ҳар хил — уларнинг бўлимлари фарқ қилади. Турни исталган вақтда ўтказиб юбориш мумкин, кейин у бошқа кўринмайди',
+      ],
+    },
+    {
+      version: '1.1.0',
+      items: [
+        'Админ Созламаларида — сервер манзили ёнида доимий эслатма "Ўзгаришлар иловани қайта ишга туширгандан сўнг кучга киради", фақат ёқилган пайтдаги ўткинчи билдиришнома эмас. "Серверга уланиб бўлмади" хатосининг ҳақиқий сабаби: манзил "Ёқиш"ни босгандан дарҳол кейин кўрсатилади, лекин сервер портни тинглашни фақат илова қайта ишга туширилгандан кейин бошлайди — энди бу кўринади, фақат осон ўтказиб юбориладиган toast\'да эмас',
+      ],
+    },
     {
       version: '1.0.0',
       items: [

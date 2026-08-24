@@ -3,6 +3,7 @@ import { Pin, PinOff, X, Plus, ArrowLeft, Trash2 } from 'lucide-react';
 import { api, type Employee, type NotebookNote } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
+import { clamp } from '../lib/clamp';
 import {
   getStoredNotebookPinned,
   setStoredNotebookPinned,
@@ -18,10 +19,6 @@ import RichEditor from './RichEditor';
 const MIN_WIDTH = 280;
 const MIN_HEIGHT = 280;
 const DEFAULT_SIZE: NotebookSize = { width: 340, height: 420 };
-
-function clamp(v: number, min: number, max: number): number {
-  return Math.min(Math.max(v, min), Math.max(min, max));
-}
 
 // Плавающая панель Записной книжки (v0.6.0) — первый в проекте
 // драг-н-дроп/resize-элемент (см. docs/TZ.md), поэтому механика написана

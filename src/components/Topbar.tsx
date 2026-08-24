@@ -107,7 +107,7 @@ export default function Topbar({ employee }: { employee: Employee }) {
 
       <div className="topbar-actions">
         {employee.isAdmin && (
-          <button className="icon-btn" onClick={() => navigate('/dashboard/partners')} aria-label={t('topbar.partners')}>
+          <button className="icon-btn" data-tour-id="topbar-partners" onClick={() => navigate('/dashboard/partners')} aria-label={t('topbar.partners')}>
             <Handshake size={20} />
           </button>
         )}
@@ -122,6 +122,7 @@ export default function Topbar({ employee }: { employee: Employee }) {
 
         <button
           className="icon-btn"
+          data-tour-id="topbar-cabinet"
           onClick={() => navigate(`/dashboard/employees/${employee.id}`)}
           aria-label={t('topbar.cabinet')}
         >
@@ -144,7 +145,7 @@ export default function Topbar({ employee }: { employee: Employee }) {
           </button>
         )}
 
-        <button className="icon-btn" onClick={() => navigate('/dashboard/settings')} aria-label={t('topbar.settings')}>
+        <button className="icon-btn" data-tour-id="topbar-settings" onClick={() => navigate('/dashboard/settings')} aria-label={t('topbar.settings')}>
           <SettingsIcon size={20} />
         </button>
       </div>

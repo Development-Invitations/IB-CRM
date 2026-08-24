@@ -637,6 +637,11 @@ struct NotebookSettings {
 }
 
 #[derive(Clone, serde::Serialize)]
+struct OnboardingStatus {
+    completed: bool,
+}
+
+#[derive(Clone, serde::Serialize)]
 struct NotebookNote {
     id: String,
     #[serde(rename = "employeeId")]
@@ -651,6 +656,10 @@ struct NotebookNote {
 
 fn to_notebook_settings(s: db::NotebookSettingsRecord) -> NotebookSettings {
     NotebookSettings { enabled: s.enabled, name: s.name }
+}
+
+fn to_onboarding_status(s: db::OnboardingStatusRecord) -> OnboardingStatus {
+    OnboardingStatus { completed: s.completed }
 }
 
 fn to_notebook_note(n: db::NotebookNoteRecord) -> NotebookNote {
@@ -1829,6 +1838,22 @@ struct SetNotebookSettingsPayload {
     employee_id: String,
     enabled: bool,
     name: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct GetOnboardingStatusPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct SetOnboardingCompletedPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -3645,6 +3670,18 @@ fn set_notebook_settings(payload: SetNotebookSettingsPayload, state: tauri::Stat
 }
 
 #[tauri::command]
+fn get_onboarding_status(payload: GetOnboardingStatusPayload, state: tauri::State<AppState>) -> Result<OnboardingStatus, String> {
+    let db = state.0.lock().unwrap();
+    db.get_onboarding_status(&payload.actor_id, &payload.employee_id).map(to_onboarding_status)
+}
+
+#[tauri::command]
+fn set_onboarding_completed(payload: SetOnboardingCompletedPayload, state: tauri::State<AppState>) -> Result<OnboardingStatus, String> {
+    let db = state.0.lock().unwrap();
+    db.set_onboarding_completed(&payload.actor_id, &payload.employee_id).map(to_onboarding_status)
+}
+
+#[tauri::command]
 fn list_notebook_notes(payload: ListNotebookNotesPayload, state: tauri::State<AppState>) -> Result<Vec<NotebookNote>, String> {
     let db = state.0.lock().unwrap();
     db.list_notebook_notes(&payload.actor_id, &payload.employee_id).map(|v| v.into_iter().map(to_notebook_note).collect())
@@ -4128,6 +4165,8 @@ fn main() {
             create_notebook_note,
             update_notebook_note,
             delete_notebook_note,
+            get_onboarding_status,
+            set_onboarding_completed,
             get_employee_report,
             get_partner_report,
             get_report_export_settings,

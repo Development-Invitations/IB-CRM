@@ -12,6 +12,7 @@ import PartnerEmployeesPage from './PartnerEmployees';
 import PartnerSettingsPage from './PartnerSettings';
 import PartnerHome from './PartnerHome';
 import ChatPage from './Chat';
+import OnboardingTour from '../components/OnboardingTour';
 import type { Employee } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { APP_VERSION } from '../lib/changelog';
@@ -48,7 +49,7 @@ export default function PartnerPanel({ employee, onLogout }: { employee: Employe
           <div className="brand">IB CRM</div>
           <nav>
             {modules.map((m) => (
-              <NavLink key={m.label} to={m.path} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+              <NavLink key={m.label} to={m.path} data-tour-id={`nav-${m.path}`} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                 <m.icon size={16} className="nav-icon" />
                 {m.label}
               </NavLink>
@@ -97,6 +98,8 @@ export default function PartnerPanel({ employee, onLogout }: { employee: Employe
         >
           {t('sidebar.logoutConfirmBody')}
         </Modal>
+
+        <OnboardingTour employee={employee} />
       </div>
     </FullscreenContext.Provider>
   );

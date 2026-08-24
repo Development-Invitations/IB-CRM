@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '1.2.0';
+export const APP_VERSION = '1.3.0';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,12 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '1.3.0',
+      items: [
+        'На экране первого запуска (выбор режима, подключение к серверу, создание админа) появился переключатель языка в правом верхнем углу — раньше язык нельзя было сменить, пока не создан аккаунт',
+      ],
+    },
     {
       version: '1.2.0',
       items: [
@@ -607,6 +613,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '1.3.0',
+      items: [
+        "Birinchi ishga tushirish ekranida (rejim tanlash, serverga ulanish, admin yaratish) o'ng yuqori burchakda til almashtirgich paydo bo'ldi — avval akkaunt yaratilmaguncha tilni o'zgartirib bo'lmasdi",
+      ],
+    },
+    {
       version: '1.2.0',
       items: [
         "Yangi interaktiv o'quv turi — har bir xodim va hamkor birinchi kirishda interfeys bo'yicha qisqa yo'riqnoma ko'radi: menyudagi haqiqiy bandlar navbat bilan yoritiladi, har biri nima ekani tushuntiriladi. Qadamlar ro'yxati admin, xodim va hamkor uchun har xil — ularning bo'limlari farq qiladi. Turni istalgan vaqtda o'tkazib yuborish mumkin, keyin u boshqa ko'rinmaydi",
@@ -1197,6 +1209,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '1.3.0',
+      items: [
+        'Биринчи ишга тушириш экранида (режим танлаш, серверга уланиш, админ яратиш) ўнг юқори бурчакда тил алмаштиргич пайдо бўлди — аввал аккаунт яратилмагунча тилни ўзгартириб бўлмасди',
+      ],
+    },
     {
       version: '1.2.0',
       items: [

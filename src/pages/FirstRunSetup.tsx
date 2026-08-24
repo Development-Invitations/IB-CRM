@@ -3,10 +3,31 @@ import { HardDrive, Server, Wifi } from 'lucide-react';
 import { api } from '../lib/api';
 import { rememberedLogin } from '../lib/session';
 import { connection } from '../lib/connection';
-import { useLocale } from '../lib/i18n';
+import { useLocale, LOCALE_LABELS, type Locale } from '../lib/i18n';
 import { useAppLogo } from '../lib/appLogo';
 
 type Step = 'choice' | 'connect' | 'admin';
+
+// Переключатель языка на экране первого запуска — до входа/создания
+// сотрудника локаль хранится независимо от сессии (localStorage, тот же
+// ключ, что и переключатель в Настройках), поэтому доступен уже здесь.
+function FirstRunLangSwitch() {
+  const { locale, setLocale } = useLocale();
+  return (
+    <div className="firstrun-lang-switch">
+      {(Object.keys(LOCALE_LABELS) as Locale[]).map((value) => (
+        <button
+          key={value}
+          type="button"
+          className={`firstrun-lang-btn${locale === value ? ' active' : ''}`}
+          onClick={() => setLocale(value)}
+        >
+          {LOCALE_LABELS[value]}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 // Оформление первого запуска — тот же приём, что и у полноэкранного
 // LoadingScreen (свечение вокруг логотипа + ворд-марк), но как отдельная
@@ -106,6 +127,7 @@ export default function FirstRunSetup({
   if (step === 'choice') {
     return (
       <div className="auth-screen firstrun-screen">
+        <FirstRunLangSwitch />
         <FirstRunBrand />
         <div className="auth-card firstrun-card">
           <h1>{t('firstRun.title')}</h1>
@@ -142,6 +164,7 @@ export default function FirstRunSetup({
   if (step === 'connect') {
     return (
       <div className="auth-screen firstrun-screen">
+        <FirstRunLangSwitch />
         <FirstRunBrand />
         <form className="auth-card firstrun-card" onSubmit={handleConnect}>
           <h1>{t('firstRun.connectTitle')}</h1>

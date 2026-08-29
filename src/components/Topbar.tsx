@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Settings as SettingsIcon, User, Home, MessageCircle, Handshake, NotebookText } from 'lucide-react';
 import { api, type Employee, type Notification } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useNotifications, type NotificationTarget } from '../lib/useNotifications';
+import { useNotebookSettings } from '../lib/notebookSettingsCache';
 import NotificationsBell from './NotificationsBell';
 import NotebookPanel from './NotebookPanel';
 import EditRequestReviewModal from './EditRequestReviewModal';
@@ -88,18 +89,12 @@ export default function Topbar({ employee }: { employee: Employee }) {
   });
 
   // Записная книжка (v0.6.0) — кнопка видна только если включена в Настройках
-  // (settings.notebook.enableLabel); имя грузится тут же, одна точка правды,
-  // чтобы NotebookPanel не делал повторный запрос настроек.
-  const [notebookEnabled, setNotebookEnabled] = useState(false);
-  const [notebookName, setNotebookName] = useState<string | null>(null);
+  // (settings.notebook.enableLabel). Через общий кеш (lib/notebookSettingsCache,
+  // v1.5.0) — раньше грузилось один раз при монтировании и не узнавало о
+  // включении/выключении в Settings.tsx без перезахода.
+  const { enabled: notebookEnabled, name: notebookName } = useNotebookSettings(employee.id);
   const [notebookOpen, setNotebookOpen] = useState(false);
   const notebookBtnRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    api.getNotebookSettings({ actorId: employee.id, employeeId: employee.id })
-      .then((s) => { setNotebookEnabled(s.enabled); setNotebookName(s.name); })
-      .catch(() => {});
-  }, [employee.id]);
 
   return (
     <header className="topbar">

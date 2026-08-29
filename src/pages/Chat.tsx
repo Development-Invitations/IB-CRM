@@ -295,6 +295,12 @@ export default function Chat({ currentEmployee }: { currentEmployee: Employee })
     if (lastId !== lastMessageIdRef.current) {
       lastMessageIdRef.current = lastId;
       messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      // Видео-вложения ещё не знают свою высоту в момент этого вызова (метаданные
+      // подгружаются асинхронно) — если последнее сообщение с видео, разметка
+      // "подрастает" через мгновение после скролла, и последнее сообщение
+      // визуально уезжает выше видимой области. Догоняем тем же вызовом ещё раз
+      // на следующем кадре — дешевле, чем вешать onLoadedMetadata на каждое видео.
+      requestAnimationFrame(() => messagesEndRef.current?.scrollIntoView({ behavior: 'auto' }));
     }
   }, [messages]);
 

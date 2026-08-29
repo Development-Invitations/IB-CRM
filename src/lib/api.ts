@@ -135,6 +135,24 @@ export type ClientHistoryEntry = {
   createdAt: string;
 };
 
+export type ClientService = {
+  id: string;
+  clientId: string;
+  houseServiceId: string | null;
+  serviceId: string | null;
+  serviceName: string;
+  price: string | null;
+  addedBy: string | null;
+  addedByName: string | null;
+  createdAt: string;
+};
+
+export type ServiceMonthStat = {
+  month: string;
+  serviceName: string;
+  count: number;
+};
+
 export type ProjectStatus = 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled';
 
 export type Project = {
@@ -216,6 +234,8 @@ export type Regulation = {
   updatedAt: string;
   memberCount: number;
   entryCount: number;
+  clientServiceId: string | null;
+  clientServiceName: string | null;
 };
 
 export type RegulationMember = {
@@ -777,6 +797,15 @@ export const api = {
   addClientHistory: (payload: { clientId: string; actorId: string; description: string }) =>
     invoke<ClientHistoryEntry>('add_client_history', { payload }),
 
+  listClientServices: (payload: { actorId: string; clientId: string }) => invoke<ClientService[]>('list_client_services', { payload }),
+
+  addClientService: (payload: { actorId: string; clientId: string; houseServiceId?: string | null; serviceId?: string | null }) =>
+    invoke<ClientService>('add_client_service', { payload }),
+
+  deleteClientService: (payload: { actorId: string; id: string }) => invoke<void>('delete_client_service', { payload }),
+
+  getServicesMonthlyStats: (payload: { actorId: string }) => invoke<ServiceMonthStat[]>('get_services_monthly_stats', { payload }),
+
   listPartnerRegulations: (payload: { actorId: string; partnerId: string }) =>
     invoke<PartnerRegulation[]>('list_partner_regulations', { payload }),
 
@@ -902,9 +931,9 @@ export const api = {
 
   listRegulations: () => invoke<Regulation[]>('list_regulations'),
   getRegulation: (id: string) => invoke<Regulation | null>('get_regulation', { id }),
-  createRegulation: (payload: { actorId: string; title: string; description?: string | null; clientId?: string | null; deadline?: string | null }) =>
+  createRegulation: (payload: { actorId: string; title: string; description?: string | null; clientId?: string | null; clientServiceId?: string | null; deadline?: string | null }) =>
     invoke<Regulation>('create_regulation', { payload }),
-  updateRegulation: (payload: { actorId: string; id: string; title: string; description?: string | null; clientId?: string | null; deadline?: string | null; status: RegulationStatus }) =>
+  updateRegulation: (payload: { actorId: string; id: string; title: string; description?: string | null; clientId?: string | null; clientServiceId?: string | null; deadline?: string | null; status: RegulationStatus }) =>
     invoke<Regulation>('update_regulation', { payload }),
   deleteRegulation: (payload: { adminId: string; id: string }) => invoke<void>('delete_regulation', { payload }),
 

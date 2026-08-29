@@ -415,6 +415,10 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
   const [formTitle, setFormTitle] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formClientId, setFormClientId] = useState('');
+  // Заполняется только через "Запустить регламент" у услуги клиента
+  // (Clients.tsx::handleStartRegulation, location.state.prefillClientServiceId) —
+  // своего поля в форме нет, пользователь его не выбирает вручную.
+  const [formClientServiceId, setFormClientServiceId] = useState('');
   const [formDeadline, setFormDeadline] = useState('');
   const [formBusy, setFormBusy] = useState(false);
   const [formError, setFormError] = useState('');
@@ -494,6 +498,23 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
     if (reg) setSelected(reg);
   }, [regulations, location.state]);
 
+  // Переход из карточки клиента (кнопка "Запустить регламент" у конкретной
+  // услуги, см. Clients.tsx::handleStartRegulation) — сразу открывает форму
+  // СОЗДАНИЯ, предзаполненную клиентом/услугой/заголовком, а не выбор уже
+  // существующего регламента (в отличие от openRegId выше).
+  useEffect(() => {
+    const st = location.state as any;
+    if (!st?.prefillClientId) return;
+    setEditingReg(undefined);
+    setFormTitle(st.prefillTitle ?? '');
+    setFormDesc('');
+    setFormClientId(st.prefillClientId);
+    setFormClientServiceId(st.prefillClientServiceId ?? '');
+    setFormDeadline('');
+    setFormError('');
+    setFormOpen(true);
+  }, [location.state]);
+
   // silent — при фоновом обновлении (тикер уведомлений каждые ~8 сек) не
   // показываем спиннер поверх уже открытых записей: раньше detailLoading
   // включался на каждый тик, список на секунду схлопывался в LoadingScreen
@@ -564,14 +585,14 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
 
   const openCreate = () => {
     setEditingReg(undefined);
-    setFormTitle(''); setFormDesc(''); setFormClientId(''); setFormDeadline(''); setFormError('');
+    setFormTitle(''); setFormDesc(''); setFormClientId(''); setFormClientServiceId(''); setFormDeadline(''); setFormError('');
     setFormOpen(true);
   };
   const openEdit = () => {
     if (!selected) return;
     setEditingReg(selected);
     setFormTitle(selected.title); setFormDesc(selected.description ?? '');
-    setFormClientId(selected.clientId ?? ''); setFormDeadline(selected.deadline ?? '');
+    setFormClientId(selected.clientId ?? ''); setFormClientServiceId(selected.clientServiceId ?? ''); setFormDeadline(selected.deadline ?? '');
     setFormError('');
     setFormOpen(true);
   };
@@ -582,10 +603,10 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
     setFormBusy(true);
     try {
       if (editingReg) {
-        await api.updateRegulation({ actorId: currentEmployee.id, id: editingReg.id, title: formTitle.trim(), description: formDesc.trim() || null, clientId: formClientId || null, deadline: formDeadline || null, status: editingReg.status });
+        await api.updateRegulation({ actorId: currentEmployee.id, id: editingReg.id, title: formTitle.trim(), description: formDesc.trim() || null, clientId: formClientId || null, clientServiceId: formClientServiceId || null, deadline: formDeadline || null, status: editingReg.status });
         showToast('success', t('regulations.updated'));
       } else {
-        await api.createRegulation({ actorId: currentEmployee.id, title: formTitle.trim(), description: formDesc.trim() || null, clientId: formClientId || null, deadline: formDeadline || null });
+        await api.createRegulation({ actorId: currentEmployee.id, title: formTitle.trim(), description: formDesc.trim() || null, clientId: formClientId || null, clientServiceId: formClientServiceId || null, deadline: formDeadline || null });
         showToast('success', t('regulations.added'));
       }
       setFormOpen(false);
@@ -801,12 +822,18 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
               </div>
             )}
 
-            {(selected.clientName || selected.deadline) && (
+            {(selected.clientName || selected.clientServiceName || selected.deadline) && (
               <div className="reg-sidebar-section">
                 {selected.clientName && (
                   <div className="employee-card-row">
                     <span className="settings-hint">{t('regulations.clientLabel')}</span>
                     <span>{selected.clientName}</span>
+                  </div>
+                )}
+                {selected.clientServiceName && (
+                  <div className="employee-card-row">
+                    <span className="settings-hint">{t('regulations.linkedServiceLabel')}</span>
+                    <span>{selected.clientServiceName}</span>
                   </div>
                 )}
                 {selected.deadline && (

@@ -1964,6 +1964,67 @@ button.employees-add-btn {
 
 .home-tasks-more { margin: 10px 0 0; }
 
+/* ---- Аналитика по услугам (v1.5.0) ----
+   Категориальная палитра фиксирована и НЕ тематизируется цветом бренда (как
+   status-цвета) — она провалидирована скиллом dataviz отдельно на светлой и
+   тёмной поверхности приложения (node scripts/validate_palette.js), менять
+   под тему нельзя, иначе разделение по CVD перестанет проходить проверку.
+   Тёмные/тёмно-серые/классическая синяя темы используют тёмный набор шагов
+   (то же самое группирование "тёмные темы вместе", что уже принято выше для
+   --color-primary у dark/graphite/classicBlue). */
+:root {
+  --viz-series-0: #2a78d6;
+  --viz-series-1: #eb6834;
+  --viz-series-2: #1baf7a;
+  --viz-series-3: #eda100;
+  --viz-series-4: #e87ba4;
+  --viz-series-5: #008300;
+  --viz-series-other: #9aa1b8;
+}
+[data-theme='dark'], [data-theme='graphite'], [data-theme='classicBlue'] {
+  --viz-series-0: #3987e5;
+  --viz-series-1: #d95926;
+  --viz-series-2: #199e70;
+  --viz-series-3: #c98500;
+  --viz-series-4: #d55181;
+  --viz-series-5: #008300;
+  --viz-series-other: #5b6480;
+}
+
+.services-chart { display: flex; flex-direction: column; gap: 14px; }
+.services-chart-scroll { overflow-x: auto; }
+
+.services-chart-gridline { stroke: var(--color-border); stroke-width: 1; }
+.services-chart-axis-label { font-size: 11px; fill: var(--color-text-muted); }
+
+.services-chart-segment[data-series='0'] { fill: var(--viz-series-0); }
+.services-chart-segment[data-series='1'] { fill: var(--viz-series-1); }
+.services-chart-segment[data-series='2'] { fill: var(--viz-series-2); }
+.services-chart-segment[data-series='3'] { fill: var(--viz-series-3); }
+.services-chart-segment[data-series='4'] { fill: var(--viz-series-4); }
+.services-chart-segment[data-series='5'] { fill: var(--viz-series-5); }
+.services-chart-segment[data-series='6'] { fill: var(--viz-series-other); }
+
+.services-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.services-chart-legend li { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.services-chart-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.services-chart-swatch[data-series='0'] { background: var(--viz-series-0); }
+.services-chart-swatch[data-series='1'] { background: var(--viz-series-1); }
+.services-chart-swatch[data-series='2'] { background: var(--viz-series-2); }
+.services-chart-swatch[data-series='3'] { background: var(--viz-series-3); }
+.services-chart-swatch[data-series='4'] { background: var(--viz-series-4); }
+.services-chart-swatch[data-series='5'] { background: var(--viz-series-5); }
+.services-chart-swatch[data-series='6'] { background: var(--viz-series-other); }
+.services-chart-legend-name { color: var(--color-text); }
+.services-chart-legend-count { color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+
 /* ---- Employee profile page ("кабинет") ---- */
 
 .employee-profile-back { width: auto; display: inline-flex; margin-bottom: 20px; }
@@ -3056,6 +3117,11 @@ button.employees-add-btn {
 .reg-entry-attachment:hover { color: var(--color-accent); }
 
 .reg-attachment-image-btn { display: block; border: none; background: none; padding: 0; margin-top: 8px; cursor: zoom-in; }
+
+/* Компактная ссылка вместо превью фото прямо в ленте (v1.5.0) — сама
+   картинка открывается по клику в том же .reg-lightbox, что и раньше. */
+.reg-attachment-image-row { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; }
+.reg-attachment-image-link { border: none; background: none; padding: 0; margin: 0; font: inherit; cursor: pointer; }
 .reg-attachment-image {
   display: block;
   max-width: 100%;

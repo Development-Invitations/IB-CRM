@@ -233,6 +233,34 @@ struct ClientHistoryEntry {
 }
 
 #[derive(Clone, serde::Serialize)]
+struct ClientService {
+    id: String,
+    #[serde(rename = "clientId")]
+    client_id: String,
+    #[serde(rename = "houseServiceId")]
+    house_service_id: Option<String>,
+    #[serde(rename = "serviceId")]
+    service_id: Option<String>,
+    #[serde(rename = "serviceName")]
+    service_name: String,
+    price: Option<String>,
+    #[serde(rename = "addedBy")]
+    added_by: Option<String>,
+    #[serde(rename = "addedByName")]
+    added_by_name: Option<String>,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct ServiceMonthStat {
+    month: String,
+    #[serde(rename = "serviceName")]
+    service_name: String,
+    count: i64,
+}
+
+#[derive(Clone, serde::Serialize)]
 struct Project {
     id: String,
     #[serde(rename = "projectNumber")]
@@ -354,6 +382,10 @@ struct Regulation {
     member_count: i64,
     #[serde(rename = "entryCount")]
     entry_count: i64,
+    #[serde(rename = "clientServiceId")]
+    client_service_id: Option<String>,
+    #[serde(rename = "clientServiceName")]
+    client_service_name: Option<String>,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -1159,6 +1191,39 @@ struct AddClientHistoryPayload {
 }
 
 #[derive(serde::Deserialize)]
+struct ListClientServicesPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "clientId")]
+    client_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct AddClientServicePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "clientId")]
+    client_id: String,
+    #[serde(rename = "houseServiceId")]
+    house_service_id: Option<String>,
+    #[serde(rename = "serviceId")]
+    service_id: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct DeleteClientServicePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct GetServicesMonthlyStatsPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+}
+
+#[derive(serde::Deserialize)]
 struct CreateProjectPayload {
     #[serde(rename = "actorId")]
     actor_id: String,
@@ -1272,6 +1337,8 @@ struct CreateRegulationPayload {
     description: Option<String>,
     #[serde(rename = "clientId")]
     client_id: Option<String>,
+    #[serde(rename = "clientServiceId")]
+    client_service_id: Option<String>,
     deadline: Option<String>,
 }
 
@@ -1284,6 +1351,8 @@ struct UpdateRegulationPayload {
     description: Option<String>,
     #[serde(rename = "clientId")]
     client_id: Option<String>,
+    #[serde(rename = "clientServiceId")]
+    client_service_id: Option<String>,
     deadline: Option<String>,
     status: String,
 }
@@ -2185,6 +2254,24 @@ fn to_client_history(h: db::ClientHistoryRecord) -> ClientHistoryEntry {
     }
 }
 
+fn to_client_service(cs: db::ClientServiceRecord) -> ClientService {
+    ClientService {
+        id: cs.id,
+        client_id: cs.client_id,
+        house_service_id: cs.house_service_id,
+        service_id: cs.service_id,
+        service_name: cs.service_name,
+        price: cs.price,
+        added_by: cs.added_by,
+        added_by_name: cs.added_by_name,
+        created_at: cs.created_at,
+    }
+}
+
+fn to_service_month_stat(s: db::ServiceMonthStat) -> ServiceMonthStat {
+    ServiceMonthStat { month: s.month, service_name: s.service_name, count: s.count }
+}
+
 fn to_project(p: db::ProjectRecord) -> Project {
     Project {
         id: p.id,
@@ -2256,6 +2343,7 @@ fn to_regulation(r: db::RegulationRecord) -> Regulation {
         created_by: r.created_by, created_by_name: r.created_by_name,
         created_at: r.created_at, updated_at: r.updated_at,
         member_count: r.member_count, entry_count: r.entry_count,
+        client_service_id: r.client_service_id, client_service_name: r.client_service_name,
     }
 }
 
@@ -2914,6 +3002,33 @@ fn add_client_history(payload: AddClientHistoryPayload, state: tauri::State<AppS
 }
 
 #[tauri::command]
+fn list_client_services(payload: ListClientServicesPayload, state: tauri::State<AppState>) -> Result<Vec<ClientService>, String> {
+    let db = state.0.lock().unwrap();
+    db.list_client_services(&payload.actor_id, &payload.client_id)
+        .map(|list| list.into_iter().map(to_client_service).collect())
+}
+
+#[tauri::command]
+fn add_client_service(payload: AddClientServicePayload, state: tauri::State<AppState>) -> Result<ClientService, String> {
+    let db = state.0.lock().unwrap();
+    db.add_client_service(&payload.actor_id, &payload.client_id, payload.house_service_id.as_deref(), payload.service_id.as_deref())
+        .map(to_client_service)
+}
+
+#[tauri::command]
+fn delete_client_service(payload: DeleteClientServicePayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.delete_client_service(&payload.actor_id, &payload.id)
+}
+
+#[tauri::command]
+fn get_services_monthly_stats(payload: GetServicesMonthlyStatsPayload, state: tauri::State<AppState>) -> Result<Vec<ServiceMonthStat>, String> {
+    let db = state.0.lock().unwrap();
+    db.get_services_monthly_stats(&payload.actor_id)
+        .map(|list| list.into_iter().map(to_service_month_stat).collect())
+}
+
+#[tauri::command]
 fn list_projects(state: tauri::State<AppState>) -> Vec<Project> {
     let db = state.0.lock().unwrap();
     db.list_projects().into_iter().map(to_project).collect()
@@ -3139,14 +3254,14 @@ fn get_regulation(id: String, state: tauri::State<AppState>) -> Option<Regulatio
 #[tauri::command]
 fn create_regulation(payload: CreateRegulationPayload, state: tauri::State<AppState>) -> Result<Regulation, String> {
     let db = state.0.lock().unwrap();
-    db.create_regulation(&payload.actor_id, &payload.title, payload.description.as_deref(), payload.client_id.as_deref(), payload.deadline.as_deref())
+    db.create_regulation(&payload.actor_id, &payload.title, payload.description.as_deref(), payload.client_id.as_deref(), payload.client_service_id.as_deref(), payload.deadline.as_deref())
         .map(to_regulation)
 }
 
 #[tauri::command]
 fn update_regulation(payload: UpdateRegulationPayload, state: tauri::State<AppState>) -> Result<Regulation, String> {
     let db = state.0.lock().unwrap();
-    db.update_regulation(&payload.actor_id, &payload.id, &payload.title, payload.description.as_deref(), payload.client_id.as_deref(), payload.deadline.as_deref(), &payload.status)
+    db.update_regulation(&payload.actor_id, &payload.id, &payload.title, payload.description.as_deref(), payload.client_id.as_deref(), payload.client_service_id.as_deref(), payload.deadline.as_deref(), &payload.status)
         .map(to_regulation)
 }
 
@@ -4096,6 +4211,10 @@ fn main() {
             move_client_to_crm_base,
             list_client_history,
             add_client_history,
+            list_client_services,
+            add_client_service,
+            delete_client_service,
+            get_services_monthly_stats,
             list_projects,
             get_project,
             create_project,

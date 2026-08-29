@@ -7,6 +7,7 @@ import { useToast } from '../lib/toast';
 import { compressImageFile } from '../lib/photo';
 import { formatUzPhone } from '../lib/phone';
 import { parseSqliteUtc } from '../lib/date';
+import { setCachedNotebookSettings } from '../lib/notebookSettingsCache';
 import Avatar from '../components/Avatar';
 import Checkbox from '../components/Checkbox';
 import Select from '../components/Select';
@@ -210,6 +211,9 @@ export default function PartnerSettings({ employee: initialEmployee }: { employe
       });
       setNotebookEnabledState(s.enabled);
       setNotebookName(s.name || '');
+      // Обновляет кнопку в PartnerTopbar немедленно, без перезахода — см.
+      // lib/notebookSettingsCache.ts (v1.5.0).
+      setCachedNotebookSettings(s);
       showToast('success', t('settings.notebook.saveSuccess'));
     } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('settings.errorGeneric'));

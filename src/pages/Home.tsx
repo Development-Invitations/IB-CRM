@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, FileText, FolderKanban, Contact, AlertTriangle, Clock3, ArrowRight } from 'lucide-react';
-import { api, type Employee, type MyTask, type MyProjectTask } from '../lib/api';
+import { Users, FileText, FolderKanban, Contact, AlertTriangle, Clock3, ArrowRight, BarChart3 } from 'lucide-react';
+import { api, type Employee, type MyTask, type MyProjectTask, type ServiceMonthStat } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
+import ServicesAnalyticsChart from '../components/ServicesAnalyticsChart';
 
 export default function Home({ employee }: { employee: Employee }) {
   const { t } = useLocale();
@@ -16,6 +17,7 @@ export default function Home({ employee }: { employee: Employee }) {
   const [clientCount, setClientCount] = useState<number | null>(null);
   const [myTasks, setMyTasks] = useState<MyTask[]>([]);
   const [myProjectTasks, setMyProjectTasks] = useState<MyProjectTask[]>([]);
+  const [servicesStats, setServicesStats] = useState<ServiceMonthStat[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,14 +28,16 @@ export default function Home({ employee }: { employee: Employee }) {
       api.listClients({ actorId: employee.id }),
       api.listMyOpenTasks(employee.id),
       api.listMyOpenProjectTasks(employee.id),
+      api.getServicesMonthlyStats({ actorId: employee.id }),
     ])
-      .then(([employees, regulations, projects, clients, tasks, projectTasks]) => {
+      .then(([employees, regulations, projects, clients, tasks, projectTasks, servicesStats]) => {
         setEmployeeCount(employees.length);
         setActiveRegulationCount(regulations.filter((r) => r.status === 'active').length);
         setActiveProjectCount(projects.filter((p) => p.status === 'active').length);
         setClientCount(clients.length);
         setMyTasks(tasks);
         setMyProjectTasks(projectTasks);
+        setServicesStats(servicesStats);
         setLoading(false);
       })
       .catch(() => {
@@ -163,6 +167,15 @@ export default function Home({ employee }: { employee: Employee }) {
         {allTasks.length > 6 && (
           <p className="settings-hint home-tasks-more">{t('home.myTasksMore', { count: allTasks.length - 6 })}</p>
         )}
+      </div>
+
+      <div className="home-tasks-card">
+        <div className="home-tasks-header">
+          <h2>
+            <BarChart3 size={16} /> {t('home.servicesChartTitle')}
+          </h2>
+        </div>
+        {!loading && <ServicesAnalyticsChart stats={servicesStats} />}
       </div>
     </div>
   );

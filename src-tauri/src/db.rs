@@ -208,6 +208,26 @@ pub struct ClientHistoryRecord {
     pub created_at: String,
 }
 
+pub struct ClientServiceRecord {
+    pub id: String,
+    pub client_id: String,
+    pub house_service_id: Option<String>,
+    pub service_id: Option<String>,
+    pub service_name: String,
+    pub price: Option<String>,
+    pub added_by: Option<String>,
+    pub added_by_name: Option<String>,
+    pub created_at: String,
+}
+
+// Плоская структура для аналитики на Главной (v1.5.0) — не привязана ни к
+// одной таблице напрямую, просто результат GROUP BY.
+pub struct ServiceMonthStat {
+    pub month: String,
+    pub service_name: String,
+    pub count: i64,
+}
+
 pub struct ProjectRecord {
     pub id: String,
     pub project_number: String,
@@ -281,6 +301,8 @@ pub struct RegulationRecord {
     pub updated_at: String,
     pub member_count: i64,
     pub entry_count: i64,
+    pub client_service_id: Option<String>,
+    pub client_service_name: Option<String>,
 }
 
 pub struct RegulationMemberRecord {
@@ -796,6 +818,30 @@ impl Db {
             );"
         );
 
+        // Полная история услуг клиента (v1.5.0) — раньше клиенту можно было
+        // закрепить только ОДНУ услугу (clients.service_id/house_service_id),
+        // без истории. Теперь это отдельная таблица: одна строка на каждую
+        // услугу, когда-либо добавленную клиенту (включая самую первую,
+        // выбранную при создании — см. create_client/backfill_client_services).
+        // service_name/price — СНИМОК на момент добавления, не живой JOIN на
+        // каталог: услугу в каталоге потом можно переименовать/удалить/
+        // поменять цену, а согласованная с клиентом история должна остаться
+        // как была. house_service_id/service_id взаимоисключающие — то же
+        // соглашение, что и в clients (см. resolve_client_service_selection).
+        let _ = conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS client_services (
+                id TEXT PRIMARY KEY,
+                client_id TEXT NOT NULL REFERENCES clients(id),
+                house_service_id TEXT REFERENCES house_services(id),
+                service_id TEXT REFERENCES partner_services(id),
+                service_name TEXT NOT NULL,
+                price TEXT,
+                added_by TEXT REFERENCES employees(id),
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_client_services_client ON client_services(client_id);"
+        );
+
         // Миграции для баз, созданных более ранними версиями.
         add_column_if_missing(&conn, "employees", "phone TEXT");
         add_column_if_missing(&conn, "employees", "position_id TEXT REFERENCES positions(id)");
@@ -844,6 +890,11 @@ impl Db {
         // partner_id (см. list_clients_for_partner_report).
         add_column_if_missing(&conn, "clients", "origin_partner_id TEXT REFERENCES partners(id)");
         let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_clients_origin_partner_id ON clients(origin_partner_id)", []);
+        // Привязка регламента к конкретной услуге клиента (v1.5.0) — в
+        // отличие от client_id (весь клиент), это про то, ПО КАКОЙ ИЗ его
+        // услуг завели этот регламент, см. add_client_service/"Запустить
+        // регламент" на карточке клиента.
+        add_column_if_missing(&conn, "regulations", "client_service_id TEXT REFERENCES client_services(id)");
         // "Помощник" по регламенту партнёра (v0.4.0) — админ, если создаёт
         // партнёр, или конкретный сотрудник этого партнёра, если создаёт админ.
         add_column_if_missing(&conn, "partner_regulations", "assistant_id TEXT REFERENCES employees(id)");
@@ -1038,7 +1089,57 @@ impl Db {
 
         let db = Db { conn, typing: Mutex::new(HashMap::new()) };
         db.notify_todays_birthdays();
+        db.backfill_client_services();
         db
+    }
+
+    // Разовый (но безвредный при повторных запусках, см. NOT EXISTS-гвард в
+    // самом запросе) перенос "старой" единственной услуги клиента
+    // (clients.service_id/house_service_id/deal_value) в новую таблицу
+    // client_services (v1.5.0) — чтобы история была полной и для клиентов,
+    // заведённых до этой версии. Раздельно от create_client/update_client,
+    // которые с этой версии сами пишут в client_services на каждую НОВУЮ
+    // услугу — этот метод только один раз "досоздаёт" запись за прошлое.
+    // Цикл через query_map + execute (как notify_todays_birthdays выше), а не
+    // raw SQL INSERT...SELECT — в SQLite нет генератора uuid, а id во всём
+    // проекте генерируются через Uuid::new_v4().
+    fn backfill_client_services(&self) {
+        let rows: Vec<(String, Option<String>, Option<String>, Option<String>, Option<String>, String, Option<String>, Option<String>)> = {
+            let mut stmt = match self.conn.prepare(
+                "SELECT c.id, c.house_service_id, c.service_id, c.deal_value, c.created_by, c.created_at,
+                        hs.name, ps.name
+                 FROM clients c
+                 LEFT JOIN house_services hs ON hs.id = c.house_service_id
+                 LEFT JOIN partner_services ps ON ps.id = c.service_id
+                 WHERE (c.house_service_id IS NOT NULL OR c.service_id IS NOT NULL)
+                   AND NOT EXISTS (SELECT 1 FROM client_services cs WHERE cs.client_id = c.id)",
+            ) {
+                Ok(s) => s,
+                Err(_) => return,
+            };
+            stmt.query_map([], |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                    row.get(6)?,
+                    row.get(7)?,
+                ))
+            })
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default()
+        };
+        for (client_id, house_service_id, service_id, deal_value, created_by, created_at, house_name, partner_name) in rows {
+            let name = house_name.or(partner_name).unwrap_or_default();
+            let _ = self.conn.execute(
+                "INSERT INTO client_services (id, client_id, house_service_id, service_id, service_name, price, added_by, created_at)
+                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+                params![Uuid::new_v4().to_string(), client_id, house_service_id, service_id, name, deal_value, created_by, created_at],
+            );
+        }
     }
 
     // Поздравления для уведомлений о дне рождения — выбираются детерминированно
@@ -3174,7 +3275,30 @@ impl Db {
                 params![id, client_number, name.trim(), contact_person, contact_position, phone, email, address, notes, actor_id, effective_partner_id, effective_deal_value, effective_service_id, effective_house_service_id],
             )
             .map_err(|e| e.to_string())?;
+        // Первая услуга клиента сразу попадает в историю (v1.5.0) — дальше
+        // ещё можно добавить (см. add_client_service), но самая первая
+        // фиксируется тут же, а не только на бэкфилле старых клиентов.
+        if effective_service_id.is_some() || effective_house_service_id.is_some() {
+            self.record_client_service(&id, effective_house_service_id.as_deref(), effective_service_id.as_deref(), effective_deal_value.as_deref(), actor_id);
+        }
         self.get_client(actor_id, &id).ok_or_else(|| "Клиент не найден".to_string())
+    }
+
+    // Снимок услуги в историю client_services — общий хвост для
+    // create_client/update_client (первая/изменённая услуга) и
+    // add_client_service (явное добавление ещё одной). Имя услуги снимается
+    // здесь же (не живой JOIN), см. комментарий у CREATE TABLE client_services.
+    fn record_client_service(&self, client_id: &str, house_service_id: Option<&str>, service_id: Option<&str>, price: Option<&str>, actor_id: &str) {
+        let name = house_service_id
+            .and_then(|hsid| self.get_house_service(hsid))
+            .map(|s| s.name)
+            .or_else(|| service_id.and_then(|sid| self.get_partner_service(sid)).map(|s| s.name))
+            .unwrap_or_default();
+        let _ = self.conn.execute(
+            "INSERT INTO client_services (id, client_id, house_service_id, service_id, service_name, price, added_by)
+             VALUES (?1,?2,?3,?4,?5,?6,?7)",
+            params![Uuid::new_v4().to_string(), client_id, house_service_id, service_id, name, price, actor_id],
+        );
     }
 
     // Общая логика для create_client/update_client: service_id (каталог
@@ -3247,6 +3371,15 @@ impl Db {
                 params![name.trim(), contact_person, contact_position, phone, email, address, notes, effective_partner_id, effective_deal_value, effective_service_id, effective_house_service_id, id],
             )
             .map_err(|e| e.to_string())?;
+        // В историю добавляем новую запись, только если услуга РЕАЛЬНО
+        // изменилась (v1.5.0) — иначе обычное редактирование телефона/имени
+        // на форме клиента плодило бы дубли в client_services при каждом
+        // сохранении, даже когда услуга не трогалась.
+        if effective_service_id != existing.service_id || effective_house_service_id != existing.house_service_id {
+            if effective_service_id.is_some() || effective_house_service_id.is_some() {
+                self.record_client_service(id, effective_house_service_id.as_deref(), effective_service_id.as_deref(), effective_deal_value.as_deref(), actor_id);
+            }
+        }
         self.get_client(actor_id, id).ok_or_else(|| "Клиент не найден".to_string())
     }
 
@@ -3254,9 +3387,120 @@ impl Db {
         if !self.is_admin(admin_id) {
             return Err("Недостаточно прав".into());
         }
+        // FK-очистка перед удалением (обнаружено при добавлении client_services
+        // в v1.5.0 — тем же тестом всплыл пре-существующий баг: удаление клиента
+        // с прикреплённым регламентом/проектом уже падало с "FOREIGN KEY
+        // constraint failed", просто раньше это никто не проверял смоук-тестом
+        // и regulations/projects.client_id — nullable — никогда не обнулялись
+        // перед DELETE). Порядок важен: сначала regulations.client_service_id
+        // (ссылается на client_services), потом сами client_services, потом
+        // остальные nullable client_id.
+        self.conn.execute(
+            "UPDATE regulations SET client_service_id = NULL WHERE client_service_id IN (SELECT id FROM client_services WHERE client_id = ?1)",
+            params![id],
+        ).map_err(|e| e.to_string())?;
+        self.conn.execute("UPDATE regulations SET client_id = NULL WHERE client_id = ?1", params![id]).map_err(|e| e.to_string())?;
+        self.conn.execute("UPDATE projects SET client_id = NULL WHERE client_id = ?1", params![id]).map_err(|e| e.to_string())?;
+        self.conn.execute("UPDATE partner_regulations SET client_id = NULL WHERE client_id = ?1", params![id]).map_err(|e| e.to_string())?;
+        self.conn.execute("DELETE FROM client_services WHERE client_id = ?1", params![id]).map_err(|e| e.to_string())?;
         self.conn.execute("DELETE FROM client_history WHERE client_id = ?1", params![id]).map_err(|e| e.to_string())?;
         self.conn.execute("DELETE FROM clients WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
         Ok(())
+    }
+
+    const CLIENT_SERVICE_SELECT: &'static str = "SELECT
+        cs.id, cs.client_id, cs.house_service_id, cs.service_id, cs.service_name, cs.price,
+        cs.added_by, e.full_name, cs.created_at
+    FROM client_services cs
+    LEFT JOIN employees e ON e.id = cs.added_by";
+
+    fn map_client_service_row(row: &rusqlite::Row) -> rusqlite::Result<ClientServiceRecord> {
+        Ok(ClientServiceRecord {
+            id: row.get(0)?,
+            client_id: row.get(1)?,
+            house_service_id: row.get(2)?,
+            service_id: row.get(3)?,
+            service_name: row.get(4)?,
+            price: row.get(5)?,
+            added_by: row.get(6)?,
+            added_by_name: row.get(7)?,
+            created_at: row.get(8)?,
+        })
+    }
+
+    // "Услуги клиента" (v1.5.0) — полная история, в отличие от одиночных
+    // clients.service_id/house_service_id. Доступ — тот же, что у самого
+    // клиента (get_client уже учитывает партнёрский скоуп).
+    pub fn list_client_services(&self, actor_id: &str, client_id: &str) -> Result<Vec<ClientServiceRecord>, String> {
+        self.get_client(actor_id, client_id).ok_or_else(|| "Клиент не найден или недоступен".to_string())?;
+        let sql = format!("{} WHERE cs.client_id = ?1 ORDER BY cs.created_at DESC", Self::CLIENT_SERVICE_SELECT);
+        let mut stmt = self.conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let rows = stmt.query_map(params![client_id], Self::map_client_service_row).map_err(|e| e.to_string())?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    // Добавление ЕЩЁ ОДНОЙ услуги уже существующему клиенту — в отличие от
+    // create_client/update_client (первая/изменённая услуга), эта запись
+    // никак не трогает clients.service_id/house_service_id, только
+    // пополняет историю. Переиспользует resolve_client_service_selection —
+    // та же проверка взаимоисключения и принадлежности партнёру, что и при
+    // создании/редактировании клиента (partner_id берём у САМОГО клиента,
+    // не у актора — иначе админ не смог бы добавить услугу клиенту партнёра).
+    pub fn add_client_service(
+        &self,
+        actor_id: &str,
+        client_id: &str,
+        house_service_id: Option<&str>,
+        service_id: Option<&str>,
+    ) -> Result<ClientServiceRecord, String> {
+        let client = self.get_client(actor_id, client_id).ok_or_else(|| "Клиент не найден или недоступен".to_string())?;
+        if house_service_id.is_none() && service_id.is_none() {
+            return Err("Выберите услугу".into());
+        }
+        let (price, effective_service_id, effective_house_service_id) =
+            self.resolve_client_service_selection(client.partner_id.as_deref(), service_id, house_service_id, None)?;
+        self.record_client_service(client_id, effective_house_service_id.as_deref(), effective_service_id.as_deref(), price.as_deref(), actor_id);
+        let sql = format!("{} WHERE cs.client_id = ?1 ORDER BY cs.created_at DESC LIMIT 1", Self::CLIENT_SERVICE_SELECT);
+        self.conn.query_row(&sql, params![client_id], Self::map_client_service_row).map_err(|e| e.to_string())
+    }
+
+    // Только на случай ошибочного добавления — админ убирает запись целиком
+    // из истории. Не трогает clients.service_id/house_service_id (та
+    // "текущая" услуга живёт своей жизнью, меняется только через
+    // update_client) и не запрещена, даже если на неё уже ссылается
+    // регламент (client_service_id там nullable + LEFT JOIN, см.
+    // REGULATION_SELECT — просто перестанет показывать название услуги).
+    pub fn delete_client_service(&self, actor_id: &str, id: &str) -> Result<(), String> {
+        if !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        // Регламент, запущенный по этой услуге, не удаляется вместе с ней —
+        // просто теряет привязку (FK иначе не даст удалить строку).
+        self.conn.execute("UPDATE regulations SET client_service_id = NULL WHERE client_service_id = ?1", params![id]).map_err(|e| e.to_string())?;
+        self.conn.execute("DELETE FROM client_services WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    // Аналитика по услугам на Главной (v1.5.0) — один общий график
+    // (столбцы по месяцам, разбитые по услугам) закрывает и "сколько
+    // клиентов/услуг по каждой позиции", и "динамика по месяцам" сразу,
+    // поэтому агрегируем в разрезе месяц×услуга одним запросом. Окно в 6
+    // месяцев — не отдельная настройка, просто разумный фиксированный
+    // горизонт для тренда. Доступно любому валидному сотруднику — без
+    // admin-гейта, как и остальные плитки/виджеты Главной.
+    pub fn get_services_monthly_stats(&self, actor_id: &str) -> Result<Vec<ServiceMonthStat>, String> {
+        self.get_employee(actor_id).ok_or_else(|| "Сотрудник не найден".to_string())?;
+        let mut stmt = self.conn.prepare(
+            "SELECT strftime('%Y-%m', created_at) AS month, service_name, COUNT(*) AS cnt
+             FROM client_services
+             WHERE created_at >= date('now', '-6 months')
+             GROUP BY month, service_name
+             ORDER BY month ASC"
+        ).map_err(|e| e.to_string())?;
+        let rows = stmt.query_map([], |row| {
+            Ok(ServiceMonthStat { month: row.get(0)?, service_name: row.get(1)?, count: row.get(2)? })
+        }).map_err(|e| e.to_string())?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
     }
 
     // Перенос клиента партнёра в общую базу CRM (v0.7.0) — необратимо из UI:
@@ -3965,11 +4209,13 @@ impl Db {
             r.created_by, cb.full_name,
             r.created_at, r.updated_at,
             (SELECT COUNT(*) FROM regulation_members rm WHERE rm.regulation_id = r.id),
-            (SELECT COUNT(*) FROM regulation_entries re WHERE re.regulation_id = r.id)
+            (SELECT COUNT(*) FROM regulation_entries re WHERE re.regulation_id = r.id),
+            r.client_service_id, cs.service_name
         FROM regulations r
         LEFT JOIN clients c ON c.id = r.client_id
         LEFT JOIN employees o ON o.id = r.owner_id
-        LEFT JOIN employees cb ON cb.id = r.created_by";
+        LEFT JOIN employees cb ON cb.id = r.created_by
+        LEFT JOIN client_services cs ON cs.id = r.client_service_id";
 
     fn map_regulation_row(row: &rusqlite::Row) -> rusqlite::Result<RegulationRecord> {
         Ok(RegulationRecord {
@@ -3991,6 +4237,8 @@ impl Db {
             updated_at: row.get(15)?,
             member_count: row.get(16)?,
             entry_count: row.get(17)?,
+            client_service_id: row.get(18)?,
+            client_service_name: row.get(19)?,
         })
     }
 
@@ -4034,26 +4282,45 @@ impl Db {
         self.conn.query_row(&sql, params![id], Self::map_regulation_row).ok()
     }
 
+    // Если client_service_id передан — проверяем, что его client_id
+    // действительно совпадает с переданным client_id (реальная проверка, не
+    // просто расчёт "на доверии" с фронта): иначе можно было бы привязать
+    // регламент к чужой услуге, подставив произвольный client_service_id.
+    fn validate_client_service_link(&self, client_id: Option<&str>, client_service_id: Option<&str>) -> Result<(), String> {
+        if let Some(csid) = client_service_id {
+            let actual_client_id: Option<String> = self.conn
+                .query_row("SELECT client_id FROM client_services WHERE id = ?1", params![csid], |row| row.get(0))
+                .ok();
+            match (actual_client_id, client_id) {
+                (Some(a), Some(b)) if a == b => {}
+                _ => return Err("Услуга не принадлежит указанному клиенту".into()),
+            }
+        }
+        Ok(())
+    }
+
     pub fn create_regulation(
         &self,
         actor_id: &str,
         title: &str,
         description: Option<&str>,
         client_id: Option<&str>,
+        client_service_id: Option<&str>,
         deadline: Option<&str>,
     ) -> Result<RegulationRecord, String> {
         if title.trim().is_empty() {
             return Err("Укажите название регламента".into());
         }
+        self.validate_client_service_link(client_id, client_service_id)?;
         let id = Uuid::new_v4().to_string();
         let reg_number = self.next_reg_number();
         let slug = self.make_slug(title.trim(), &id);
 
         self.conn
             .execute(
-                "INSERT INTO regulations (id, reg_number, slug, title, description, client_id, owner_id, deadline, created_by)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                params![id, reg_number, slug, title.trim(), description, client_id, actor_id, deadline, actor_id],
+                "INSERT INTO regulations (id, reg_number, slug, title, description, client_id, client_service_id, owner_id, deadline, created_by)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                params![id, reg_number, slug, title.trim(), description, client_id, client_service_id, actor_id, deadline, actor_id],
             )
             .map_err(|e| e.to_string())?;
 
@@ -4074,6 +4341,7 @@ impl Db {
         title: &str,
         description: Option<&str>,
         client_id: Option<&str>,
+        client_service_id: Option<&str>,
         deadline: Option<&str>,
         status: &str,
     ) -> Result<RegulationRecord, String> {
@@ -4087,6 +4355,7 @@ impl Db {
         if !["active", "closed"].contains(&status) {
             return Err("Некорректный статус".into());
         }
+        self.validate_client_service_link(client_id, client_service_id)?;
 
         let closed_at = if status == "closed" && reg.status != "closed" {
             "datetime('now')"
@@ -4097,10 +4366,10 @@ impl Db {
         };
 
         let sql = format!(
-            "UPDATE regulations SET title = ?1, description = ?2, client_id = ?3, deadline = ?4, status = ?5, closed_at = {}, updated_at = datetime('now') WHERE id = ?6",
+            "UPDATE regulations SET title = ?1, description = ?2, client_id = ?3, client_service_id = ?4, deadline = ?5, status = ?6, closed_at = {}, updated_at = datetime('now') WHERE id = ?7",
             closed_at
         );
-        self.conn.execute(&sql, params![title.trim(), description, client_id, deadline, status, id])
+        self.conn.execute(&sql, params![title.trim(), description, client_id, client_service_id, deadline, status, id])
             .map_err(|e| e.to_string())?;
 
         self.get_regulation(id).ok_or_else(|| "Регламент не найден".to_string())
@@ -4798,6 +5067,12 @@ impl Db {
         let existing = self.get_partner_service(id).ok_or_else(|| "Услуга не найдена".to_string())?;
         self.can_access_partner_org(actor_id, &existing.partner_id)?;
         self.conn.execute("UPDATE clients SET service_id = NULL WHERE service_id = ?1", params![id]).map_err(|e| e.to_string())?;
+        // client_services хранит СНИМОК имени/цены (см. CREATE TABLE выше) —
+        // сама история не пропадает, только рвётся ссылка на уже удалённую
+        // каталожную запись (обязательно из-за FK — иначе DELETE ниже упадёт
+        // с "FOREIGN KEY constraint failed", как только у услуги есть хоть
+        // одна запись в истории хоть одного клиента).
+        self.conn.execute("UPDATE client_services SET service_id = NULL WHERE service_id = ?1", params![id]).map_err(|e| e.to_string())?;
         self.conn.execute("DELETE FROM partner_services WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
         Ok(())
     }
@@ -4887,6 +5162,10 @@ impl Db {
             return Err("Недостаточно прав".into());
         }
         self.conn.execute("UPDATE clients SET house_service_id = NULL WHERE house_service_id = ?1", params![id]).map_err(|e| e.to_string())?;
+        // См. комментарий в delete_partner_service — то же самое для общего
+        // каталога: история (client_services) остаётся, ссылка на удалённую
+        // каталожную запись обнуляется, иначе DELETE ниже упадёт по FK.
+        self.conn.execute("UPDATE client_services SET house_service_id = NULL WHERE house_service_id = ?1", params![id]).map_err(|e| e.to_string())?;
         self.conn.execute("DELETE FROM house_services WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
         Ok(())
     }
@@ -6217,4 +6496,3 @@ pub struct ReportExportSettingsRecord {
     pub time_hhmm: String,
     pub folder: String,
 }
-

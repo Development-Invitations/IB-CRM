@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '1.4.0';
+export const APP_VERSION = '1.5.0';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,16 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '1.5.0',
+      items: [
+        'Клиенту теперь можно добавлять несколько услуг — не только одну при создании: в карточке клиента новый раздел «Услуги клиента» со всей историей (что добавлено, когда, по какой цене) и кнопкой «+ Добавить услугу»',
+        'Услугу из общего каталога «Наши услуги» теперь можно выбрать при создании ЛЮБОГО клиента, а не только клиента партнёра — раньше без партнёра был доступен только свободный ввод «Стоимости»',
+        'У каждой услуги клиента — кнопка «Запустить регламент»: открывает создание регламента, уже привязанного к этому клиенту и этой услуге; в самом регламенте видно, к какой услуге он относится',
+        'На Главной — новый график «Аналитика по услугам»: столбцы по месяцам за последние полгода, разбитые по услугам, плюс список услуг с общим количеством',
+        'Исправлен баг (не точечный — обнаружен и закрыт вместе с этим обновлением): удаление клиента, у которого есть хоть один регламент или проект, раньше падало с ошибкой — теперь удаляется корректно',
+      ],
+    },
     {
       version: '1.4.0',
       items: [
@@ -626,6 +636,16 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '1.5.0',
+      items: [
+        "Mijozga endi bir nechta xizmat qo'shish mumkin — nafaqat yaratishda bitta: mijoz kartochkasida yangi \"Mijoz xizmatlari\" bo'limi to'liq tarix bilan (nima qachon va qanday narxda qo'shilgan) va \"+ Xizmat qo'shish\" tugmasi",
+        "\"Bizning xizmatlar\" umumiy katalogidan xizmatni endi ISTALGAN mijoz yaratishda tanlash mumkin, faqat hamkor mijozida emas — avval hamkorsiz faqat erkin \"Qiymati\" maydoni bor edi",
+        "Mijozning har bir xizmati yonida \"Reglamentni ishga tushirish\" tugmasi — shu mijoz va shu xizmatga bog'langan reglament yaratishni ochadi; reglamentning o'zida qaysi xizmatga tegishli ekani ko'rinadi",
+        "Bosh sahifada — yangi \"Xizmatlar bo'yicha tahlil\" grafigi: so'nggi olti oy bo'yicha oylik ustunlar, xizmatlarga bo'lingan, shu bilan birga umumiy soni bilan xizmatlar ro'yxati",
+        "Xato tuzatildi (nuqtaviy emas — shu yangilanish bilan birga topilgan va yopilgan): kamida bitta reglament yoki loyihasi bor mijozni o'chirish avval xato bilan tugardi — endi to'g'ri o'chadi",
+      ],
+    },
+    {
       version: '1.4.0',
       items: [
         "\"Xizmatlar\"da (umumiy katalog va hamkor katalogi) \"Xizmat kodi\" maydoni qo'shildi — ixtiyoriy, jadvalda tavsif yonida ko'rsatiladi",
@@ -1235,6 +1255,16 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '1.5.0',
+      items: [
+        'Мижозга энди бир нечта хизмат қўшиш мумкин — нафақат яратишда битта: мижоз карточкасида янги "Мижоз хизматлари" бўлими тўлиқ тарих билан (нима қачон ва қандай нархда қўшилган) ва "+ Хизмат қўшиш" тугмаси',
+        '"Бизнинг хизматлар" умумий каталогидан хизматни энди ИСТАЛГАН мижоз яратишда танлаш мумкин, фақат ҳамкор мижозида эмас — аввал ҳамкорсиз фақат эркин "Қиймати" майдони бор эди',
+        'Мижознинг ҳар бир хизмати ёнида "Регламентни ишга тушириш" тугмаси — шу мижоз ва шу хизматга боғланган регламент яратишни очади; регламентнинг ўзида қайси хизматга тегишли экани кўринади',
+        'Бош саҳифада — янги "Хизматлар бўйича таҳлил" графиги: сўнгги олти ой бўйича ойлик устунлар, хизматларга бўлинган, шу билан бирга умумий сони билан хизматлар рўйхати',
+        'Хато тузатилди (нуқтавий эмас — шу янгиланиш билан бирга топилган ва ёпилган): камида битта регламент ёки лойиҳаси бор мижозни ўчириш аввал хато билан тугарди — энди тўғри ўчади',
+      ],
+    },
     {
       version: '1.4.0',
       items: [

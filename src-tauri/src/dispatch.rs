@@ -241,6 +241,25 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
             let p: crate::AddClientHistoryPayload = from_payload(payload)?;
             db.add_client_history(&p.client_id, &p.actor_id, &p.description).map(crate::to_client_history).map(to_json)
         }
+        "list_client_services" => {
+            let p: crate::ListClientServicesPayload = from_payload(payload)?;
+            db.list_client_services(&p.actor_id, &p.client_id)
+                .map(|list| list.into_iter().map(crate::to_client_service).collect::<Vec<_>>()).map(to_json)
+        }
+        "add_client_service" => {
+            let p: crate::AddClientServicePayload = from_payload(payload)?;
+            db.add_client_service(&p.actor_id, &p.client_id, p.house_service_id.as_deref(), p.service_id.as_deref())
+                .map(crate::to_client_service).map(to_json)
+        }
+        "delete_client_service" => {
+            let p: crate::DeleteClientServicePayload = from_payload(payload)?;
+            db.delete_client_service(&p.actor_id, &p.id).map(to_json)
+        }
+        "get_services_monthly_stats" => {
+            let p: crate::GetServicesMonthlyStatsPayload = from_payload(payload)?;
+            db.get_services_monthly_stats(&p.actor_id)
+                .map(|list| list.into_iter().map(crate::to_service_month_stat).collect::<Vec<_>>()).map(to_json)
+        }
 
         // ---- Проекты ----
         "list_projects" => Ok(to_json(db.list_projects().into_iter().map(crate::to_project).collect::<Vec<_>>())),
@@ -349,12 +368,12 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
         }
         "create_regulation" => {
             let p: crate::CreateRegulationPayload = from_payload(payload)?;
-            db.create_regulation(&p.actor_id, &p.title, p.description.as_deref(), p.client_id.as_deref(), p.deadline.as_deref())
+            db.create_regulation(&p.actor_id, &p.title, p.description.as_deref(), p.client_id.as_deref(), p.client_service_id.as_deref(), p.deadline.as_deref())
                 .map(crate::to_regulation).map(to_json)
         }
         "update_regulation" => {
             let p: crate::UpdateRegulationPayload = from_payload(payload)?;
-            db.update_regulation(&p.actor_id, &p.id, &p.title, p.description.as_deref(), p.client_id.as_deref(), p.deadline.as_deref(), &p.status)
+            db.update_regulation(&p.actor_id, &p.id, &p.title, p.description.as_deref(), p.client_id.as_deref(), p.client_service_id.as_deref(), p.deadline.as_deref(), &p.status)
                 .map(crate::to_regulation).map(to_json)
         }
         "delete_regulation" => {

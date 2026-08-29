@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Plus, Search, Pencil, Contact, Trash2, Send, ExternalLink, ArrowRightLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { api, type Employee, type Client, type ClientHistoryEntry, type Regulation, type PartnerRegulation, type Partner } from '../lib/api';
+import { api, type Employee, type Client, type ClientHistoryEntry, type ClientService, type Regulation, type PartnerRegulation, type Partner } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
 import { parseSqliteUtc } from '../lib/date';
 import Drawer from '../components/Drawer';
 import Modal from '../components/Modal';
 import ClientFormModal from '../components/ClientFormModal';
+import AddClientServiceModal from '../components/AddClientServiceModal';
 import LoadingScreen from '../components/LoadingScreen';
 import Select from '../components/Select';
 
@@ -35,11 +36,13 @@ export default function Clients({
 
   const [selected, setSelected] = useState<Client | null>(null);
   const [history, setHistory] = useState<ClientHistoryEntry[]>([]);
+  const [clientServices, setClientServices] = useState<ClientService[]>([]);
   const [clientRegs, setClientRegs] = useState<Regulation[]>([]);
   const [clientPartnerRegs, setClientPartnerRegs] = useState<PartnerRegulation[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [noteBusy, setNoteBusy] = useState(false);
+  const [addServiceOpen, setAddServiceOpen] = useState(false);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | undefined>(undefined);
@@ -75,6 +78,7 @@ export default function Clients({
   useEffect(() => {
     if (!selected) {
       setHistory([]);
+      setClientServices([]);
       setClientRegs([]);
       setClientPartnerRegs([]);
       return;
@@ -87,13 +91,15 @@ export default function Clients({
     const regPartnerId = selected.partnerId || selected.originPartnerId;
     Promise.all([
       api.listClientHistory({ actorId: currentEmployee.id, clientId: selected.id }),
+      api.listClientServices({ actorId: currentEmployee.id, clientId: selected.id }),
       api.listRegulations(),
       regPartnerId && (currentEmployee.isAdmin || currentEmployee.isPartner)
         ? api.listPartnerRegulations({ actorId: currentEmployee.id, partnerId: regPartnerId }).catch(() => [])
         : Promise.resolve([]),
     ])
-      .then(([entries, allRegs, partnerRegs]) => {
+      .then(([entries, services, allRegs, partnerRegs]) => {
         setHistory(entries);
+        setClientServices(services);
         setClientRegs(allRegs.filter((r) => r.clientId === selected.id));
         setClientPartnerRegs(partnerRegs.filter((r) => r.clientId === selected.id));
         setHistoryLoading(false);
@@ -161,6 +167,31 @@ export default function Clients({
       showToast('error', typeof err === 'string' ? err : t('clients.errorGeneric'));
     } finally {
       setNoteBusy(false);
+    }
+  };
+
+  const reloadClientServices = () => {
+    if (!selected) return;
+    api.listClientServices({ actorId: currentEmployee.id, clientId: selected.id }).then(setClientServices).catch(() => {});
+  };
+
+  const handleStartRegulation = (cs: ClientService) => {
+    if (!selected) return;
+    navigate(regulationsBasePath, {
+      state: {
+        prefillClientId: selected.id,
+        prefillClientServiceId: cs.id,
+        prefillTitle: t('regulations.autoTitleForService', { service: cs.serviceName }),
+      },
+    });
+  };
+
+  const handleDeleteClientService = async (id: string) => {
+    try {
+      await api.deleteClientService({ actorId: currentEmployee.id, id });
+      reloadClientServices();
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('clients.errorGeneric'));
     }
   };
 
@@ -309,21 +340,11 @@ export default function Clients({
                 <span>{selected.notes}</span>
               </div>
             )}
-            {selected.serviceId ? (
+            {!selected.serviceId && !selected.houseServiceId && selected.dealValue && (
               <div className="employee-card-row">
-                <span className="settings-hint">{t('clients.serviceLabel')}</span>
-                <span>
-                  {selected.serviceName}
-                  {selected.dealValue ? ` · ${selected.dealValue}` : ''}
-                </span>
+                <span className="settings-hint">{t('clients.dealValueLabel')}</span>
+                <span>{selected.dealValue}</span>
               </div>
-            ) : (
-              selected.dealValue && (
-                <div className="employee-card-row">
-                  <span className="settings-hint">{t('clients.dealValueLabel')}</span>
-                  <span>{selected.dealValue}</span>
-                </div>
-              )
             )}
             {scopedPartnerId === undefined && (
               <div className="employee-card-row">
@@ -399,6 +420,38 @@ export default function Clients({
               </>
             )}
 
+            <div className="department-members-title">{t('clients.servicesTitle')}</div>
+            {clientServices.length === 0 ? (
+              <p className="settings-hint">{t('clients.serviceHistoryEmpty')}</p>
+            ) : (
+              <ul className="client-history-list">
+                {clientServices.map((cs) => (
+                  <li key={cs.id} className="client-reg-item">
+                    <div>
+                      <div className="client-reg-name">{cs.serviceName}</div>
+                      <div className="settings-hint client-history-meta">
+                        {cs.price ? `${cs.price} · ` : ''}
+                        {parseSqliteUtc(cs.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      <button type="button" className="modal-btn" onClick={() => handleStartRegulation(cs)}>
+                        {t('clients.startRegulationBtn')}
+                      </button>
+                      {currentEmployee.isAdmin && (
+                        <button type="button" className="icon-btn" onClick={() => handleDeleteClientService(cs.id)} title={t('common.deleteBtn')}>
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button type="button" className="modal-btn" onClick={() => setAddServiceOpen(true)} style={{ marginTop: 8 }}>
+              <Plus size={14} /> {t('clients.addServiceBtn')}
+            </button>
+
             <div className="department-members-title">{t('clients.historyTitle')}</div>
 
             <div className="client-history-add">
@@ -442,6 +495,16 @@ export default function Clients({
         lockedPartnerId={scopedPartnerId}
         onSaved={load}
       />
+
+      {selected && (
+        <AddClientServiceModal
+          open={addServiceOpen}
+          onClose={() => setAddServiceOpen(false)}
+          client={selected}
+          currentEmployee={currentEmployee}
+          onSaved={reloadClientServices}
+        />
+      )}
 
       <Modal
         open={deleteConfirmOpen}

@@ -26,6 +26,7 @@ import { useAppLogo, setCachedAppLogo, applyRuntimeIcon, DEFAULT_LOGO } from '..
 import Select from '../components/Select';
 import Checkbox from '../components/Checkbox';
 import { TOUR_STEPS, type TourRole } from '../lib/onboardingSteps';
+import { setCachedNotebookSettings } from '../lib/notebookSettingsCache';
 
 export default function Settings({ employee }: { employee: Employee }) {
   const { t, locale, setLocale } = useLocale();
@@ -127,6 +128,9 @@ export default function Settings({ employee }: { employee: Employee }) {
       });
       setNotebookEnabledState(s.enabled);
       setNotebookName(s.name || '');
+      // Обновляет и кнопку в шапке немедленно, без перезахода — см.
+      // lib/notebookSettingsCache.ts (v1.5.0).
+      setCachedNotebookSettings(s);
       showToast('success', t('settings.notebook.saveSuccess'));
     } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('settings.errorGeneric'));

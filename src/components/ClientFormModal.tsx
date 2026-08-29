@@ -44,16 +44,18 @@ export default function ClientFormModal({
   const [busy, setBusy] = useState(false);
 
   const showPartnerSelect = !currentEmployee.isPartner && lockedPartnerId === undefined;
-  // Услуга доступна только когда у клиента есть партнёр (свой у lockedPartnerId,
-  // либо выбранный в свободном селекте на общей странице Клиентов) — без
-  // партнёра каталога услуг не существует, остаётся свободное поле "Стоимость".
   const effectivePartnerId = lockedPartnerId !== undefined ? (lockedPartnerId ?? null) : (partnerId || null);
   // Партнёр создающий/редактирующий своего клиента — всегда каталог "Наши
-  // услуги" (общий, v0.7.0). Админ — каталог услуг партнёра, КРОМЕ случая,
-  // когда открыт на редактирование уже существующий клиент, у которого стоит
-  // houseServiceId (без serviceId) — тогда сохраняем "родной" каталог, чтобы
-  // не потерять привязку услуги при правке админом прочих полей.
-  const catalogIsHouse = currentEmployee.isPartner || (!!client?.houseServiceId && !client?.serviceId);
+  // услуги" (общий, v0.7.0). Клиент БЕЗ партнёра (обычный клиент CRM) —
+  // тоже всегда "Наши услуги" (v1.5.0: раньше без партнёра каталога вообще
+  // не показывалось, только свободный "Стоимость" — хотя backend никогда не
+  // требовал партнёра для house_service_id, это было чисто фронтендное
+  // ограничение). Каталог конкретного партнёра (service_id) — только когда
+  // админ работает с клиентом партнёра, КРОМЕ случая, когда открыт на
+  // редактирование уже существующий клиент, у которого стоит houseServiceId
+  // (без serviceId) — тогда сохраняем "родной" каталог, чтобы не потерять
+  // привязку услуги при правке админом прочих полей.
+  const catalogIsHouse = currentEmployee.isPartner || !effectivePartnerId || (!!client?.houseServiceId && !client?.serviceId);
 
   useEffect(() => {
     if (!showPartnerSelect) return;
@@ -61,12 +63,10 @@ export default function ClientFormModal({
   }, [showPartnerSelect]);
 
   useEffect(() => {
-    if (!catalogIsHouse) {
-      setHouseServices([]);
-      return;
-    }
+    // Общий справочник, не зависит от партнёра — грузим всегда, каталог
+    // "Наши услуги" теперь доступен любому клиенту (см. catalogIsHouse выше).
     api.listHouseServices({ actorId: currentEmployee.id }).then(setHouseServices).catch(() => setHouseServices([]));
-  }, [catalogIsHouse, currentEmployee.id]);
+  }, [currentEmployee.id]);
 
   useEffect(() => {
     if (catalogIsHouse || !effectivePartnerId) {
@@ -110,7 +110,7 @@ export default function ClientFormModal({
         address: address.trim() || null,
         notes: notes.trim() || null,
         partnerId: lockedPartnerId !== undefined ? lockedPartnerId : (partnerId || null),
-        dealValue: effectivePartnerId ? null : (dealValue.trim() || null),
+        dealValue: catalogIsHouse ? (houseServiceId ? null : (dealValue.trim() || null)) : null,
         serviceId: !catalogIsHouse && effectivePartnerId ? (serviceId || null) : null,
         houseServiceId: catalogIsHouse ? (houseServiceId || null) : null,
       };
@@ -185,19 +185,33 @@ export default function ClientFormModal({
           <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('clients.notesPlaceholder')} />
         </div>
 
-        {effectivePartnerId ? (
+        {catalogIsHouse ? (
           <div className="field">
             <label>{t('clients.serviceLabel')}</label>
             <Select
-              value={catalogIsHouse ? houseServiceId : serviceId}
+              value={houseServiceId}
               options={[
                 { value: '', label: t('clients.serviceNotSelected') },
-                ...(catalogIsHouse ? houseServices : services).map((s) => ({ value: s.id, label: s.name })),
+                ...houseServices.map((s) => ({ value: s.id, label: s.name })),
               ]}
-              onChange={catalogIsHouse ? setHouseServiceId : setServiceId}
+              onChange={setHouseServiceId}
             />
           </div>
         ) : (
+          <div className="field">
+            <label>{t('clients.serviceLabel')}</label>
+            <Select
+              value={serviceId}
+              options={[
+                { value: '', label: t('clients.serviceNotSelected') },
+                ...services.map((s) => ({ value: s.id, label: s.name })),
+              ]}
+              onChange={setServiceId}
+            />
+          </div>
+        )}
+
+        {catalogIsHouse && !houseServiceId && (
           <div className="field">
             <label>{t('clients.dealValueLabel')}</label>
             <input value={dealValue} onChange={(e) => setDealValue(e.target.value)} placeholder={t('clients.dealValuePlaceholder')} />

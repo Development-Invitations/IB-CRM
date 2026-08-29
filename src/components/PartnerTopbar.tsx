@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Settings as SettingsIcon, Home, MessageCircle, NotebookText } from 'lucide-react';
 import { api, type Employee, type Notification } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useNotifications, type NotificationTarget } from '../lib/useNotifications';
+import { useNotebookSettings } from '../lib/notebookSettingsCache';
 import NotificationsBell from './NotificationsBell';
 import NotebookPanel from './NotebookPanel';
 import type { ToastKind } from '../pages/ToastWindow';
@@ -48,17 +49,10 @@ export default function PartnerTopbar({ employee }: { employee: Employee }) {
     fallbackPath: '/dashboard',
   });
 
-  // Записная книжка (v0.6.0) — та же логика, что в основном Topbar.tsx.
-  const [notebookEnabled, setNotebookEnabled] = useState(false);
-  const [notebookName, setNotebookName] = useState<string | null>(null);
+  // Записная книжка (v0.6.0) — через общий кеш (см. Topbar.tsx, v1.5.0).
+  const { enabled: notebookEnabled, name: notebookName } = useNotebookSettings(employee.id);
   const [notebookOpen, setNotebookOpen] = useState(false);
   const notebookBtnRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    api.getNotebookSettings({ actorId: employee.id, employeeId: employee.id })
-      .then((s) => { setNotebookEnabled(s.enabled); setNotebookName(s.name); })
-      .catch(() => {});
-  }, [employee.id]);
 
   return (
     <header className="topbar">

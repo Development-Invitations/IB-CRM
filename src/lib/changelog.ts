@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '1.5.0';
+export const APP_VERSION = '1.6.0';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,19 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '1.6.0',
+      items: [
+        'Новый общий раздел «Агенты» (виден всем сотрудникам) — физлица-рефереры, которые приводят клиентов за вознаграждение, без собственного входа в CRM',
+        'Агенты регистрируются через отдельного Telegram-бота: выбор языка (русский / узбекский латиница / узбекский кириллица) → при необходимости — согласие на обработку данных (текст задаётся в Настройках сразу на 3 языках) → анкета ФИО, телефон, адрес, эл. почта и обязательное фото паспорта → заявка уходит админу на подтверждение',
+        'Личные данные агента (телефон, адрес, почта, фото паспорта) видны только админу — в разделе «Агенты» появилась отдельная кнопка «Список агентов» с полной анкетой по каждому и выгрузкой в красиво оформленный Excel; фото паспортов в Excel не попадают, но остаются доступны для просмотра прямо в карточке агента',
+        'После подтверждения агенту в боте открываются кнопки «Полезная информация» и «Записать продажу» (ФИО, ИНН, телефон, название компании клиента) — новый клиент падает в CRM в раздел «Агенты» и проходит стадии «Новый → Думает → Согласен → Оформлен»; на финальной стадии CRM автоматически создаёт настоящую запись в «Клиенты» с привязкой к агенту (для расчёта вознаграждения)',
+        'Проверка на дубли: если ИНН клиента уже встречался у другого агента или уже есть в клиентах CRM, бот не даст записать такую продажу повторно',
+        'В боте — кнопка со ссылкой на групповой чат агентов (ссылка задаётся админом в Настройках)',
+        'В Настройках — новый раздел «Telegram-бот для агентов» (свой токен, отдельный от бота задач сотрудников) и раздел «Согласие агента и чат агентов»',
+        'В разделе «Агенты» — блок «Обучение»: админ публикует материалы, бот выдаёт их агентам по кнопке «Материалы»',
+      ],
+    },
     {
       version: '1.5.0',
       items: [
@@ -636,6 +649,19 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '1.6.0',
+      items: [
+        "Yangi umumiy \"Agentlar\" bo'limi (barcha xodimlarga ko'rinadi) — mukofot evaziga mijoz olib keladigan jismoniy shaxs-referallar, CRM'ga o'z kirishisiz",
+        "Agentlar alohida Telegram-bot orqali ro'yxatdan o'tadi: til tanlash (rus / o'zbek lotin / o'zbek kirill) → kerak bo'lsa, ma'lumotlarni qayta ishlashga rozilik (matni Sozlamalarda darhol 3 tilda kiritiladi) → anketa: F.I.Sh, telefon, manzil, elektron pochta va majburiy pasport surati → ariza admin tasdig'iga yuboriladi",
+        "Agentning shaxsiy ma'lumotlari (telefon, manzil, pochta, pasport surati) faqat adminga ko'rinadi — \"Agentlar\" bo'limida yangi \"Agentlar ro'yxati\" tugmasi paydo bo'ldi: har biri bo'yicha to'liq anketa va chiroyli formatlangan Excel'ga yuklab olish; pasport suratlari Excel'ga kiritilmaydi, lekin agent kartochkasida ko'rish uchun mavjud",
+        "Tasdiqlangandan so'ng agentda bot menyusida \"Foydali ma'lumot\" va \"Sotuvni yozish\" (mijozning F.I.Sh, STIR, telefon, kompaniya nomi) tugmalari ochiladi — yangi mijoz CRM'ning \"Agentlar\" bo'limiga tushadi va \"Yangi → O'ylamoqda → Rozi → Rasmiylashtirildi\" bosqichlaridan o'tadi, oxirgi bosqichda CRM avtomatik ravishda haqiqiy \"Mijozlar\" yozuvini yaratadi, agentga bog'langan holda (mukofot hisob-kitobi uchun)",
+        "Takrorlanishni tekshirish: agar mijozning STIR raqami boshqa agentda yoki CRM mijozlarida allaqachon mavjud bo'lsa, bot bunday sotuvni qayta yozishga yo'l qo'ymaydi",
+        "Botda — agentlar guruh chatiga havola tugmasi (havola Sozlamalarda admin tomonidan kiritiladi)",
+        "Sozlamalarda — yangi \"Agentlar uchun Telegram-bot\" bo'limi (xodimlar vazifa botidan alohida, o'z tokeni bilan) va \"Agent roziligi va agentlar chati\" bo'limi",
+        "\"Agentlar\" bo'limida — \"O'rgatish\" bloki: admin material joylaydi, bot ularni agentlarga \"Materiallar\" tugmasi orqali ko'rsatadi",
+      ],
+    },
+    {
       version: '1.5.0',
       items: [
         "Mijozga endi bir nechta xizmat qo'shish mumkin — nafaqat yaratishda bitta: mijoz kartochkasida yangi \"Mijoz xizmatlari\" bo'limi to'liq tarix bilan (nima qachon va qanday narxda qo'shilgan) va \"+ Xizmat qo'shish\" tugmasi",
@@ -1255,6 +1281,19 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '1.6.0',
+      items: [
+        'Янги умумий "Агентлар" бўлими (барча ходимларга кўринади) — мукофот эвазига мижоз олиб келадиган жисмоний шахс-реферерлар, CRM\'га ўз киришисиз',
+        'Агентлар алоҳида Telegram-бот орқали рўйхатдан ўтади: тил танлаш (рус / ўзбек лотин / ўзбек кирилл) → керак бўлса, маълумотларни қайта ишлашга розилик (матни Созламаларда дарҳол 3 тилда киритилади) → анкета: Ф.И.Ш, телефон, манзил, электрон почта ва мажбурий паспорт сурати → ариза админ тасдиғига юборилади',
+        'Агентнинг шахсий маълумотлари (телефон, манзил, почта, паспорт сурати) фақат админга кўринади — "Агентлар" бўлимида янги "Агентлар рўйхати" тугмаси пайдо бўлди: ҳар бири бўйича тўлиқ анкета ва чиройли форматланган Excel\'га юклаб олиш; паспорт суратлари Excel\'га киритилмайди, лекин агент карточкасида кўриш учун мавжуд',
+        'Тасдиқлангандан сўнг агентда бот менюсида "Фойдали маълумот" ва "Сотувни ёзиш" (мижознинг Ф.И.Ш, СТИР, телефон, компания номи) тугмалари очилади — янги мижоз CRM\'нинг "Агентлар" бўлимига тушади ва "Янги → Ўйламоқда → Рози → Расмийлаштирилди" босқичларидан ўтади, охирги босқичда CRM автоматик равишда ҳақиқий "Мижозлар" ёзувини яратади, агентга боғланган ҳолда (мукофот ҳисоб-китоби учун)',
+        'Такрорланишни текшириш: агар мижознинг СТИР рақами бошқа агентда ёки CRM мижозларида аллақачон мавжуд бўлса, бот бундай сотувни қайта ёзишга йўл қўймайди',
+        'Ботда — агентлар гуруҳ чатига ҳавола тугмаси (ҳавола Созламаларда админ томонидан киритилади)',
+        'Созламаларда — янги "Агентлар учун Telegram-бот" бўлими (ходимлар вазифа ботидан алоҳида, ўз токени билан) ва "Агент розилиги ва агентлар чати" бўлими',
+        '"Агентлар" бўлимида — "Ўргатиш" блоки: админ материал жойлайди, бот уларни агентларга "Материаллар" тугмаси орқали кўрсатади',
+      ],
+    },
     {
       version: '1.5.0',
       items: [

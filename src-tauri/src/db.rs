@@ -228,6 +228,57 @@ pub struct ServiceMonthStat {
     pub count: i64,
 }
 
+pub struct AgentRecord {
+    pub id: String,
+    pub agent_number: String,
+    pub full_name: String,
+    pub phone: Option<String>,
+    pub address: Option<String>,
+    pub email: Option<String>,
+    pub passport_photo_data: Option<String>,
+    pub passport_photo_name: Option<String>,
+    pub consent_given: bool,
+    pub consent_given_at: Option<String>,
+    pub locale: String,
+    pub telegram_chat_id: String,
+    pub status: String,
+    pub created_at: String,
+    pub resolved_at: Option<String>,
+    pub resolved_by: Option<String>,
+}
+
+pub struct AgentLeadRecord {
+    pub id: String,
+    pub agent_id: String,
+    pub agent_name: String,
+    pub client_name: String,
+    pub client_inn: String,
+    pub client_phone: Option<String>,
+    pub company_name: Option<String>,
+    pub note: Option<String>,
+    pub stage: String,
+    pub converted_client_id: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+pub struct AgentConsentSettings {
+    pub enabled: bool,
+    pub text_ru: String,
+    pub text_uz: String,
+    pub text_uz_cyrl: String,
+    pub chat_link: Option<String>,
+}
+
+pub struct AgentTrainingPostRecord {
+    pub id: String,
+    pub title: String,
+    pub body: String,
+    pub created_by: Option<String>,
+    pub created_by_name: Option<String>,
+    pub created_at: String,
+}
+
 pub struct ProjectRecord {
     pub id: String,
     pub project_number: String,
@@ -1086,6 +1137,100 @@ impl Db {
             );
             CREATE INDEX IF NOT EXISTS idx_notebook_notes_employee ON notebook_notes(employee_id);",
         );
+
+        // Агенты (v1.6.0) — физлица-рефереры БЕЗ входа в CRM (в отличие от
+        // партнёров — те получают обычный employees-аккаунт с флагом
+        // is_partner). Регистрируются и работают целиком через отдельного
+        // Telegram-бота (свой токен, см. get_telegram_bot_settings_internal
+        // с role="agents_bot") — заявка на регистрацию требует подтверждения
+        // админом (тот же паттерн, что edit_requests/absence_requests:
+        // status pending/approved/rejected + resolved_at/resolved_by).
+        let _ = conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS agents (
+                id TEXT PRIMARY KEY,
+                agent_number TEXT UNIQUE NOT NULL,
+                full_name TEXT NOT NULL,
+                phone TEXT,
+                address TEXT,
+                email TEXT,
+                passport_photo_data TEXT,
+                passport_photo_name TEXT,
+                consent_given INTEGER NOT NULL DEFAULT 0,
+                consent_given_at TEXT,
+                locale TEXT NOT NULL DEFAULT 'ru',
+                telegram_chat_id TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                resolved_at TEXT,
+                resolved_by TEXT REFERENCES employees(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_agents_chat_id ON agents(telegram_chat_id);",
+        );
+        // Лид (потенциальный клиент), который агент завёл через бота — живёт
+        // отдельно от clients, пока не пройдёт стадии до 'converted': тогда
+        // create_agent_lead_conversion заводит настоящую запись в clients
+        // (см. advance_agent_lead_stage) и проставляет converted_client_id —
+        // именно так CRM "сама формирует продажу в Клиенты" по просьбе
+        // пользователя, а не агент напрямую создаёт запись в clients.
+        let _ = conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS agent_leads (
+                id TEXT PRIMARY KEY,
+                agent_id TEXT NOT NULL REFERENCES agents(id),
+                client_name TEXT NOT NULL,
+                client_inn TEXT NOT NULL,
+                client_phone TEXT,
+                company_name TEXT,
+                note TEXT,
+                stage TEXT NOT NULL DEFAULT 'new',
+                converted_client_id TEXT REFERENCES clients(id),
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_agent_leads_agent ON agent_leads(agent_id);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_leads_inn ON agent_leads(client_inn);",
+        );
+        // Обучающие материалы для агентов — публикует админ через CRM, бот
+        // раздаёт их обычным текстом (см. telegram.rs::handle_agents_bot_update).
+        // Отдельная лёгкая таблица, а не расширение blog_topics —
+        // аудитория/права чтения там завязаны на залогиненных
+        // сотрудников/партнёров, а агенты вообще не логинятся в CRM.
+        let _ = conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS agent_training_posts (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                body TEXT NOT NULL,
+                created_by TEXT REFERENCES employees(id),
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );"
+        );
+        // Конечный автомат многошаговых диалогов агентского бота — регистрация
+        // (имя → телефон → резюме) и "новый клиент" (имя → телефон → заметка)
+        // требуют помнить, на каком шаге находится конкретный chat_id, между
+        // отдельными сообщениями. Ничего подобного в проекте раньше не было
+        // (нынешний бот сотрудников полностью stateless — одна кнопка,
+        // мгновенный ответ) — и это обязано быть таблицей, а не in-memory
+        // Mutex (как typing-индикатор чата), потому что диалог должен
+        // переживать перезапуск приложения между шагами.
+        let _ = conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS agent_bot_state (
+                chat_id TEXT PRIMARY KEY,
+                flow TEXT NOT NULL,
+                step TEXT NOT NULL,
+                draft_json TEXT NOT NULL DEFAULT '{}',
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );"
+        );
+        // Чистая атрибуция "какой агент привёл этого клиента" — для
+        // отображения в разделе "Агенты" (кому платить комиссию), тот же
+        // приём, что origin_partner_id (не участвует в обычном
+        // create_client/update_client, проставляется отдельно при конвертации
+        // лида — см. advance_agent_lead_stage).
+        add_column_if_missing(&conn, "clients", "origin_agent_id TEXT REFERENCES agents(id)");
+        // ИНН клиента, пришедшего от агента — снимается с лида при конвертации
+        // (advance_agent_lead_stage), сохраняется и на самой записи клиента,
+        // чтобы уникальность ИНН была видна и после того, как лид уже стал
+        // клиентом (не только пока он ещё в agent_leads).
+        add_column_if_missing(&conn, "clients", "inn TEXT");
 
         let db = Db { conn, typing: Mutex::new(HashMap::new()) };
         db.notify_todays_birthdays();
@@ -5920,14 +6065,19 @@ impl Db {
     // нужна). Токен — секрет админа, в отличие от Radmin-данных читать
     // может только админ (не открыто всем, как get_radmin_settings). Тот же
     // app_meta key/value паттерн, что у Radmin/логотипа.
-    pub fn get_telegram_bot_settings(&self, actor_id: &str) -> Result<TelegramBotSettingsRecord, String> {
+    pub fn get_telegram_bot_settings(&self, actor_id: &str, role: &str) -> Result<TelegramBotSettingsRecord, String> {
         if !self.is_admin(actor_id) {
             return Err("Недостаточно прав".into());
         }
-        Ok(self.get_telegram_bot_settings_internal())
+        Ok(self.get_telegram_bot_settings_internal(role))
     }
 
-    pub fn set_telegram_bot_settings(&self, admin_id: &str, enabled: bool, token: Option<&str>) -> Result<TelegramBotSettingsRecord, String> {
+    // role параметризован с v1.6.0 (изначально был жёстко "bot") — второй
+    // независимый бот для агентов (role="agents_bot") хранит токен/включение
+    // под своими ключами tg_agents_bot_*, не пересекаясь с сотрудничьим
+    // ботом. role="bot" даёт РОВНО те же ключи (tg_bot_enabled/tg_bot_token),
+    // что были всегда — существующие установки ничего не теряют.
+    pub fn set_telegram_bot_settings(&self, admin_id: &str, role: &str, enabled: bool, token: Option<&str>) -> Result<TelegramBotSettingsRecord, String> {
         if !self.is_admin(admin_id) {
             return Err("Недостаточно прав".into());
         }
@@ -5938,22 +6088,22 @@ impl Db {
                 params![key, value],
             )
         };
-        set("tg_bot_enabled", if enabled { "1" } else { "0" }).map_err(|e| e.to_string())?;
-        set("tg_bot_token", token.unwrap_or("")).map_err(|e| e.to_string())?;
-        Ok(self.get_telegram_bot_settings_internal())
+        set(&format!("tg_{role}_enabled"), if enabled { "1" } else { "0" }).map_err(|e| e.to_string())?;
+        set(&format!("tg_{role}_token"), token.unwrap_or("")).map_err(|e| e.to_string())?;
+        Ok(self.get_telegram_bot_settings_internal(role))
     }
 
     // Без actor-гейта — читается фоновым polling-циклом и хук-поинтами
     // отправки в main.rs (v0.5.3), у которых нет "админа-актора" в контексте
     // (фоновый поток, не запрос от конкретного пользователя). Тот же
     // паттерн, что read_report_export_settings() у отчётов.
-    pub fn get_telegram_bot_settings_internal(&self) -> TelegramBotSettingsRecord {
+    pub fn get_telegram_bot_settings_internal(&self, role: &str) -> TelegramBotSettingsRecord {
         let get = |key: &str| -> Option<String> {
             self.conn.query_row("SELECT value FROM app_meta WHERE key = ?1", params![key], |row| row.get(0)).ok()
         };
         TelegramBotSettingsRecord {
-            enabled: get("tg_bot_enabled").as_deref() == Some("1"),
-            token: get("tg_bot_token").filter(|v| !v.is_empty()),
+            enabled: get(&format!("tg_{role}_enabled")).as_deref() == Some("1"),
+            token: get(&format!("tg_{role}_token")).filter(|v| !v.is_empty()),
         }
     }
 
@@ -6061,6 +6211,380 @@ impl Db {
 
     pub fn find_employee_id_by_chat_id(&self, chat_id: &str) -> Option<String> {
         self.conn.query_row("SELECT id FROM employees WHERE telegram_chat_id = ?1", params![chat_id], |row| row.get(0)).ok()
+    }
+
+    // ---- Агенты (v1.6.0) ----
+    // Физлица-рефереры без входа в CRM — регистрируются и работают целиком
+    // через отдельного Telegram-бота (role="agents_bot", см.
+    // get_telegram_bot_settings_internal). Списки (list_agents/list_agent_leads/
+    // list_agent_training_posts) сознательно без actor-гейта — та же логика,
+    // что у list_regulations ("сегодня вообще нет проверки доступа на
+    // чтение"), раздел виден всем сотрудникам. Мутации — admin-only.
+
+    fn next_agent_number(&self) -> String {
+        let count: i64 = self.conn.query_row("SELECT COUNT(*) FROM agents", [], |row| row.get(0)).unwrap_or(0);
+        format!("AGT-{:05}", count + 1)
+    }
+
+    // Согласие на обработку данных + ссылка на групповой чат агентов — тот же
+    // app_meta key/value паттерн, что у остальных настроек в этом файле.
+    // Текст согласия — сразу на 3 локалях (по конвенции проекта), потому что
+    // агент выбирает язык бота при регистрации (см. telegram.rs) и должен
+    // видеть текст на СВОЁМ языке, а не на языке администратора.
+    pub fn get_agent_consent_settings(&self, actor_id: &str) -> Result<AgentConsentSettings, String> {
+        if !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        Ok(self.get_agent_consent_settings_internal())
+    }
+
+    pub fn get_agent_consent_settings_internal(&self) -> AgentConsentSettings {
+        let get = |key: &str| -> Option<String> {
+            self.conn.query_row("SELECT value FROM app_meta WHERE key = ?1", params![key], |row| row.get(0)).ok()
+        };
+        AgentConsentSettings {
+            enabled: get("agent_consent_enabled").as_deref() == Some("1"),
+            text_ru: get("agent_consent_text_ru").unwrap_or_default(),
+            text_uz: get("agent_consent_text_uz").unwrap_or_default(),
+            text_uz_cyrl: get("agent_consent_text_uz_cyrl").unwrap_or_default(),
+            chat_link: get("agent_chat_link").filter(|v| !v.is_empty()),
+        }
+    }
+
+    pub fn set_agent_consent_settings(
+        &self,
+        admin_id: &str,
+        enabled: bool,
+        text_ru: &str,
+        text_uz: &str,
+        text_uz_cyrl: &str,
+        chat_link: Option<&str>,
+    ) -> Result<AgentConsentSettings, String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        let set = |key: &str, value: &str| {
+            self.conn.execute(
+                "INSERT INTO app_meta (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params![key, value],
+            )
+        };
+        set("agent_consent_enabled", if enabled { "1" } else { "0" }).map_err(|e| e.to_string())?;
+        set("agent_consent_text_ru", text_ru.trim()).map_err(|e| e.to_string())?;
+        set("agent_consent_text_uz", text_uz.trim()).map_err(|e| e.to_string())?;
+        set("agent_consent_text_uz_cyrl", text_uz_cyrl.trim()).map_err(|e| e.to_string())?;
+        set("agent_chat_link", chat_link.unwrap_or("").trim()).map_err(|e| e.to_string())?;
+        Ok(self.get_agent_consent_settings_internal())
+    }
+
+    const AGENT_SELECT: &'static str = "SELECT
+        id, agent_number, full_name, phone, address, email,
+        passport_photo_data, passport_photo_name,
+        consent_given, consent_given_at, locale,
+        telegram_chat_id, status, created_at, resolved_at, resolved_by
+    FROM agents";
+
+    fn map_agent_row(row: &rusqlite::Row) -> rusqlite::Result<AgentRecord> {
+        Ok(AgentRecord {
+            id: row.get(0)?,
+            agent_number: row.get(1)?,
+            full_name: row.get(2)?,
+            phone: row.get(3)?,
+            address: row.get(4)?,
+            email: row.get(5)?,
+            passport_photo_data: row.get(6)?,
+            passport_photo_name: row.get(7)?,
+            consent_given: row.get::<_, i64>(8)? != 0,
+            consent_given_at: row.get(9)?,
+            locale: row.get(10)?,
+            telegram_chat_id: row.get(11)?,
+            status: row.get(12)?,
+            created_at: row.get(13)?,
+            resolved_at: row.get(14)?,
+            resolved_by: row.get(15)?,
+        })
+    }
+
+    pub fn get_agent_by_chat_id(&self, chat_id: &str) -> Option<AgentRecord> {
+        let sql = format!("{} WHERE telegram_chat_id = ?1", Self::AGENT_SELECT);
+        self.conn.query_row(&sql, params![chat_id], Self::map_agent_row).ok()
+    }
+
+    pub fn get_agent(&self, id: &str) -> Option<AgentRecord> {
+        let sql = format!("{} WHERE id = ?1", Self::AGENT_SELECT);
+        self.conn.query_row(&sql, params![id], Self::map_agent_row).ok()
+    }
+
+    pub fn list_agents(&self) -> Vec<AgentRecord> {
+        let sql = format!("{} ORDER BY created_at DESC", Self::AGENT_SELECT);
+        let mut stmt = match self.conn.prepare(&sql) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map([], Self::map_agent_row).map(|rows| rows.filter_map(|r| r.ok()).collect()).unwrap_or_default()
+    }
+
+    // Вызывается ботом при регистрации (см. telegram.rs::handle_agents_bot_update)
+    // — без actor_id, инициатор не сотрудник CRM. Уведомляет всех админов
+    // тем же helper'ом, что edit_requests/absence_requests.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_agent_application(
+        &self,
+        chat_id: &str,
+        full_name: &str,
+        phone: Option<&str>,
+        address: Option<&str>,
+        email: Option<&str>,
+        passport_photo_data: Option<&str>,
+        passport_photo_name: Option<&str>,
+        consent_given: bool,
+        locale: &str,
+    ) -> Result<AgentRecord, String> {
+        let id = Uuid::new_v4().to_string();
+        let agent_number = self.next_agent_number();
+        self.conn
+            .execute(
+                "INSERT INTO agents (id, agent_number, full_name, phone, address, email, passport_photo_data, passport_photo_name, consent_given, consent_given_at, locale, telegram_chat_id, status)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, CASE WHEN ?9 = 1 THEN datetime('now') ELSE NULL END, ?10, ?11, 'pending')",
+                params![id, agent_number, full_name.trim(), phone, address, email, passport_photo_data, passport_photo_name, consent_given as i64, locale, chat_id],
+            )
+            .map_err(|e| e.to_string())?;
+        self.notify_all_admins(
+            "agent_application",
+            "Новая заявка от агента",
+            Some(&format!("«{}» подал заявку на регистрацию в качестве агента", full_name.trim())),
+            Some("agent"),
+            Some(&id),
+        );
+        self.get_agent(&id).ok_or_else(|| "Заявка не найдена".to_string())
+    }
+
+    pub fn resolve_agent_application(&self, actor_id: &str, id: &str, approve: bool) -> Result<AgentRecord, String> {
+        if !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        let agent = self.get_agent(id).ok_or_else(|| "Заявка не найдена".to_string())?;
+        if agent.status != "pending" {
+            return Err("Заявка уже обработана".into());
+        }
+        let status = if approve { "approved" } else { "rejected" };
+        self.conn
+            .execute(
+                "UPDATE agents SET status = ?1, resolved_at = datetime('now'), resolved_by = ?2 WHERE id = ?3",
+                params![status, actor_id, id],
+            )
+            .map_err(|e| e.to_string())?;
+        self.get_agent(id).ok_or_else(|| "Заявка не найдена".to_string())
+    }
+
+    const AGENT_LEAD_SELECT: &'static str = "SELECT
+        al.id, al.agent_id, a.full_name, al.client_name, al.client_inn, al.client_phone, al.company_name, al.note,
+        al.stage, al.converted_client_id, al.created_at, al.updated_at
+    FROM agent_leads al
+    JOIN agents a ON a.id = al.agent_id";
+
+    fn map_agent_lead_row(row: &rusqlite::Row) -> rusqlite::Result<AgentLeadRecord> {
+        Ok(AgentLeadRecord {
+            id: row.get(0)?,
+            agent_id: row.get(1)?,
+            agent_name: row.get(2)?,
+            client_name: row.get(3)?,
+            client_inn: row.get(4)?,
+            client_phone: row.get(5)?,
+            company_name: row.get(6)?,
+            note: row.get(7)?,
+            stage: row.get(8)?,
+            converted_client_id: row.get(9)?,
+            created_at: row.get(10)?,
+            updated_at: row.get(11)?,
+        })
+    }
+
+    // ИНН — уникален (проверка тут даёт понятную ошибку боту сразу, вместо
+    // "sqlite constraint failed" от UNIQUE-индекса на agent_leads.client_inn,
+    // который остаётся как второй, страхующий рубеж защиты от гонки).
+    // Проверяем и против уже оформленных клиентов (clients.inn) — ИНН не
+    // должен повторяться, даже если один лид уже стал клиентом, а другой
+    // агент (или тот же) пытается завести того же клиента заново.
+    pub fn create_agent_lead(
+        &self,
+        agent_id: &str,
+        client_name: &str,
+        client_inn: &str,
+        client_phone: Option<&str>,
+        company_name: Option<&str>,
+    ) -> Result<AgentLeadRecord, String> {
+        let agent = self.get_agent(agent_id).ok_or_else(|| "Агент не найден".to_string())?;
+        if agent.status != "approved" {
+            return Err("Агент не подтверждён".into());
+        }
+        let inn = client_inn.trim();
+        if inn.is_empty() {
+            return Err("Укажите ИНН клиента".into());
+        }
+        let existing_lead: Option<String> = self.conn
+            .query_row("SELECT id FROM agent_leads WHERE client_inn = ?1", params![inn], |row| row.get(0))
+            .ok();
+        if existing_lead.is_some() {
+            return Err("Клиент с таким ИНН уже зарегистрирован".into());
+        }
+        let existing_client: Option<String> = self.conn
+            .query_row("SELECT id FROM clients WHERE inn = ?1", params![inn], |row| row.get(0))
+            .ok();
+        if existing_client.is_some() {
+            return Err("Клиент с таким ИНН уже есть в базе".into());
+        }
+        let id = Uuid::new_v4().to_string();
+        self.conn
+            .execute(
+                "INSERT INTO agent_leads (id, agent_id, client_name, client_inn, client_phone, company_name) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![id, agent_id, client_name.trim(), inn, client_phone, company_name],
+            )
+            .map_err(|e| e.to_string())?;
+        self.notify_all_admins(
+            "agent_lead_new",
+            "Новый клиент от агента",
+            Some(&format!("Агент «{}» добавил клиента «{}»", agent.full_name, client_name.trim())),
+            Some("agent_lead"),
+            Some(&id),
+        );
+        let sql = format!("{} WHERE al.id = ?1", Self::AGENT_LEAD_SELECT);
+        self.conn.query_row(&sql, params![id], Self::map_agent_lead_row).map_err(|e| e.to_string())
+    }
+
+    pub fn list_agent_leads(&self) -> Vec<AgentLeadRecord> {
+        let sql = format!("{} ORDER BY al.created_at DESC", Self::AGENT_LEAD_SELECT);
+        let mut stmt = match self.conn.prepare(&sql) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map([], Self::map_agent_lead_row).map(|rows| rows.filter_map(|r| r.ok()).collect()).unwrap_or_default()
+    }
+
+    // "Оформлен" (converted) — единственная стадия, которая на самом деле
+    // ЧТО-ТО ДЕЛАЕТ, а не просто переставляет ярлык: заводит настоящую
+    // запись в clients (переиспользует create_client как есть — свои поля
+    // услуги/партнёра лид не знает и не должен) и проставляет origin_agent_id
+    // для атрибуции комиссии + converted_client_id на самом лиде. Остальные
+    // стадии — обычный UPDATE stage.
+    pub fn advance_agent_lead_stage(&self, actor_id: &str, lead_id: &str, new_stage: &str) -> Result<AgentLeadRecord, String> {
+        if !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        if !["new", "thinking", "agreed", "rejected", "converted"].contains(&new_stage) {
+            return Err("Некорректная стадия".into());
+        }
+        let sql = format!("{} WHERE al.id = ?1", Self::AGENT_LEAD_SELECT);
+        let lead = self.conn.query_row(&sql, params![lead_id], Self::map_agent_lead_row).map_err(|_| "Лид не найден".to_string())?;
+        if lead.stage == "converted" {
+            return Err("Лид уже оформлен в клиента".into());
+        }
+        if new_stage == "converted" {
+            // company_name/note лида не имеют отдельных полей на clients —
+            // складываем в notes, чтобы информация не терялась при конвертации.
+            let combined_notes = [lead.company_name.as_deref(), lead.note.as_deref()]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>()
+                .join(" · ");
+            let client = self.create_client(
+                actor_id, &lead.client_name, None, None, lead.client_phone.as_deref(), None, None,
+                (!combined_notes.is_empty()).then_some(combined_notes.as_str()), None, None, None, None,
+            )?;
+            self.conn
+                .execute("UPDATE clients SET origin_agent_id = ?1, inn = ?2 WHERE id = ?3", params![lead.agent_id, lead.client_inn, client.id])
+                .map_err(|e| e.to_string())?;
+            self.conn
+                .execute(
+                    "UPDATE agent_leads SET stage = 'converted', converted_client_id = ?1, updated_at = datetime('now') WHERE id = ?2",
+                    params![client.id, lead_id],
+                )
+                .map_err(|e| e.to_string())?;
+        } else {
+            self.conn
+                .execute("UPDATE agent_leads SET stage = ?1, updated_at = datetime('now') WHERE id = ?2", params![new_stage, lead_id])
+                .map_err(|e| e.to_string())?;
+        }
+        let sql = format!("{} WHERE al.id = ?1", Self::AGENT_LEAD_SELECT);
+        self.conn.query_row(&sql, params![lead_id], Self::map_agent_lead_row).map_err(|e| e.to_string())
+    }
+
+    const AGENT_TRAINING_POST_SELECT: &'static str = "SELECT
+        p.id, p.title, p.body, p.created_by, e.full_name, p.created_at
+    FROM agent_training_posts p
+    LEFT JOIN employees e ON e.id = p.created_by";
+
+    fn map_agent_training_post_row(row: &rusqlite::Row) -> rusqlite::Result<AgentTrainingPostRecord> {
+        Ok(AgentTrainingPostRecord {
+            id: row.get(0)?,
+            title: row.get(1)?,
+            body: row.get(2)?,
+            created_by: row.get(3)?,
+            created_by_name: row.get(4)?,
+            created_at: row.get(5)?,
+        })
+    }
+
+    pub fn list_agent_training_posts(&self) -> Vec<AgentTrainingPostRecord> {
+        let sql = format!("{} ORDER BY p.created_at DESC", Self::AGENT_TRAINING_POST_SELECT);
+        let mut stmt = match self.conn.prepare(&sql) {
+            Ok(s) => s,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map([], Self::map_agent_training_post_row).map(|rows| rows.filter_map(|r| r.ok()).collect()).unwrap_or_default()
+    }
+
+    pub fn create_agent_training_post(&self, actor_id: &str, title: &str, body: &str) -> Result<AgentTrainingPostRecord, String> {
+        if !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        if title.trim().is_empty() || body.trim().is_empty() {
+            return Err("Укажите заголовок и текст материала".into());
+        }
+        let id = Uuid::new_v4().to_string();
+        self.conn
+            .execute(
+                "INSERT INTO agent_training_posts (id, title, body, created_by) VALUES (?1, ?2, ?3, ?4)",
+                params![id, title.trim(), body.trim(), actor_id],
+            )
+            .map_err(|e| e.to_string())?;
+        let sql = format!("{} WHERE p.id = ?1", Self::AGENT_TRAINING_POST_SELECT);
+        self.conn.query_row(&sql, params![id], Self::map_agent_training_post_row).map_err(|e| e.to_string())
+    }
+
+    pub fn delete_agent_training_post(&self, actor_id: &str, id: &str) -> Result<(), String> {
+        if !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        self.conn.execute("DELETE FROM agent_training_posts WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    // ---- Конечный автомат диалогов агентского бота (v1.6.0) ----
+    // По chat_id — один активный диалог на чат (регистрация ИЛИ "новый
+    // клиент", никогда оба сразу). draft_json — сырой JSON-объект с уже
+    // собранными полями, копится по шагам, парсится/сериализуется в
+    // telegram.rs (там же, где и остальная сетевая логика бота).
+    pub fn get_agent_bot_state(&self, chat_id: &str) -> Option<(String, String, String)> {
+        self.conn
+            .query_row(
+                "SELECT flow, step, draft_json FROM agent_bot_state WHERE chat_id = ?1",
+                params![chat_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .ok()
+    }
+
+    pub fn set_agent_bot_state(&self, chat_id: &str, flow: &str, step: &str, draft_json: &str) {
+        let _ = self.conn.execute(
+            "INSERT INTO agent_bot_state (chat_id, flow, step, draft_json, updated_at) VALUES (?1, ?2, ?3, ?4, datetime('now'))
+             ON CONFLICT(chat_id) DO UPDATE SET flow = excluded.flow, step = excluded.step, draft_json = excluded.draft_json, updated_at = excluded.updated_at",
+            params![chat_id, flow, step, draft_json],
+        );
+    }
+
+    pub fn clear_agent_bot_state(&self, chat_id: &str) {
+        let _ = self.conn.execute("DELETE FROM agent_bot_state WHERE chat_id = ?1", params![chat_id]);
     }
 
     // ---- Записная книжка (v0.6.0) ----

@@ -2616,6 +2616,29 @@ button.employees-add-btn {
   color: var(--color-danger);
 }
 
+/* Стадии лида агента (v1.6.0) — свой namespace lead-*, чтобы не путать со
+   статусом самой заявки агента выше (у обоих есть общее значение "rejected"). */
+.absence-status-lead-new {
+  background: color-mix(in srgb, var(--color-text-muted) 20%, transparent);
+  color: var(--color-text-muted);
+}
+.absence-status-lead-thinking {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  color: var(--color-accent);
+}
+.absence-status-lead-agreed {
+  background: color-mix(in srgb, var(--color-primary) 20%, transparent);
+  color: var(--color-primary);
+}
+.absence-status-lead-rejected {
+  background: color-mix(in srgb, var(--color-danger) 18%, transparent);
+  color: var(--color-danger);
+}
+.absence-status-lead-converted {
+  background: color-mix(in srgb, var(--color-success) 18%, transparent);
+  color: var(--color-success);
+}
+
 /* ---- Недельный пикер рабочих дней ---- */
 
 .week-day-picker {

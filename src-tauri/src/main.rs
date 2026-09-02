@@ -261,6 +261,146 @@ struct ServiceMonthStat {
 }
 
 #[derive(Clone, serde::Serialize)]
+struct Agent {
+    id: String,
+    #[serde(rename = "agentNumber")]
+    agent_number: String,
+    #[serde(rename = "fullName")]
+    full_name: String,
+    phone: Option<String>,
+    address: Option<String>,
+    email: Option<String>,
+    #[serde(rename = "passportPhotoData")]
+    passport_photo_data: Option<String>,
+    #[serde(rename = "passportPhotoName")]
+    passport_photo_name: Option<String>,
+    #[serde(rename = "consentGiven")]
+    consent_given: bool,
+    #[serde(rename = "consentGivenAt")]
+    consent_given_at: Option<String>,
+    locale: String,
+    status: String,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+    #[serde(rename = "resolvedAt")]
+    resolved_at: Option<String>,
+    #[serde(rename = "resolvedBy")]
+    resolved_by: Option<String>,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct AgentLead {
+    id: String,
+    #[serde(rename = "agentId")]
+    agent_id: String,
+    #[serde(rename = "agentName")]
+    agent_name: String,
+    #[serde(rename = "clientName")]
+    client_name: String,
+    #[serde(rename = "clientInn")]
+    client_inn: String,
+    #[serde(rename = "clientPhone")]
+    client_phone: Option<String>,
+    #[serde(rename = "companyName")]
+    company_name: Option<String>,
+    note: Option<String>,
+    stage: String,
+    #[serde(rename = "convertedClientId")]
+    converted_client_id: Option<String>,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+    #[serde(rename = "updatedAt")]
+    updated_at: String,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct AgentConsentSettings {
+    enabled: bool,
+    #[serde(rename = "textRu")]
+    text_ru: String,
+    #[serde(rename = "textUz")]
+    text_uz: String,
+    #[serde(rename = "textUzCyrl")]
+    text_uz_cyrl: String,
+    #[serde(rename = "chatLink")]
+    chat_link: Option<String>,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct AgentTrainingPost {
+    id: String,
+    title: String,
+    body: String,
+    #[serde(rename = "createdBy")]
+    created_by: Option<String>,
+    #[serde(rename = "createdByName")]
+    created_by_name: Option<String>,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+}
+
+#[derive(serde::Deserialize)]
+struct ResolveAgentApplicationPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    id: String,
+    approve: bool,
+}
+
+#[derive(serde::Deserialize)]
+struct GetAgentConsentSettingsPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct SetAgentConsentSettingsPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    enabled: bool,
+    #[serde(rename = "textRu")]
+    text_ru: String,
+    #[serde(rename = "textUz")]
+    text_uz: String,
+    #[serde(rename = "textUzCyrl")]
+    text_uz_cyrl: String,
+    #[serde(rename = "chatLink")]
+    chat_link: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct ExportAgentsExcelPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "outPath")]
+    out_path: String,
+}
+
+#[derive(serde::Deserialize)]
+struct AdvanceAgentLeadStagePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "leadId")]
+    lead_id: String,
+    stage: String,
+}
+
+#[derive(serde::Deserialize)]
+struct CreateAgentTrainingPostPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    title: String,
+    body: String,
+}
+
+#[derive(serde::Deserialize)]
+struct DeleteAgentTrainingPostPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    id: String,
+}
+
+#[derive(Clone, serde::Serialize)]
 struct Project {
     id: String,
     #[serde(rename = "projectNumber")]
@@ -1863,12 +2003,14 @@ struct SetRadminSettingsPayload {
 struct GetTelegramBotSettingsPayload {
     #[serde(rename = "actorId")]
     actor_id: String,
+    role: String,
 }
 
 #[derive(serde::Deserialize)]
 struct SetTelegramBotSettingsPayload {
     #[serde(rename = "adminId")]
     admin_id: String,
+    role: String,
     enabled: bool,
     token: Option<String>,
 }
@@ -2270,6 +2412,58 @@ fn to_client_service(cs: db::ClientServiceRecord) -> ClientService {
 
 fn to_service_month_stat(s: db::ServiceMonthStat) -> ServiceMonthStat {
     ServiceMonthStat { month: s.month, service_name: s.service_name, count: s.count }
+}
+
+fn to_agent(a: db::AgentRecord) -> Agent {
+    Agent {
+        id: a.id,
+        agent_number: a.agent_number,
+        full_name: a.full_name,
+        phone: a.phone,
+        address: a.address,
+        email: a.email,
+        passport_photo_data: a.passport_photo_data,
+        passport_photo_name: a.passport_photo_name,
+        consent_given: a.consent_given,
+        consent_given_at: a.consent_given_at,
+        locale: a.locale,
+        status: a.status,
+        created_at: a.created_at,
+        resolved_at: a.resolved_at,
+        resolved_by: a.resolved_by,
+    }
+}
+
+fn to_agent_lead(l: db::AgentLeadRecord) -> AgentLead {
+    AgentLead {
+        id: l.id,
+        agent_id: l.agent_id,
+        agent_name: l.agent_name,
+        client_name: l.client_name,
+        client_inn: l.client_inn,
+        client_phone: l.client_phone,
+        company_name: l.company_name,
+        note: l.note,
+        stage: l.stage,
+        converted_client_id: l.converted_client_id,
+        created_at: l.created_at,
+        updated_at: l.updated_at,
+    }
+}
+
+fn to_agent_consent_settings(s: db::AgentConsentSettings) -> AgentConsentSettings {
+    AgentConsentSettings { enabled: s.enabled, text_ru: s.text_ru, text_uz: s.text_uz, text_uz_cyrl: s.text_uz_cyrl, chat_link: s.chat_link }
+}
+
+fn to_agent_training_post(p: db::AgentTrainingPostRecord) -> AgentTrainingPost {
+    AgentTrainingPost {
+        id: p.id,
+        title: p.title,
+        body: p.body,
+        created_by: p.created_by,
+        created_by_name: p.created_by_name,
+        created_at: p.created_at,
+    }
 }
 
 fn to_project(p: db::ProjectRecord) -> Project {
@@ -3137,7 +3331,7 @@ pub(crate) fn resolve_telegram_task_spawn(
     if assignee_id == actor_id {
         return None;
     }
-    let settings = db.get_telegram_bot_settings_internal();
+    let settings = db.get_telegram_bot_settings_internal("bot");
     let token = settings.token.filter(|t| !t.is_empty()).filter(|_| settings.enabled)?;
     let chat_id = db.get_employee_telegram_chat_id(assignee_id)?;
     let employee_name = db.get_employee(assignee_id).map(|e| e.full_name).unwrap_or_default();
@@ -3768,20 +3962,89 @@ fn set_radmin_settings(payload: SetRadminSettingsPayload, state: tauri::State<Ap
 #[tauri::command]
 fn get_telegram_bot_settings(payload: GetTelegramBotSettingsPayload, state: tauri::State<AppState>) -> Result<TelegramBotSettings, String> {
     let db = state.0.lock().unwrap();
-    db.get_telegram_bot_settings(&payload.actor_id).map(to_telegram_bot_settings)
+    db.get_telegram_bot_settings(&payload.actor_id, &payload.role).map(to_telegram_bot_settings)
 }
 
 #[tauri::command]
 fn set_telegram_bot_settings(payload: SetTelegramBotSettingsPayload, state: tauri::State<AppState>) -> Result<TelegramBotSettings, String> {
     let db = state.0.lock().unwrap();
-    db.set_telegram_bot_settings(&payload.admin_id, payload.enabled, payload.token.as_deref()).map(to_telegram_bot_settings)
+    db.set_telegram_bot_settings(&payload.admin_id, &payload.role, payload.enabled, payload.token.as_deref()).map(to_telegram_bot_settings)
+}
+
+// ---- Агенты (v1.6.0) ----
+
+#[tauri::command]
+fn list_agents(state: tauri::State<AppState>) -> Vec<Agent> {
+    let db = state.0.lock().unwrap();
+    db.list_agents().into_iter().map(to_agent).collect()
+}
+
+#[tauri::command]
+fn resolve_agent_application(payload: ResolveAgentApplicationPayload, state: tauri::State<AppState>) -> Result<Agent, String> {
+    let db = state.0.lock().unwrap();
+    db.resolve_agent_application(&payload.actor_id, &payload.id, payload.approve).map(to_agent)
+}
+
+#[tauri::command]
+fn list_agent_leads(state: tauri::State<AppState>) -> Vec<AgentLead> {
+    let db = state.0.lock().unwrap();
+    db.list_agent_leads().into_iter().map(to_agent_lead).collect()
+}
+
+#[tauri::command]
+fn advance_agent_lead_stage(payload: AdvanceAgentLeadStagePayload, state: tauri::State<AppState>) -> Result<AgentLead, String> {
+    let db = state.0.lock().unwrap();
+    db.advance_agent_lead_stage(&payload.actor_id, &payload.lead_id, &payload.stage).map(to_agent_lead)
+}
+
+#[tauri::command]
+fn list_agent_training_posts(state: tauri::State<AppState>) -> Vec<AgentTrainingPost> {
+    let db = state.0.lock().unwrap();
+    db.list_agent_training_posts().into_iter().map(to_agent_training_post).collect()
+}
+
+#[tauri::command]
+fn create_agent_training_post(payload: CreateAgentTrainingPostPayload, state: tauri::State<AppState>) -> Result<AgentTrainingPost, String> {
+    let db = state.0.lock().unwrap();
+    db.create_agent_training_post(&payload.actor_id, &payload.title, &payload.body).map(to_agent_training_post)
+}
+
+#[tauri::command]
+fn delete_agent_training_post(payload: DeleteAgentTrainingPostPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.delete_agent_training_post(&payload.actor_id, &payload.id)
+}
+
+#[tauri::command]
+fn get_agent_consent_settings(payload: GetAgentConsentSettingsPayload, state: tauri::State<AppState>) -> Result<AgentConsentSettings, String> {
+    let db = state.0.lock().unwrap();
+    db.get_agent_consent_settings(&payload.actor_id).map(to_agent_consent_settings)
+}
+
+#[tauri::command]
+fn set_agent_consent_settings(payload: SetAgentConsentSettingsPayload, state: tauri::State<AppState>) -> Result<AgentConsentSettings, String> {
+    let db = state.0.lock().unwrap();
+    db.set_agent_consent_settings(&payload.admin_id, payload.enabled, &payload.text_ru, &payload.text_uz, &payload.text_uz_cyrl, payload.chat_link.as_deref())
+        .map(to_agent_consent_settings)
+}
+
+#[tauri::command]
+fn export_agents_excel(payload: ExportAgentsExcelPayload, state: tauri::State<AppState>) -> Result<String, String> {
+    let db = state.0.lock().unwrap();
+    if !db.is_admin(&payload.actor_id) {
+        return Err("Недостаточно прав".into());
+    }
+    let agents = db.list_agents();
+    let out_path = std::path::Path::new(&payload.out_path);
+    report_export::generate_agents_workbook(&agents, out_path)?;
+    Ok(payload.out_path)
 }
 
 #[tauri::command]
 fn generate_telegram_link_code(payload: GenerateTelegramLinkCodePayload, state: tauri::State<AppState>) -> Result<TelegramLinkInfo, String> {
     let db = state.0.lock().unwrap();
     let code = db.generate_telegram_link_code(&payload.actor_id, &payload.employee_id)?;
-    let settings = db.get_telegram_bot_settings_internal();
+    let settings = db.get_telegram_bot_settings_internal("bot");
     let bot_configured = settings.enabled && settings.token.is_some();
     let deep_link = if bot_configured {
         db.get_telegram_bot_username("bot").map(|username| format!("https://t.me/{username}?start={code}"))
@@ -4311,6 +4574,16 @@ fn main() {
             set_radmin_settings,
             get_telegram_bot_settings,
             set_telegram_bot_settings,
+            list_agents,
+            resolve_agent_application,
+            list_agent_leads,
+            advance_agent_lead_stage,
+            list_agent_training_posts,
+            create_agent_training_post,
+            delete_agent_training_post,
+            get_agent_consent_settings,
+            set_agent_consent_settings,
+            export_agents_excel,
             generate_telegram_link_code,
             get_telegram_link_status,
             unlink_telegram,

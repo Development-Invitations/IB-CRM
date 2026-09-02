@@ -2,7 +2,7 @@
 // стилизация под бренд приложения (тёмно-синий/золотой, см. tauri.conf.json/theme.css),
 // ширина колонок — автоподбор по содержимому (rust_xlsxwriter::Worksheet::autofit).
 
-use crate::db::{EmployeeReportRow, PartnerReportRow};
+use crate::db::{AgentRecord, EmployeeReportRow, PartnerReportRow};
 use rust_xlsxwriter::{Color, Format, FormatBorder, Workbook};
 use std::path::Path;
 
@@ -81,6 +81,48 @@ pub fn generate_report_workbook(
             ""
         };
         sheet.write_string_with_format(r, 4, note, &cell_fmt).map_err(|e| e.to_string())?;
+    }
+    sheet.set_freeze_panes(1, 0).map_err(|e| e.to_string())?;
+    sheet.autofit();
+
+    workbook.save(out_path).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+// Выгрузка списка агентов (v1.6.0) — по прямой просьбе пользователя БЕЗ фото
+// паспорта (Excel не предназначен для встраивания изображений через
+// rust_xlsxwriter удобным образом) — фото остаются доступны в самой CRM, на
+// карточке каждого агента (см. Agents.tsx). Стилизация 1-в-1 с
+// generate_report_workbook выше — тот же бренд-формат.
+pub fn generate_agents_workbook(agents: &[AgentRecord], out_path: &Path) -> Result<(), String> {
+    let mut workbook = Workbook::new();
+    let header_fmt = header_format();
+    let cell_fmt = cell_format();
+
+    let sheet = workbook.add_worksheet();
+    sheet.set_name("Агенты").map_err(|e| e.to_string())?;
+    let headers = ["№ агента", "ФИО", "Телефон", "Адрес", "Эл. почта", "Статус", "Согласие дано", "Дата регистрации"];
+    for (col, title) in headers.iter().enumerate() {
+        sheet.write_string_with_format(0, col as u16, *title, &header_fmt).map_err(|e| e.to_string())?;
+    }
+    fn status_label(s: &str) -> &str {
+        match s {
+            "pending" => "На рассмотрении",
+            "approved" => "Подтверждён",
+            "rejected" => "Отклонён",
+            other => other,
+        }
+    }
+    for (i, a) in agents.iter().enumerate() {
+        let r = (i + 1) as u32;
+        sheet.write_string_with_format(r, 0, &a.agent_number, &cell_fmt).map_err(|e| e.to_string())?;
+        sheet.write_string_with_format(r, 1, &a.full_name, &cell_fmt).map_err(|e| e.to_string())?;
+        sheet.write_string_with_format(r, 2, a.phone.as_deref().unwrap_or("—"), &cell_fmt).map_err(|e| e.to_string())?;
+        sheet.write_string_with_format(r, 3, a.address.as_deref().unwrap_or("—"), &cell_fmt).map_err(|e| e.to_string())?;
+        sheet.write_string_with_format(r, 4, a.email.as_deref().unwrap_or("—"), &cell_fmt).map_err(|e| e.to_string())?;
+        sheet.write_string_with_format(r, 5, status_label(&a.status), &cell_fmt).map_err(|e| e.to_string())?;
+        sheet.write_string_with_format(r, 6, if a.consent_given { "Да" } else { "Нет" }, &cell_fmt).map_err(|e| e.to_string())?;
+        sheet.write_string_with_format(r, 7, &a.created_at, &cell_fmt).map_err(|e| e.to_string())?;
     }
     sheet.set_freeze_panes(1, 0).map_err(|e| e.to_string())?;
     sheet.autofit();

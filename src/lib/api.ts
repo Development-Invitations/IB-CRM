@@ -530,6 +530,59 @@ export type TelegramBotSettings = {
   token: string | null;
 };
 
+export type AgentStatus = 'pending' | 'approved' | 'rejected';
+export type AgentLeadStage = 'new' | 'thinking' | 'agreed' | 'rejected' | 'converted';
+
+export type Agent = {
+  id: string;
+  agentNumber: string;
+  fullName: string;
+  phone: string | null;
+  address: string | null;
+  email: string | null;
+  passportPhotoData: string | null;
+  passportPhotoName: string | null;
+  consentGiven: boolean;
+  consentGivenAt: string | null;
+  locale: string;
+  status: AgentStatus;
+  createdAt: string;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+};
+
+export type AgentLead = {
+  id: string;
+  agentId: string;
+  agentName: string;
+  clientName: string;
+  clientInn: string;
+  clientPhone: string | null;
+  companyName: string | null;
+  note: string | null;
+  stage: AgentLeadStage;
+  convertedClientId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AgentTrainingPost = {
+  id: string;
+  title: string;
+  body: string;
+  createdBy: string | null;
+  createdByName: string | null;
+  createdAt: string;
+};
+
+export type AgentConsentSettings = {
+  enabled: boolean;
+  textRu: string;
+  textUz: string;
+  textUzCyrl: string;
+  chatLink: string | null;
+};
+
 export type TelegramLinkInfo = {
   code: string;
   deepLink: string | null;
@@ -1046,8 +1099,8 @@ export const api = {
   getRadminSettings: () => invoke<RadminSettings>('get_radmin_settings'),
   setRadminSettings: (payload: { adminId: string; networkId: string; networkPassword: string; note: string }) =>
     invoke<RadminSettings>('set_radmin_settings', { payload }),
-  getTelegramBotSettings: (payload: { actorId: string }) => invoke<TelegramBotSettings>('get_telegram_bot_settings', { payload }),
-  setTelegramBotSettings: (payload: { adminId: string; enabled: boolean; token?: string | null }) =>
+  getTelegramBotSettings: (payload: { actorId: string; role: 'bot' | 'agents_bot' }) => invoke<TelegramBotSettings>('get_telegram_bot_settings', { payload }),
+  setTelegramBotSettings: (payload: { adminId: string; role: 'bot' | 'agents_bot'; enabled: boolean; token?: string | null }) =>
     invoke<TelegramBotSettings>('set_telegram_bot_settings', { payload }),
   generateTelegramLinkCode: (payload: { actorId: string; employeeId: string }) =>
     invoke<TelegramLinkInfo>('generate_telegram_link_code', { payload }),
@@ -1055,6 +1108,22 @@ export const api = {
     invoke<boolean>('get_telegram_link_status', { payload }),
   unlinkTelegram: (payload: { actorId: string; employeeId: string }) =>
     invoke<void>('unlink_telegram', { payload }),
+
+  listAgents: () => invoke<Agent[]>('list_agents'),
+  resolveAgentApplication: (payload: { actorId: string; id: string; approve: boolean }) =>
+    invoke<Agent>('resolve_agent_application', { payload }),
+  listAgentLeads: () => invoke<AgentLead[]>('list_agent_leads'),
+  advanceAgentLeadStage: (payload: { actorId: string; leadId: string; stage: AgentLeadStage }) =>
+    invoke<AgentLead>('advance_agent_lead_stage', { payload }),
+  listAgentTrainingPosts: () => invoke<AgentTrainingPost[]>('list_agent_training_posts'),
+  createAgentTrainingPost: (payload: { actorId: string; title: string; body: string }) =>
+    invoke<AgentTrainingPost>('create_agent_training_post', { payload }),
+  deleteAgentTrainingPost: (payload: { actorId: string; id: string }) =>
+    invoke<void>('delete_agent_training_post', { payload }),
+  getAgentConsentSettings: (payload: { actorId: string }) => invoke<AgentConsentSettings>('get_agent_consent_settings', { payload }),
+  setAgentConsentSettings: (payload: { adminId: string; enabled: boolean; textRu: string; textUz: string; textUzCyrl: string; chatLink?: string | null }) =>
+    invoke<AgentConsentSettings>('set_agent_consent_settings', { payload }),
+  exportAgentsExcel: (payload: { actorId: string; outPath: string }) => invoke<string>('export_agents_excel', { payload }),
 
   getNotebookSettings: (payload: { actorId: string; employeeId: string }) =>
     invoke<NotebookSettings>('get_notebook_settings', { payload }),

@@ -728,16 +728,48 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
         }
         "get_telegram_bot_settings" => {
             let p: crate::GetTelegramBotSettingsPayload = from_payload(payload)?;
-            db.get_telegram_bot_settings(&p.actor_id).map(crate::to_telegram_bot_settings).map(to_json)
+            db.get_telegram_bot_settings(&p.actor_id, &p.role).map(crate::to_telegram_bot_settings).map(to_json)
         }
         "set_telegram_bot_settings" => {
             let p: crate::SetTelegramBotSettingsPayload = from_payload(payload)?;
-            db.set_telegram_bot_settings(&p.admin_id, p.enabled, p.token.as_deref()).map(crate::to_telegram_bot_settings).map(to_json)
+            db.set_telegram_bot_settings(&p.admin_id, &p.role, p.enabled, p.token.as_deref()).map(crate::to_telegram_bot_settings).map(to_json)
         }
+        "list_agents" => Ok(to_json(db.list_agents().into_iter().map(crate::to_agent).collect::<Vec<_>>())),
+        "resolve_agent_application" => {
+            let p: crate::ResolveAgentApplicationPayload = from_payload(payload)?;
+            db.resolve_agent_application(&p.actor_id, &p.id, p.approve).map(crate::to_agent).map(to_json)
+        }
+        "list_agent_leads" => Ok(to_json(db.list_agent_leads().into_iter().map(crate::to_agent_lead).collect::<Vec<_>>())),
+        "advance_agent_lead_stage" => {
+            let p: crate::AdvanceAgentLeadStagePayload = from_payload(payload)?;
+            db.advance_agent_lead_stage(&p.actor_id, &p.lead_id, &p.stage).map(crate::to_agent_lead).map(to_json)
+        }
+        "list_agent_training_posts" => Ok(to_json(db.list_agent_training_posts().into_iter().map(crate::to_agent_training_post).collect::<Vec<_>>())),
+        "create_agent_training_post" => {
+            let p: crate::CreateAgentTrainingPostPayload = from_payload(payload)?;
+            db.create_agent_training_post(&p.actor_id, &p.title, &p.body).map(crate::to_agent_training_post).map(to_json)
+        }
+        "delete_agent_training_post" => {
+            let p: crate::DeleteAgentTrainingPostPayload = from_payload(payload)?;
+            db.delete_agent_training_post(&p.actor_id, &p.id).map(to_json)
+        }
+        "get_agent_consent_settings" => {
+            let p: crate::GetAgentConsentSettingsPayload = from_payload(payload)?;
+            db.get_agent_consent_settings(&p.actor_id).map(crate::to_agent_consent_settings).map(to_json)
+        }
+        "set_agent_consent_settings" => {
+            let p: crate::SetAgentConsentSettingsPayload = from_payload(payload)?;
+            db.set_agent_consent_settings(&p.admin_id, p.enabled, &p.text_ru, &p.text_uz, &p.text_uz_cyrl, p.chat_link.as_deref())
+                .map(crate::to_agent_consent_settings).map(to_json)
+        }
+        // export_agents_excel сознательно НЕ проксируется через dispatch —
+        // тот же паттерн, что уже есть у generate_report_now (в dispatch.rs
+        // тоже нет руки): выгрузка в файл имеет смысл только там, где реально
+        // исполняется, файлы не гоняются по HTTP-протоколу этого dispatch'а.
         "generate_telegram_link_code" => {
             let p: crate::GenerateTelegramLinkCodePayload = from_payload(payload)?;
             let code = db.generate_telegram_link_code(&p.actor_id, &p.employee_id)?;
-            let settings = db.get_telegram_bot_settings_internal();
+            let settings = db.get_telegram_bot_settings_internal("bot");
             let bot_configured = settings.enabled && settings.token.is_some();
             let deep_link = if bot_configured {
                 db.get_telegram_bot_username("bot").map(|username| format!("https://t.me/{username}?start={code}"))

@@ -180,7 +180,7 @@ export default function Settings({ employee }: { employee: Employee }) {
 
   useEffect(() => {
     if (!employee.isAdmin) return;
-    api.getTelegramBotSettings({ actorId: employee.id }).then((s) => {
+    api.getTelegramBotSettings({ actorId: employee.id, role: 'bot' }).then((s) => {
       setTgEnabled(s.enabled);
       setTgToken(s.token ?? '');
     }).catch(() => {});
@@ -191,6 +191,7 @@ export default function Settings({ employee }: { employee: Employee }) {
     try {
       await api.setTelegramBotSettings({
         adminId: employee.id,
+        role: 'bot',
         enabled: tgEnabled,
         token: tgToken.trim() || null,
       });
@@ -199,6 +200,80 @@ export default function Settings({ employee }: { employee: Employee }) {
       showToast('error', typeof err === 'string' ? err : t('settings.errorGeneric'));
     } finally {
       setTgBusy(false);
+    }
+  };
+
+  // Второй, независимый бот — для агентов (v1.6.0, см. src/pages/Agents.tsx
+  // и src-tauri/src/telegram.rs::handle_agents_bot_update). Своя пара
+  // enabled/token под role="agents_bot" — тот же паттерн, что у бота задач
+  // выше, просто с другим role в get/set_telegram_bot_settings.
+  const [tgAgentsEnabled, setTgAgentsEnabled] = useState(false);
+  const [tgAgentsToken, setTgAgentsToken] = useState('');
+  const [tgAgentsBusy, setTgAgentsBusy] = useState(false);
+
+  useEffect(() => {
+    if (!employee.isAdmin) return;
+    api.getTelegramBotSettings({ actorId: employee.id, role: 'agents_bot' }).then((s) => {
+      setTgAgentsEnabled(s.enabled);
+      setTgAgentsToken(s.token ?? '');
+    }).catch(() => {});
+  }, [employee.isAdmin, employee.id]);
+
+  const handleSaveAgentsBot = async () => {
+    setTgAgentsBusy(true);
+    try {
+      await api.setTelegramBotSettings({
+        adminId: employee.id,
+        role: 'agents_bot',
+        enabled: tgAgentsEnabled,
+        token: tgAgentsToken.trim() || null,
+      });
+      showToast('success', t('settings.agentsBot.saveSuccess'));
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('settings.errorGeneric'));
+    } finally {
+      setTgAgentsBusy(false);
+    }
+  };
+
+  // Согласие на обработку данных перед регистрацией агента (v1.6.0) — админ
+  // может включить/выключить требование и задаёт текст сразу на 3 языках
+  // (агент выбирает язык бота при /start, см. telegram.rs::bot_text), плюс
+  // ссылка на групповой Telegram-чат агентов (кнопка в меню бота).
+  const [consentEnabled, setConsentEnabled] = useState(false);
+  const [consentTextRu, setConsentTextRu] = useState('');
+  const [consentTextUz, setConsentTextUz] = useState('');
+  const [consentTextUzCyrl, setConsentTextUzCyrl] = useState('');
+  const [agentChatLink, setAgentChatLink] = useState('');
+  const [consentBusy, setConsentBusy] = useState(false);
+
+  useEffect(() => {
+    if (!employee.isAdmin) return;
+    api.getAgentConsentSettings({ actorId: employee.id }).then((s) => {
+      setConsentEnabled(s.enabled);
+      setConsentTextRu(s.textRu);
+      setConsentTextUz(s.textUz);
+      setConsentTextUzCyrl(s.textUzCyrl);
+      setAgentChatLink(s.chatLink ?? '');
+    }).catch(() => {});
+  }, [employee.isAdmin, employee.id]);
+
+  const handleSaveAgentConsent = async () => {
+    setConsentBusy(true);
+    try {
+      await api.setAgentConsentSettings({
+        adminId: employee.id,
+        enabled: consentEnabled,
+        textRu: consentTextRu,
+        textUz: consentTextUz,
+        textUzCyrl: consentTextUzCyrl,
+        chatLink: agentChatLink.trim() || null,
+      });
+      showToast('success', t('settings.agentConsent.saveSuccess'));
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('settings.errorGeneric'));
+    } finally {
+      setConsentBusy(false);
     }
   };
 
@@ -963,6 +1038,64 @@ export default function Settings({ employee }: { employee: Employee }) {
 
           <button className="modal-btn" onClick={handleSaveTelegramBots} disabled={tgBusy}>
             {tgBusy ? t('common.loading') : t('settings.telegramBots.saveBtn')}
+          </button>
+        </section>
+      )}
+
+      {employee.isAdmin && (
+        <section className="settings-section">
+          <h2><Bot size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />{t('settings.agentsBot.title')}</h2>
+          <p className="settings-hint">{t('settings.agentsBot.hint')}</p>
+
+          <div className="telegram-bot-card">
+            <div className="telegram-bot-card-head">
+              <Checkbox checked={tgAgentsEnabled} onChange={setTgAgentsEnabled} label={t('settings.agentsBot.enableLabel')} />
+            </div>
+            {tgAgentsEnabled && (
+              <div className="field" style={{ maxWidth: 420 }}>
+                <label>{t('settings.telegramBots.tokenLabel')}</label>
+                <input value={tgAgentsToken} onChange={(e) => setTgAgentsToken(e.target.value)} placeholder={t('settings.telegramBots.tokenPlaceholder')} />
+              </div>
+            )}
+          </div>
+
+          <button className="modal-btn" onClick={handleSaveAgentsBot} disabled={tgAgentsBusy} style={{ marginTop: 10 }}>
+            {tgAgentsBusy ? t('common.loading') : t('settings.telegramBots.saveBtn')}
+          </button>
+        </section>
+      )}
+
+      {employee.isAdmin && (
+        <section className="settings-section">
+          <h2>{t('settings.agentConsent.title')}</h2>
+          <p className="settings-hint">{t('settings.agentConsent.hint')}</p>
+          <Checkbox checked={consentEnabled} onChange={setConsentEnabled} label={t('settings.agentConsent.enableLabel')} />
+
+          {consentEnabled && (
+            <>
+              <div className="field" style={{ marginTop: 10 }}>
+                <label>{t('settings.agentConsent.textRuLabel')}</label>
+                <textarea rows={4} value={consentTextRu} onChange={(e) => setConsentTextRu(e.target.value)} />
+              </div>
+              <div className="field" style={{ marginTop: 10 }}>
+                <label>{t('settings.agentConsent.textUzLabel')}</label>
+                <textarea rows={4} value={consentTextUz} onChange={(e) => setConsentTextUz(e.target.value)} />
+              </div>
+              <div className="field" style={{ marginTop: 10 }}>
+                <label>{t('settings.agentConsent.textUzCyrlLabel')}</label>
+                <textarea rows={4} value={consentTextUzCyrl} onChange={(e) => setConsentTextUzCyrl(e.target.value)} />
+              </div>
+            </>
+          )}
+
+          <div className="field" style={{ marginTop: 10, maxWidth: 420 }}>
+            <label>{t('settings.agentConsent.chatLinkLabel')}</label>
+            <input value={agentChatLink} onChange={(e) => setAgentChatLink(e.target.value)} placeholder={t('settings.agentConsent.chatLinkPlaceholder')} />
+            <p className="settings-hint">{t('settings.agentConsent.chatLinkHint')}</p>
+          </div>
+
+          <button className="modal-btn" onClick={handleSaveAgentConsent} disabled={consentBusy} style={{ marginTop: 10 }}>
+            {consentBusy ? t('common.loading') : t('settings.telegramBots.saveBtn')}
           </button>
         </section>
       )}

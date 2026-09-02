@@ -55,6 +55,22 @@ export default function Topbar({ employee }: { employee: Employee }) {
       // ('general' или id партнёра), см. Chat.tsx (читает location.state.channel).
       return { kind: 'navigate', path: '/dashboard/chat', state: { channel: n.relatedEntityId } };
     }
+    if (n.relatedEntityType === 'client' && n.relatedEntityId) {
+      // Клиент, автоматически оформленный из лида агента (v1.6.0) — см.
+      // notify_all_admins("agent_lead_converted", ...) в db.rs.
+      return { kind: 'navigate', path: '/dashboard/clients', state: { openClientId: n.relatedEntityId } };
+    }
+    if ((n.relatedEntityType === 'agent' || n.relatedEntityType === 'agent_lead') && n.relatedEntityId) {
+      // Заявка агента на регистрацию или новый клиент от агента (v1.6.0) —
+      // ведём в раздел "Агенты" (см. notify_all_admins в create_agent_application/
+      // create_agent_lead в db.rs); открытие конкретной заявки/лида делает сама
+      // страница по openAgentId/openLeadId в location.state.
+      return {
+        kind: 'navigate',
+        path: '/dashboard/agents',
+        state: n.relatedEntityType === 'agent' ? { openAgentId: n.relatedEntityId } : { openLeadId: n.relatedEntityId },
+      };
+    }
     // Остальные типы (например, результат рассмотрения своей же заявки) — ведём в кабинет.
     return { kind: 'navigate', path: `/dashboard/employees/${employee.id}` };
   };
@@ -71,6 +87,7 @@ export default function Topbar({ employee }: { employee: Employee }) {
     if (n.relatedEntityType === 'project') return 'project';
     if (n.type === 'birthday') return 'birthday';
     if (n.type === 'chat_message') return 'chat';
+    if (n.relatedEntityType === 'agent' || n.relatedEntityType === 'agent_lead' || n.relatedEntityType === 'client') return 'agent';
     return 'other';
   };
 

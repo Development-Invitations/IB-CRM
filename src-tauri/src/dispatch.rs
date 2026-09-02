@@ -98,6 +98,10 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
                 p.birth_date.as_deref(),
             ).map(crate::to_employee).map(to_json)
         }
+        "set_employee_blocked" => {
+            let p: crate::SetEmployeeBlockedPayload = from_payload(payload)?;
+            db.set_employee_blocked(&p.admin_id, &p.employee_id, p.blocked).map(crate::to_employee).map(to_json)
+        }
         "self_update_employee" => {
             let p: crate::SelfUpdateEmployeePayload = from_payload(payload)?;
             db.self_update_employee(&p.employee_id, &p.full_name, p.phone.as_deref()).map(crate::to_employee).map(to_json)
@@ -737,17 +741,60 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
         "list_agents" => Ok(to_json(db.list_agents().into_iter().map(crate::to_agent).collect::<Vec<_>>())),
         "resolve_agent_application" => {
             let p: crate::ResolveAgentApplicationPayload = from_payload(payload)?;
-            db.resolve_agent_application(&p.actor_id, &p.id, p.approve).map(crate::to_agent).map(to_json)
+            let agent = db.resolve_agent_application(&p.actor_id, &p.id, p.approve)?;
+            if p.approve {
+                if let Some((client, token)) = crate::agents_bot_ready(db) {
+                    tauri::async_runtime::spawn(crate::telegram::notify_agent_approved(
+                        db_arc.clone(), client, token, agent.telegram_chat_id.clone(), agent.locale.clone(),
+                    ));
+                }
+            }
+            Ok(to_json(crate::to_agent(agent)))
+        }
+        "request_agent_reregistration" => {
+            let p: crate::RequestAgentReregistrationPayload = from_payload(payload)?;
+            let agent = db.request_agent_reregistration(&p.actor_id, &p.agent_id, p.from_step.as_deref())?;
+            if let Some((client, token)) = crate::agents_bot_ready(db) {
+                let step = p.from_step.unwrap_or_else(|| "name".to_string());
+                tauri::async_runtime::spawn(crate::telegram::notify_agent_reregister(
+                    client, token, agent.telegram_chat_id.clone(), agent.locale.clone(), step,
+                ));
+            }
+            Ok(to_json(crate::to_agent(agent)))
+        }
+        "delete_agent" => {
+            let p: crate::DeleteAgentPayload = from_payload(payload)?;
+            let agent = db.delete_agent(&p.actor_id, &p.agent_id)?;
+            if let Some((client, token)) = crate::agents_bot_ready(db) {
+                tauri::async_runtime::spawn(crate::telegram::notify_agent_deleted(
+                    db_arc.clone(), client, token, agent.telegram_chat_id.clone(), agent.locale.clone(),
+                ));
+            }
+            Ok(to_json(()))
         }
         "list_agent_leads" => Ok(to_json(db.list_agent_leads().into_iter().map(crate::to_agent_lead).collect::<Vec<_>>())),
         "advance_agent_lead_stage" => {
             let p: crate::AdvanceAgentLeadStagePayload = from_payload(payload)?;
-            db.advance_agent_lead_stage(&p.actor_id, &p.lead_id, &p.stage).map(crate::to_agent_lead).map(to_json)
+            let lead = db.advance_agent_lead_stage(&p.actor_id, &p.lead_id, &p.stage)?;
+            if p.stage != "converted" {
+                if let Some(agent) = db.get_agent(&lead.agent_id) {
+                    if let Some((client, token)) = crate::agents_bot_ready(db) {
+                        tauri::async_runtime::spawn(crate::telegram::notify_agent_lead_stage_changed(
+                            client, token, agent.telegram_chat_id.clone(), agent.locale.clone(), lead.client_name.clone(), p.stage.clone(),
+                        ));
+                    }
+                }
+            }
+            Ok(to_json(crate::to_agent_lead(lead)))
         }
         "list_agent_training_posts" => Ok(to_json(db.list_agent_training_posts().into_iter().map(crate::to_agent_training_post).collect::<Vec<_>>())),
         "create_agent_training_post" => {
             let p: crate::CreateAgentTrainingPostPayload = from_payload(payload)?;
             db.create_agent_training_post(&p.actor_id, &p.title, &p.body).map(crate::to_agent_training_post).map(to_json)
+        }
+        "update_agent_training_post" => {
+            let p: crate::UpdateAgentTrainingPostPayload = from_payload(payload)?;
+            db.update_agent_training_post(&p.actor_id, &p.id, &p.title, &p.body).map(crate::to_agent_training_post).map(to_json)
         }
         "delete_agent_training_post" => {
             let p: crate::DeleteAgentTrainingPostPayload = from_payload(payload)?;
@@ -762,10 +809,22 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
             db.set_agent_consent_settings(&p.admin_id, p.enabled, &p.text_ru, &p.text_uz, &p.text_uz_cyrl, p.chat_link.as_deref())
                 .map(crate::to_agent_consent_settings).map(to_json)
         }
-        // export_agents_excel сознательно НЕ проксируется через dispatch —
-        // тот же паттерн, что уже есть у generate_report_now (в dispatch.rs
-        // тоже нет руки): выгрузка в файл имеет смысл только там, где реально
-        // исполняется, файлы не гоняются по HTTP-протоколу этого dispatch'а.
+        // В отличие от generate_report_now (который пишет прямо в out_path на
+        // диске сервера и поэтому сознательно не проксируется, см. ниже),
+        // export_agents_excel только возвращает готовые байты .xlsx как
+        // base64 — файл на диск сохраняет сам фронтенд (см. main.rs и
+        // Agents.tsx::handleExportExcel), так что это обычная команда с
+        // данными, дублируем ту же admin-проверку, что и в main.rs.
+        "export_agents_excel" => {
+            let p: crate::ExportAgentsExcelPayload = from_payload(payload)?;
+            if !db.is_admin(&p.actor_id) {
+                return Err("Недостаточно прав".into());
+            }
+            use base64::Engine;
+            let agents = db.list_agents();
+            let bytes = crate::report_export::generate_agents_workbook(&agents)?;
+            Ok(to_json(base64::engine::general_purpose::STANDARD.encode(&bytes)))
+        }
         "generate_telegram_link_code" => {
             let p: crate::GenerateTelegramLinkCodePayload = from_payload(payload)?;
             let code = db.generate_telegram_link_code(&p.actor_id, &p.employee_id)?;

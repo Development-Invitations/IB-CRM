@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Pencil, ArrowRight, MessageCircle } from 'lucide-react';
+import { Plus, Search, Pencil, ArrowRight, MessageCircle, Lock, Unlock } from 'lucide-react';
 import { api, type Employee, type Position, type Department, type AbsenceRequest, type Regulation } from '../lib/api';
 import { dmChannelId } from '../lib/chat';
 import { useLocale } from '../lib/i18n';
@@ -30,6 +30,7 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
   const [empRegs, setEmpRegs] = useState<Regulation[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
+  const [blockBusy, setBlockBusy] = useState(false);
 
   useEffect(() => {
     if (selected) {
@@ -92,6 +93,21 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
     setSelected(emp);
     setFormMode('edit');
     setFormOpen(true);
+  };
+
+  const handleToggleBlock = async () => {
+    if (!selected) return;
+    setBlockBusy(true);
+    try {
+      const updated = await api.setEmployeeBlocked({ adminId: currentEmployee.id, employeeId: selected.id, blocked: !selected.isBlocked });
+      setSelected(updated);
+      setEmployees((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+      showToast('success', updated.isBlocked ? t('employees.blockedSuccess') : t('employees.unblockedSuccess'));
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('employees.errorGeneric'));
+    } finally {
+      setBlockBusy(false);
+    }
   };
 
   return (
@@ -165,6 +181,12 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
                   <Pencil size={14} /> {t('employees.editBtn')}
                 </button>
               )}
+              {currentEmployee.isAdmin && selected.id !== currentEmployee.id && (
+                <button className="modal-btn danger" onClick={handleToggleBlock} disabled={blockBusy}>
+                  {selected.isBlocked ? <Unlock size={14} /> : <Lock size={14} />}
+                  {blockBusy ? t('common.loading') : selected.isBlocked ? t('employees.unblockBtn') : t('employees.blockBtn')}
+                </button>
+              )}
               <button
                 className="modal-btn danger"
                 onClick={() => {
@@ -182,7 +204,10 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
             <div className="employee-card-head">
               <Avatar name={selected.fullName || selected.login} size={56} src={selected.avatarData} />
               <div>
-                <div className="employee-card-name">{selected.fullName || selected.login}</div>
+                <div className="employee-card-name">
+                  {selected.fullName || selected.login}
+                  {selected.isBlocked && <span className="absence-status absence-status-rejected" style={{ marginLeft: 8 }}>{t('employees.blockedLabel')}</span>}
+                </div>
                 <div className="settings-hint">{selected.employeeNumber}</div>
                 {!selected.isPartner && selected.birthDate && <div className="settings-hint">{formatLocalDate(selected.birthDate)}</div>}
                 {(selected.headOfDepartmentName || selected.deputyOfDepartmentName) && (

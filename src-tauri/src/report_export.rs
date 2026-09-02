@@ -94,7 +94,15 @@ pub fn generate_report_workbook(
 // rust_xlsxwriter удобным образом) — фото остаются доступны в самой CRM, на
 // карточке каждого агента (см. Agents.tsx). Стилизация 1-в-1 с
 // generate_report_workbook выше — тот же бренд-формат.
-pub fn generate_agents_workbook(agents: &[AgentRecord], out_path: &Path) -> Result<(), String> {
+//
+// В отличие от generate_report_workbook (которая пишет прямо в out_path и
+// поэтому сознательно не проксируется через dispatch.rs в клиент-серверном
+// режиме — см. main.rs::generate_report_now), эта функция возвращает готовые
+// байты .xlsx, а не пишет файл сама: команда export_agents_excel в main.rs
+// отдаёт их как base64 и фронтенд сохраняет файл локально сам (см.
+// Agents.tsx::handleExportExcel) — так экспорт работает и когда CRM
+// подключена к серверу как клиент по сети, а не только на самом сервере.
+pub fn generate_agents_workbook(agents: &[AgentRecord]) -> Result<Vec<u8>, String> {
     let mut workbook = Workbook::new();
     let header_fmt = header_format();
     let cell_fmt = cell_format();
@@ -127,6 +135,5 @@ pub fn generate_agents_workbook(agents: &[AgentRecord], out_path: &Path) -> Resu
     sheet.set_freeze_panes(1, 0).map_err(|e| e.to_string())?;
     sheet.autofit();
 
-    workbook.save(out_path).map_err(|e| e.to_string())?;
-    Ok(())
+    workbook.save_to_buffer().map_err(|e| e.to_string())
 }

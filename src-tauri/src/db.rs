@@ -1,5 +1,6 @@
 use chrono::NaiveDateTime;
 use rusqlite::{params, Connection};
+use serde_json::json;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Mutex;
@@ -54,6 +55,7 @@ pub struct EmployeeRecord {
     pub is_partner: bool,
     pub partner_id: Option<String>,
     pub partner_name: Option<String>,
+    pub is_blocked: bool,
 }
 
 pub struct PartnerRecord {
@@ -1119,6 +1121,9 @@ impl Db {
         // выше, который просто опускает колонку из INSERT и полагается на
         // DEFAULT.
         add_column_if_missing(&conn, "employees", "onboarding_completed INTEGER NOT NULL DEFAULT 1");
+        // Блокировка сотрудника админом (v1.6.0) — заблокированный не может
+        // войти (см. verify_login), но существующая запись/история не трогается.
+        add_column_if_missing(&conn, "employees", "is_blocked INTEGER NOT NULL DEFAULT 0");
 
         // Заметки — отдельная таблица (много строк на одного сотрудника), тот
         // же паттерн, что notifications/absence_requests: employee_id FK +
@@ -1398,7 +1403,8 @@ impl Db {
             (SELECT hd.name FROM departments hd WHERE hd.head_employee_id = e.id LIMIT 1),
             (SELECT dd.name FROM departments dd WHERE dd.deputy_employee_id = e.id LIMIT 1),
             e.birth_date,
-            e.is_partner, e.partner_id, pr.name
+            e.is_partner, e.partner_id, pr.name,
+            e.is_blocked
         FROM employees e
         LEFT JOIN positions p ON p.id = e.position_id
         LEFT JOIN employees m ON m.id = e.manager_id
@@ -1439,6 +1445,7 @@ impl Db {
             is_partner: row.get::<_, i64>(28)? != 0,
             partner_id: row.get(29)?,
             partner_name: row.get(30)?,
+            is_blocked: row.get::<_, i64>(31)? != 0,
         })
     }
 
@@ -1474,10 +1481,13 @@ impl Db {
             return Err("Неверный логин или пароль".into());
         }
 
-        let id: String = self
+        let (id, is_blocked): (String, i64) = self
             .conn
-            .query_row("SELECT id FROM employees WHERE login = ?1", params![login], |row| row.get(0))
+            .query_row("SELECT id, is_blocked FROM employees WHERE login = ?1", params![login], |row| Ok((row.get(0)?, row.get(1)?)))
             .map_err(|_| "Неверный логин или пароль".to_string())?;
+        if is_blocked != 0 {
+            return Err("Учётная запись заблокирована администратором".into());
+        }
 
         self.get_employee(&id).ok_or_else(|| "Неверный логин или пароль".to_string())
     }
@@ -1649,6 +1659,23 @@ impl Db {
             )
             .map_err(|e| e.to_string())?;
 
+        self.get_employee(employee_id).ok_or_else(|| "Сотрудник не найден".to_string())
+    }
+
+    // Блокировка сотрудника (v1.6.0) — заблокированный не может войти
+    // (см. verify_login), существующая сессия/данные не трогаются, только
+    // будущий вход. Админ не может заблокировать сам себя — иначе можно
+    // остаться без единственного администратора в системе.
+    pub fn set_employee_blocked(&self, admin_id: &str, employee_id: &str, blocked: bool) -> Result<EmployeeRecord, String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        if employee_id == admin_id && blocked {
+            return Err("Нельзя заблокировать самого себя".into());
+        }
+        self.conn
+            .execute("UPDATE employees SET is_blocked = ?1 WHERE id = ?2", params![blocked as i64, employee_id])
+            .map_err(|e| e.to_string())?;
         self.get_employee(employee_id).ok_or_else(|| "Сотрудник не найден".to_string())
     }
 
@@ -6277,6 +6304,33 @@ impl Db {
         Ok(self.get_agent_consent_settings_internal())
     }
 
+    // ID группового чата агентов для "кика" при удалении агента (banChatMember
+    // в Telegram Bot API требует числовой chat_id, а не ссылку-приглашение,
+    // которую хранит agent_chat_link/chat_link выше — из самой ссылки ID
+    // штатными средствами Bot API не получить). Вместо того чтобы просить
+    // админа откуда-то доставать этот ID вручную, ловим его сами: чтобы кикать
+    // участников, бот всё равно обязан быть админом группы — а админы ботов
+    // видят все сообщения группы даже при включённом privacy mode, так что
+    // первое же сообщение в группе после этого само даёт нам числовой ID
+    // (см. telegram.rs::handle_agents_bot_update). "Если пропало" не
+    // перезаписываем — фиксируем ПЕРВЫЙ увиденный groupwide chat, чтобы не
+    // уплыть на случайную другую группу, если бота туда тоже когда-то добавят.
+    pub fn get_agent_group_chat_id(&self) -> Option<String> {
+        self.conn
+            .query_row("SELECT value FROM app_meta WHERE key = 'agent_group_chat_id'", [], |row| row.get(0))
+            .ok()
+    }
+
+    pub fn capture_agent_group_chat_id_if_missing(&self, chat_id: &str) {
+        if self.get_agent_group_chat_id().is_some() {
+            return;
+        }
+        let _ = self.conn.execute(
+            "INSERT INTO app_meta (key, value) VALUES ('agent_group_chat_id', ?1) ON CONFLICT(key) DO NOTHING",
+            params![chat_id],
+        );
+    }
+
     const AGENT_SELECT: &'static str = "SELECT
         id, agent_number, full_name, phone, address, email,
         passport_photo_data, passport_photo_name,
@@ -6327,6 +6381,12 @@ impl Db {
     // Вызывается ботом при регистрации (см. telegram.rs::handle_agents_bot_update)
     // — без actor_id, инициатор не сотрудник CRM. Уведомляет всех админов
     // тем же helper'ом, что edit_requests/absence_requests.
+    //
+    // Upsert по chat_id — если у этого чата УЖЕ есть запись в agents (это
+    // повторная регистрация после request_agent_reregistration ниже —
+    // например, admin счёл первые данные неверными и попросил заполнить
+    // заново), обновляем её на месте (тот же id/agent_number), а не создаём
+    // вторую заявку от того же человека.
     #[allow(clippy::too_many_arguments)]
     pub fn create_agent_application(
         &self,
@@ -6340,6 +6400,24 @@ impl Db {
         consent_given: bool,
         locale: &str,
     ) -> Result<AgentRecord, String> {
+        if let Some(existing) = self.get_agent_by_chat_id(chat_id) {
+            self.conn
+                .execute(
+                    "UPDATE agents SET full_name = ?1, phone = ?2, address = ?3, email = ?4, passport_photo_data = ?5, passport_photo_name = ?6,
+                     consent_given = ?7, consent_given_at = CASE WHEN ?7 = 1 THEN datetime('now') ELSE consent_given_at END, locale = ?8,
+                     status = 'pending', resolved_at = NULL, resolved_by = NULL WHERE id = ?9",
+                    params![full_name.trim(), phone, address, email, passport_photo_data, passport_photo_name, consent_given as i64, locale, existing.id],
+                )
+                .map_err(|e| e.to_string())?;
+            self.notify_all_admins(
+                "agent_application",
+                "Уточнённая заявка от агента",
+                Some(&format!("«{}» повторно прислал(а) данные регистрации", full_name.trim())),
+                Some("agent"),
+                Some(&existing.id),
+            );
+            return self.get_agent(&existing.id).ok_or_else(|| "Заявка не найдена".to_string());
+        }
         let id = Uuid::new_v4().to_string();
         let agent_number = self.next_agent_number();
         self.conn
@@ -6359,6 +6437,36 @@ impl Db {
         self.get_agent(&id).ok_or_else(|| "Заявка не найдена".to_string())
     }
 
+    // Админ считает часть данных агента неверной и просит пройти регистрацию
+    // заново — целиком (from_step=None) или начиная с конкретного поля (даты
+    // ДО from_step остаются как есть, показаны в подтверждении, а не стираются
+    // молча). Продвигаем agent_bot_state на нужный шаг с предзаполненным
+    // draft — при завершении формы create_agent_application (выше) обновит
+    // ту же запись, а не создаст вторую.
+    pub fn request_agent_reregistration(&self, actor_id: &str, agent_id: &str, from_step: Option<&str>) -> Result<AgentRecord, String> {
+        if !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        let agent = self.get_agent(agent_id).ok_or_else(|| "Агент не найден".to_string())?;
+        const STEPS: [&str; 5] = ["name", "phone", "address", "email", "passport"];
+        let start = from_step.filter(|s| STEPS.contains(s)).unwrap_or("name");
+        let mut draft = json!({ "locale": agent.locale, "consent": agent.consent_given });
+        for step in STEPS {
+            if step == start {
+                break;
+            }
+            match step {
+                "name" => draft["full_name"] = json!(agent.full_name),
+                "phone" => draft["phone"] = json!(agent.phone),
+                "address" => draft["address"] = json!(agent.address),
+                "email" => draft["email"] = json!(agent.email),
+                _ => {}
+            }
+        }
+        self.set_agent_bot_state(&agent.telegram_chat_id, "register", start, &draft.to_string());
+        Ok(agent)
+    }
+
     pub fn resolve_agent_application(&self, actor_id: &str, id: &str, approve: bool) -> Result<AgentRecord, String> {
         if !self.is_admin(actor_id) {
             return Err("Недостаточно прав".into());
@@ -6375,6 +6483,28 @@ impl Db {
             )
             .map_err(|e| e.to_string())?;
         self.get_agent(id).ok_or_else(|| "Заявка не найдена".to_string())
+    }
+
+    // Удаление агента — по прямой просьбе пользователя ("если удаляешь
+    // агента удаляются данные его и из бота он кикается и из чата тоже").
+    // Сначала отвязываем уже оформленных через него клиентов (origin_agent_id
+    // — nullable FK, обнуляем перед удалением строки agents, тот же приём,
+    // что уже был нужен для delete_client с регламентом/проектом), потом
+    // удаляем лиды (agent_id там NOT NULL — обнулить нельзя, только удалить),
+    // потом саму запись агента. Реальный "кик" из бота/группового чата (best
+    // effort через Telegram Bot API) делает main.rs после успешного вызова
+    // этого метода — здесь только CRM-данные.
+    pub fn delete_agent(&self, actor_id: &str, agent_id: &str) -> Result<AgentRecord, String> {
+        if !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        let agent = self.get_agent(agent_id).ok_or_else(|| "Агент не найден".to_string())?;
+        self.conn
+            .execute("UPDATE clients SET origin_agent_id = NULL WHERE origin_agent_id = ?1", params![agent_id])
+            .map_err(|e| e.to_string())?;
+        self.conn.execute("DELETE FROM agent_leads WHERE agent_id = ?1", params![agent_id]).map_err(|e| e.to_string())?;
+        self.conn.execute("DELETE FROM agents WHERE id = ?1", params![agent_id]).map_err(|e| e.to_string())?;
+        Ok(agent)
     }
 
     const AGENT_LEAD_SELECT: &'static str = "SELECT
@@ -6500,6 +6630,13 @@ impl Db {
                     params![client.id, lead_id],
                 )
                 .map_err(|e| e.to_string())?;
+            self.notify_all_admins(
+                "agent_lead_converted",
+                "Новый клиент оформлен от агента",
+                Some(&format!("Клиент «{}» (агент «{}») оформлен и добавлен в «Клиенты»", lead.client_name, lead.agent_name)),
+                Some("client"),
+                Some(&client.id),
+            );
         } else {
             self.conn
                 .execute("UPDATE agent_leads SET stage = ?1, updated_at = datetime('now') WHERE id = ?2", params![new_stage, lead_id])
@@ -6547,6 +6684,20 @@ impl Db {
                 "INSERT INTO agent_training_posts (id, title, body, created_by) VALUES (?1, ?2, ?3, ?4)",
                 params![id, title.trim(), body.trim(), actor_id],
             )
+            .map_err(|e| e.to_string())?;
+        let sql = format!("{} WHERE p.id = ?1", Self::AGENT_TRAINING_POST_SELECT);
+        self.conn.query_row(&sql, params![id], Self::map_agent_training_post_row).map_err(|e| e.to_string())
+    }
+
+    pub fn update_agent_training_post(&self, actor_id: &str, id: &str, title: &str, body: &str) -> Result<AgentTrainingPostRecord, String> {
+        if !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        if title.trim().is_empty() || body.trim().is_empty() {
+            return Err("Укажите заголовок и текст материала".into());
+        }
+        self.conn
+            .execute("UPDATE agent_training_posts SET title = ?1, body = ?2 WHERE id = ?3", params![title.trim(), body.trim(), id])
             .map_err(|e| e.to_string())?;
         let sql = format!("{} WHERE p.id = ?1", Self::AGENT_TRAINING_POST_SELECT);
         self.conn.query_row(&sql, params![id], Self::map_agent_training_post_row).map_err(|e| e.to_string())

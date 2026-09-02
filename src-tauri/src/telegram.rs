@@ -61,33 +61,50 @@ pub async fn send_message(
     Ok(())
 }
 
-// Меню из нескольких кнопок, каждая на своей строке (v1.6.0, агентский бот)
+// Меню из нескольких инлайн-кнопок, каждая на своей строке (v1.6.0,
+// агентский бот, шаги регистрации до появления постоянной клавиатуры ниже)
 // — send_message выше остаётся как есть (одна опциональная кнопка, уже
-// используется существующим ботом сотрудников), это отдельные функции, а не
+// используется существующим ботом сотрудников), это отдельная функция, а не
 // расширение сигнатуры send_message, чтобы не трогать текущие вызовы.
-// BtnAction::Url — для ссылки на групповой чат агентов: такая кнопка
-// обрабатывается самим Telegram-клиентом (просто открывает ссылку), боту
-// никакой callback_query по ней не приходит.
-pub enum BtnAction {
-    Cb(String),
-    Url(String),
-}
-
-pub async fn send_menu(client: &reqwest::Client, token: &str, chat_id: &str, text: &str, buttons: Vec<(String, BtnAction)>) -> Result<(), TelegramError> {
+pub async fn send_menu(client: &reqwest::Client, token: &str, chat_id: &str, text: &str, buttons: Vec<(String, String)>) -> Result<(), TelegramError> {
     let mut body = json!({ "chat_id": chat_id, "text": text });
     if !buttons.is_empty() {
         let rows: Vec<Vec<serde_json::Value>> = buttons
             .into_iter()
-            .map(|(label, action)| {
-                let btn = match action {
-                    BtnAction::Cb(data) => json!({ "text": label, "callback_data": data }),
-                    BtnAction::Url(url) => json!({ "text": label, "url": url }),
-                };
-                vec![btn]
-            })
+            .map(|(label, callback_data)| vec![json!({ "text": label, "callback_data": callback_data })])
             .collect();
         body["reply_markup"] = json!({ "inline_keyboard": rows });
     }
+    let resp = client.post(api_url(token, "sendMessage")).json(&body).send().await.map_err(|e| TelegramError(e.to_string()))?;
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        return Err(TelegramError(format!("sendMessage: {status} {text}")));
+    }
+    Ok(())
+}
+
+// Постоянная клавиатура (ReplyKeyboardMarkup) — в отличие от inline-кнопок
+// выше (привязаны к одному сообщению, теряются, если оно уезжает вверх по
+// экрану) эта висит внизу экрана всё время, пока не заменена/не убрана
+// (remove_keyboard). Тапнутая кнопка приходит боту обычным текстовым
+// сообщением с тем же текстом, что на кнопке — маршрутизация на действие
+// поэтому идёт сравнением текста в handle_agents_bot_update, а не через
+// callback_data. Ссылка на чат агентов — тоже такая кнопка (обычные
+// reply-кнопки не умеют открывать URL напрямую, в отличие от inline), при
+// нажатии бот отвечает самой ссылкой отдельным сообщением — Telegram сам
+// делает её кликабельной.
+fn agent_menu_keyboard(locale: &str, chat_link: Option<&str>) -> serde_json::Value {
+    let mut rows = vec![vec![bot_text(locale, "btn_sale")], vec![bot_text(locale, "btn_materials")], vec![bot_text(locale, "btn_my_leads")]];
+    if chat_link.is_some() {
+        rows.push(vec![bot_text(locale, "btn_chat")]);
+    }
+    let keyboard: Vec<Vec<serde_json::Value>> = rows.into_iter().map(|row| row.into_iter().map(|label| json!({ "text": label })).collect()).collect();
+    json!({ "keyboard": keyboard, "resize_keyboard": true, "is_persistent": true })
+}
+
+async fn send_agent_menu_message(client: &reqwest::Client, token: &str, chat_id: &str, text: &str, locale: &str, chat_link: Option<&str>) -> Result<(), TelegramError> {
+    let body = json!({ "chat_id": chat_id, "text": text, "reply_markup": agent_menu_keyboard(locale, chat_link) });
     let resp = client.post(api_url(token, "sendMessage")).json(&body).send().await.map_err(|e| TelegramError(e.to_string()))?;
     if !resp.status().is_success() {
         let status = resp.status();
@@ -156,6 +173,20 @@ async fn answer_callback_query(client: &reqwest::Client, token: &str, callback_q
     }
     client.post(api_url(token, "answerCallbackQuery")).json(&body).send().await.map_err(|e| TelegramError(e.to_string()))?;
     Ok(())
+}
+
+// "Кик" из группового чата агентов при удалении агента — у Bot API нет
+// отдельного метода kick, стандартный приём: banChatMember, затем сразу
+// unbanChatMember (иначе человек не сможет зайти обратно по новой ссылке,
+// если админ его когда-нибудь снова одобрит как агента). Требует, чтобы бот
+// был админом группы с правом банить — если это не так, Telegram просто
+// вернёт ошибку, которую здесь молча проглатываем (best effort, как и
+// остальная доставка ботом в этом файле).
+async fn kick_from_group(client: &reqwest::Client, token: &str, group_chat_id: &str, user_id: &str) {
+    let ban_body = json!({ "chat_id": group_chat_id, "user_id": user_id });
+    let _ = client.post(api_url(token, "banChatMember")).json(&ban_body).send().await;
+    let unban_body = json!({ "chat_id": group_chat_id, "user_id": user_id, "only_if_banned": true });
+    let _ = client.post(api_url(token, "unbanChatMember")).json(&unban_body).send().await;
 }
 
 async fn get_updates(client: &reqwest::Client, token: &str, offset: i64, timeout_secs: u64) -> Result<Vec<serde_json::Value>, TelegramError> {
@@ -471,6 +502,9 @@ fn bot_text<'a>(locale: &str, key: &'a str) -> &'a str {
             "no_leads" => "Siz hali birorta mijoz qo'shmagansiz.",
             "not_available" => "Mavjud emas.",
             "start_hint" => "Boshlash uchun /start yuboring.",
+            "approved_intro" => "🎉 Siz agent sifatida tasdiqlandingiz!\n\nEndi sizga mavjud:\n💰 Sotuvni yozish — mijoz ma'lumotlarini kiritish\n📚 Foydali ma'lumot — sotuv uchun materiallar\n📊 Mijozlarim — mijozlaringiz ro'yxati va holati\n💬 Agentlar chati — umumiy chat\n\nTugmalar — ekran pastida.",
+            "reregister_notice" => "Administrator ro'yxatdan o'tish ma'lumotlarini aniqlashtirishni so'radi.",
+            "deleted_notice" => "Sizning agent sifatidagi kirishingiz administrator tomonidan bekor qilindi.",
             _ => key,
         },
         "uz-cyrl" => match key {
@@ -502,6 +536,9 @@ fn bot_text<'a>(locale: &str, key: &'a str) -> &'a str {
             "no_leads" => "Сиз ҳали бирорта мижоз қўшмагансиз.",
             "not_available" => "Мавжуд эмас.",
             "start_hint" => "Бошлаш учун /start юборинг.",
+            "approved_intro" => "🎉 Сиз агент сифатида тасдиқландингиз!\n\nЭнди сизга мавжуд:\n💰 Сотувни ёзиш — мижоз маълумотларини киритиш\n📚 Фойдали маълумот — сотув учун материаллар\n📊 Мижозларим — мижозларингиз рўйхати ва ҳолати\n💬 Агентлар чати — умумий чат\n\nТугмалар — экран пастида.",
+            "reregister_notice" => "Администратор рўйхатдан ўтиш маълумотларини аниқлаштиришни сўради.",
+            "deleted_notice" => "Сизнинг агент сифатидаги киришингиз администратор томонидан бекор қилинди.",
             _ => key,
         },
         _ => match key {
@@ -533,22 +570,116 @@ fn bot_text<'a>(locale: &str, key: &'a str) -> &'a str {
             "no_leads" => "Вы пока не добавили ни одного клиента.",
             "not_available" => "Недоступно.",
             "start_hint" => "Отправьте /start, чтобы начать.",
+            "approved_intro" => "🎉 Вас подтвердили как агента!\n\nТеперь вам доступно:\n💰 Записать продажу — внести данные клиента\n📚 Полезная информация — материалы для продаж\n📊 Мои клиенты — список и статус ваших клиентов\n💬 Чат агентов — общий чат\n\nКнопки — внизу экрана.",
+            "reregister_notice" => "Администратор попросил уточнить данные регистрации.",
+            "deleted_notice" => "Ваш доступ агента отозван администратором.",
             _ => key,
         },
     }
 }
 
+// Эмодзи стадии лида — для наглядности в "Мои клиенты" в боте (по просьбе
+// пользователя: "нужно пояснение клиентов которые оформлены или не оформлены").
+fn stage_emoji(stage: &str) -> &'static str {
+    match stage {
+        "new" => "🆕",
+        "thinking" => "🤔",
+        "agreed" => "👍",
+        "rejected" => "❌",
+        "converted" => "✅",
+        _ => "•",
+    }
+}
+
+fn build_leads_summary(locale: &str, leads: &[crate::db::AgentLeadRecord]) -> String {
+    let converted = leads.iter().filter(|l| l.stage == "converted").count();
+    let pending = leads.len() - converted;
+    let header = match locale {
+        "uz" => format!("📊 Mijozlaringiz (jami: {})\n\n✅ Rasmiylashtirilgan: {}\n⏳ Jarayonda: {}", leads.len(), converted, pending),
+        "uz-cyrl" => format!("📊 Мижозларингиз (жами: {})\n\n✅ Расмийлаштирилган: {}\n⏳ Жараёнда: {}", leads.len(), converted, pending),
+        _ => format!("📊 Ваши клиенты (всего: {})\n\n✅ Оформлено: {}\n⏳ В работе: {}", leads.len(), converted, pending),
+    };
+    let lines = leads
+        .iter()
+        .map(|l| format!("{} {} — {}", stage_emoji(&l.stage), l.client_name, stage_label(locale, &l.stage)))
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!("{header}\n\n{lines}")
+}
+
+// Уведомление агенту, когда админ меняет стадию его лида в CRM (кроме
+// "converted" — там отдельный, более развёрнутый sale_done уже не подходит,
+// нужен именно факт смены статуса).
+fn lead_stage_message(locale: &str, client_name: &str, stage: &str) -> String {
+    let label = stage_label(locale, stage);
+    match locale {
+        "uz" => format!("ℹ️ \"{client_name}\" mijozi bo'yicha holat o'zgardi: {label}"),
+        "uz-cyrl" => format!("ℹ️ \"{client_name}\" мижози бўйича ҳолат ўзгарди: {label}"),
+        _ => format!("ℹ️ По клиенту «{client_name}» статус изменился: {label}"),
+    }
+}
+
+// Главное меню одобренного агента — постоянная клавиатура (см.
+// send_agent_menu_message выше), а не одноразовые inline-кнопки: раньше
+// кнопки жили только в одном сообщении и терялись, стоило истории чата
+// уйти вверх — пользователь жаловался на пустой квадрат-переключатель
+// клавиатуры у поля ввода (в Telegram это именно кнопка "открыть
+// постоянную клавиатуру", у бота её просто не было).
 async fn send_agents_menu(db: &Arc<Mutex<Db>>, client: &reqwest::Client, token: &str, chat_id: &str, locale: &str) {
     let chat_link = db.lock().unwrap().get_agent_consent_settings_internal().chat_link;
-    let mut buttons = vec![
-        (bot_text(locale, "btn_sale").to_string(), BtnAction::Cb("agent:new_lead".to_string())),
-        (bot_text(locale, "btn_materials").to_string(), BtnAction::Cb("agent:materials".to_string())),
-        (bot_text(locale, "btn_my_leads").to_string(), BtnAction::Cb("agent:my_leads".to_string())),
-    ];
-    if let Some(link) = chat_link {
-        buttons.push((bot_text(locale, "btn_chat").to_string(), BtnAction::Url(link)));
+    let _ = send_agent_menu_message(client, token, chat_id, bot_text(locale, "menu_prompt"), locale, chat_link.as_deref()).await;
+}
+
+// ---- Публичные уведомления агентского бота, вызываются fire-and-forget из
+// main.rs (tauri::async_runtime::spawn) при мутациях из CRM — тот же паттерн,
+// что notify_task_assigned выше. ----
+
+// После одобрения заявки в CRM — раньше на этом всё и заканчивалось для
+// агента (пользователь: "с этапа подтверждения ничего нету в боте не
+// кнопок ничего нету"), теперь бот сам присылает и инструкцию, и постоянное
+// меню одним сообщением.
+pub async fn notify_agent_approved(db: Arc<Mutex<Db>>, client: reqwest::Client, token: String, chat_id: String, locale: String) {
+    let chat_link = db.lock().unwrap().get_agent_consent_settings_internal().chat_link;
+    let _ = send_agent_menu_message(&client, &token, &chat_id, bot_text(&locale, "approved_intro"), &locale, chat_link.as_deref()).await;
+}
+
+// Админ посчитал часть данных агента неверной и попросил заполнить заново
+// (см. Db::request_agent_reregistration) — состояние диалога уже продвинуто
+// на нужный шаг в БД, здесь только уведомляем агента и присылаем первый
+// вопрос той же формы регистрации.
+pub async fn notify_agent_reregister(client: reqwest::Client, token: String, chat_id: String, locale: String, step: String) {
+    let ask_key = match step.as_str() {
+        "phone" => "ask_phone",
+        "address" => "ask_address",
+        "email" => "ask_email",
+        "passport" => "ask_passport",
+        _ => "ask_name",
+    };
+    let text = format!("{}\n\n{}", bot_text(&locale, "reregister_notice"), bot_text(&locale, ask_key));
+    let _ = send_message(&client, &token, &chat_id, &text, None).await;
+}
+
+// Удаление агента в CRM — по просьбе пользователя, агент должен быть
+// "выгнан" отовсюду: постоянная клавиатура убирается (remove_keyboard,
+// иначе кнопки продолжали бы висеть, хотя нажатия ни к чему не приведут —
+// записи в agents уже нет), плюс best-effort кик из группового чата агентов,
+// если его ID уже успел определиться (см. Db::get_agent_group_chat_id).
+pub async fn notify_agent_deleted(db: Arc<Mutex<Db>>, client: reqwest::Client, token: String, chat_id: String, locale: String) {
+    let body = json!({ "chat_id": chat_id, "text": bot_text(&locale, "deleted_notice"), "reply_markup": { "remove_keyboard": true } });
+    let _ = client.post(api_url(&token, "sendMessage")).json(&body).send().await;
+    let group_chat_id = db.lock().unwrap().get_agent_group_chat_id();
+    if let Some(group_chat_id) = group_chat_id {
+        kick_from_group(&client, &token, &group_chat_id, &chat_id).await;
     }
-    let _ = send_menu(client, token, chat_id, bot_text(locale, "menu_prompt"), buttons).await;
+}
+
+// Админ продвинул стадию лида в CRM ("Думает"/"Согласен"/... — пользователь:
+// "нужно ID клиента чтоб Агенту приходили уведомления что по такому клиенту
+// статус поменялся"). Стадию "converted" сюда не зовут — там уже есть
+// отдельный, более развёрнутый sale_done в момент самой записи продажи.
+pub async fn notify_agent_lead_stage_changed(client: reqwest::Client, token: String, chat_id: String, locale: String, client_name: String, stage: String) {
+    let text = lead_stage_message(&locale, &client_name, &stage);
+    let _ = send_message(&client, &token, &chat_id, &text, None).await;
 }
 
 async fn send_consent_prompt(db: &Arc<Mutex<Db>>, client: &reqwest::Client, token: &str, chat_id: &str, locale: &str) {
@@ -563,13 +694,26 @@ async fn send_consent_prompt(db: &Arc<Mutex<Db>>, client: &reqwest::Client, toke
         token,
         chat_id,
         &text,
-        vec![(bot_text(locale, "consent_agree_btn").to_string(), BtnAction::Cb("consent:agree".to_string()))],
+        vec![(bot_text(locale, "consent_agree_btn").to_string(), "consent:agree".to_string())],
     )
     .await;
 }
 
 async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client, token: &str, update: &serde_json::Value) {
     if let Some(msg) = update.get("message") {
+        let chat_type = msg.get("chat").and_then(|c| c.get("type")).and_then(|v| v.as_str()).unwrap_or("private");
+        // Сообщение из группового чата (не личка агента) — единственное, что
+        // нас интересует здесь, это сам факт получения сообщения ИЗ группы:
+        // так мы узнаём числовой chat_id группового чата агентов, не прося
+        // админа доставать его руками (см. Db::capture_agent_group_chat_id_if_missing).
+        // Дальше эту группу как диалог агента не обрабатываем вообще.
+        if chat_type == "group" || chat_type == "supergroup" {
+            if let Some(chat_id) = msg.get("chat").and_then(|c| c.get("id")).map(|v| v.to_string()) {
+                db.lock().unwrap().capture_agent_group_chat_id_if_missing(&chat_id);
+            }
+            return;
+        }
+
         let chat_id = msg.get("chat").and_then(|c| c.get("id")).map(|v| v.to_string());
         let Some(chat_id) = chat_id else { return };
         let text = msg.get("text").and_then(|v| v.as_str()).map(|s| s.trim().to_string());
@@ -586,9 +730,9 @@ async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client,
                         &chat_id,
                         "Выберите язык / Tilni tanlang / Тилни танланг",
                         vec![
-                            ("🇷🇺 Русский".to_string(), BtnAction::Cb("lang:ru".to_string())),
-                            ("🇺🇿 O'zbekcha".to_string(), BtnAction::Cb("lang:uz".to_string())),
-                            ("🇺🇿 Ўзбекча".to_string(), BtnAction::Cb("lang:uz-cyrl".to_string())),
+                            ("🇷🇺 Русский".to_string(), "lang:ru".to_string()),
+                            ("🇺🇿 O'zbekcha".to_string(), "lang:uz".to_string()),
+                            ("🇺🇿 Ўзбекча".to_string(), "lang:uz-cyrl".to_string()),
                         ],
                     )
                     .await;
@@ -608,6 +752,28 @@ async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client,
 
         let state = db.lock().unwrap().get_agent_bot_state(&chat_id);
         let Some((flow, step, draft_json)) = state else {
+            // Нет активного диалога — возможно, это тап по кнопке постоянной
+            // клавиатуры (см. agent_menu_keyboard), которая шлёт обычный текст
+            // с тем же лейблом, что на кнопке. Сравниваем с известными
+            // лейблами ТОЛЬКО для уже подтверждённого агента — до одобрения
+            // такой клавиатуры ему не показывали.
+            let approved_agent = db.lock().unwrap().get_agent_by_chat_id(&chat_id).filter(|a| a.status == "approved");
+            if let (Some(agent), Some(t)) = (approved_agent, text.as_deref()) {
+                let locale = agent.locale.clone();
+                if t == bot_text(&locale, "btn_sale") {
+                    start_agent_new_lead(db, client, token, &chat_id, &agent).await;
+                    return;
+                } else if t == bot_text(&locale, "btn_materials") {
+                    send_agent_materials(db, client, token, &chat_id, &locale).await;
+                    return;
+                } else if t == bot_text(&locale, "btn_my_leads") {
+                    send_agent_my_leads(db, client, token, &chat_id, &agent.id, &locale).await;
+                    return;
+                } else if t == bot_text(&locale, "btn_chat") {
+                    send_agent_chat_link(db, client, token, &chat_id, &locale).await;
+                    return;
+                }
+            }
             let _ = send_message(client, token, &chat_id, bot_text("ru", "start_hint"), None).await;
             return;
         };
@@ -763,35 +929,62 @@ async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client,
         let locale = agent.locale.clone();
 
         match data.as_str() {
+            // Оставлены для совместимости со старыми уже отправленными
+            // inline-сообщениями (до перехода на постоянную клавиатуру ниже)
+            // — сами кнопки этого типа новый send_agents_menu больше не шлёт.
             "agent:new_lead" => {
-                let draft = json!({ "agent_id": agent.id, "locale": locale });
-                db.lock().unwrap().set_agent_bot_state(&chat_id, "new_lead", "name", &draft.to_string());
                 let _ = answer_callback_query(client, token, &cb_id, None).await;
-                let _ = send_message(client, token, &chat_id, bot_text(&locale, "sale_ask_name"), None).await;
+                start_agent_new_lead(db, client, token, &chat_id, &agent).await;
             }
             "agent:materials" => {
-                let posts = db.lock().unwrap().list_agent_training_posts();
                 let _ = answer_callback_query(client, token, &cb_id, None).await;
-                if posts.is_empty() {
-                    let _ = send_message(client, token, &chat_id, bot_text(&locale, "no_materials"), None).await;
-                } else {
-                    let text = posts.iter().take(5).map(|p| format!("📌 {}\n{}", p.title, p.body)).collect::<Vec<_>>().join("\n\n---\n\n");
-                    let _ = send_message(client, token, &chat_id, &text, None).await;
-                }
+                send_agent_materials(db, client, token, &chat_id, &locale).await;
             }
             "agent:my_leads" => {
-                let leads: Vec<_> = db.lock().unwrap().list_agent_leads().into_iter().filter(|l| l.agent_id == agent.id).collect();
                 let _ = answer_callback_query(client, token, &cb_id, None).await;
-                if leads.is_empty() {
-                    let _ = send_message(client, token, &chat_id, bot_text(&locale, "no_leads"), None).await;
-                } else {
-                    let text = leads.iter().map(|l| format!("{} — {}", l.client_name, stage_label(&locale, &l.stage))).collect::<Vec<_>>().join("\n");
-                    let _ = send_message(client, token, &chat_id, &text, None).await;
-                }
+                send_agent_my_leads(db, client, token, &chat_id, &agent.id, &locale).await;
             }
             _ => {
                 let _ = answer_callback_query(client, token, &cb_id, None).await;
             }
         }
     }
+}
+
+// ---- Общие действия главного меню агента — переиспользуются и тапом по
+// постоянной клавиатуре (текстовое сообщение с лейблом кнопки), и (для
+// обратной совместимости со старыми сообщениями) старым callback_data. ----
+
+async fn start_agent_new_lead(db: &Arc<Mutex<Db>>, client: &reqwest::Client, token: &str, chat_id: &str, agent: &crate::db::AgentRecord) {
+    let draft = json!({ "agent_id": agent.id, "locale": agent.locale });
+    db.lock().unwrap().set_agent_bot_state(chat_id, "new_lead", "name", &draft.to_string());
+    let _ = send_message(client, token, chat_id, bot_text(&agent.locale, "sale_ask_name"), None).await;
+}
+
+async fn send_agent_materials(db: &Arc<Mutex<Db>>, client: &reqwest::Client, token: &str, chat_id: &str, locale: &str) {
+    let posts = db.lock().unwrap().list_agent_training_posts();
+    if posts.is_empty() {
+        let _ = send_message(client, token, chat_id, bot_text(locale, "no_materials"), None).await;
+    } else {
+        let text = posts.iter().take(5).map(|p| format!("📌 {}\n{}", p.title, p.body)).collect::<Vec<_>>().join("\n\n---\n\n");
+        let _ = send_message(client, token, chat_id, &text, None).await;
+    }
+}
+
+// Со сводкой оформлено/не оформлено — по просьбе пользователя ("нужно
+// пояснение клиентов которые оформлены или не оформлены аналитика с бота").
+async fn send_agent_my_leads(db: &Arc<Mutex<Db>>, client: &reqwest::Client, token: &str, chat_id: &str, agent_id: &str, locale: &str) {
+    let leads: Vec<_> = db.lock().unwrap().list_agent_leads().into_iter().filter(|l| l.agent_id == agent_id).collect();
+    if leads.is_empty() {
+        let _ = send_message(client, token, chat_id, bot_text(locale, "no_leads"), None).await;
+    } else {
+        let text = build_leads_summary(locale, &leads);
+        let _ = send_message(client, token, chat_id, &text, None).await;
+    }
+}
+
+async fn send_agent_chat_link(db: &Arc<Mutex<Db>>, client: &reqwest::Client, token: &str, chat_id: &str, locale: &str) {
+    let chat_link = db.lock().unwrap().get_agent_consent_settings_internal().chat_link;
+    let text = chat_link.unwrap_or_else(|| bot_text(locale, "not_available").to_string());
+    let _ = send_message(client, token, chat_id, &text, None).await;
 }

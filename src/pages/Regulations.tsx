@@ -398,6 +398,8 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
   const { enter: enterFullscreen, exit: exitFullscreen } = useContext(FullscreenContext);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const entriesRef = useRef<HTMLDivElement>(null);
+  const entriesEndRef = useRef<HTMLDivElement>(null);
+  const lastEntryIdRef = useRef<string | null>(null);
 
   const [regulations, setRegulations] = useState<Regulation[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -565,6 +567,27 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
       document.getElementById(`entry-${entry.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 150);
   }, [entries, location.state]);
+
+  // Прокрутка к последней записи треда при открытии/переключении — раньше
+  // скролл был только после отправки своей же записи (см. handleAddEntry),
+  // так что открытие регламента/переключение на чужой тред показывало верх
+  // списка, а не актуальную последнюю запись (тот же класс бага, что уже
+  // чинили в Chat.tsx). Пропускаем, если это переход по ссылке на конкретную
+  // запись — тот эффект выше уже сам скроллит куда нужно.
+  useEffect(() => {
+    if ((location.state as any)?.openEntryId) return;
+    const threadEntries = entries.filter((e) => e.targetEmployeeId === activeThreadId);
+    if (threadEntries.length === 0) return;
+    const lastId = threadEntries[threadEntries.length - 1].id;
+    if (lastId !== lastEntryIdRef.current) {
+      lastEntryIdRef.current = lastId;
+      entriesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      // Вложения (фото/видео) ещё не знают свою высоту в момент этого вызова —
+      // догоняем ещё раз на следующем кадре, см. тот же приём в Chat.tsx.
+      requestAnimationFrame(() => entriesEndRef.current?.scrollIntoView({ behavior: 'auto' }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries, activeThreadId]);
 
   const filtered = search.trim()
     ? regulations.filter((r) => {
@@ -741,8 +764,7 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
       await api.addRegulationEntry({ actorId: currentEmployee.id, regulationId: selected.id, targetEmployeeId: activeThreadId, content: newEntry.trim(), attachmentData: attachData, attachmentName: attachName, deadline: newEntryDeadline || null });
       setNewEntry(''); setNewEntryDeadline(''); setAttachData(null); setAttachName(null);
       loadDetail();
-      // Прокрутка к новой записи
-      setTimeout(() => entriesRef.current?.scrollTo({ top: entriesRef.current.scrollHeight, behavior: 'smooth' }), 200);
+      // Прокрутка к новой записи — теперь берёт на себя эффект по [entries, activeThreadId] выше.
     } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('regulations.errorGeneric'));
     } finally {
@@ -1103,6 +1125,7 @@ export default function Regulations({ currentEmployee }: { currentEmployee: Empl
                         />
                       ))
                     )}
+                    <div ref={entriesEndRef} />
                   </div>
 
                   {/* Форма добавления записи — внизу, оформлена под единый стиль

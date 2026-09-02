@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { emit, listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { X, Bell, FileText, FolderKanban, MessageCircle, Cake, ClipboardList, Pencil } from 'lucide-react';
+import { X, Bell, FileText, FolderKanban, MessageCircle, Cake, ClipboardList, Pencil, UserRound } from 'lucide-react';
 
 // Источник уведомления — определяется в Topbar.tsx (resolveNotificationTarget)
 // и передаётся сюда вместе с payload, чтобы баннер визуально отличался по
 // иконке/цвету в зависимости от того, откуда пришло уведомление (регламент/
 // проект/чат/день рождения/заявка), а не только текстом заголовка.
-export type ToastKind = 'regulation' | 'project' | 'chat' | 'birthday' | 'absence' | 'edit_request' | 'other';
+export type ToastKind = 'regulation' | 'project' | 'chat' | 'birthday' | 'absence' | 'edit_request' | 'agent' | 'other';
 
 export type ToastPayload = {
   notificationId: string;
@@ -26,6 +26,7 @@ const KIND_ICON: Record<ToastKind, typeof Bell> = {
   birthday: Cake,
   absence: ClipboardList,
   edit_request: Pencil,
+  agent: UserRound,
   other: Bell,
 };
 
@@ -53,6 +54,21 @@ export default function ToastWindow() {
     const unlisten = listen<ToastPayload>('toast-show', (event) => {
       setData(event.payload);
     });
+    // Пользователь мог открыть то же уведомление через колокольчик в главном
+    // окне, пока баннер ещё висит на экране — раньше баннер оставался
+    // висеть с уже неактуальным содержимым (уведомление уже прочитано и
+    // обработано), пока не появится следующее или пока его не закрыть
+    // руками. Сверяем notificationId — не гасим баннер, если он уже успел
+    // смениться на другое, более новое уведомление.
+    const unlistenHide = listen<{ notificationId: string }>('toast-hide', (event) => {
+      setData((prev) => {
+        if (prev?.notificationId === event.payload.notificationId) {
+          getCurrentWindow().hide().catch(() => {});
+          return null;
+        }
+        return prev;
+      });
+    });
     // Сообщаем главному окну, что страница домонтировалась и подписка на
     // toast-show уже готова — при первом показе после запуска приложения
     // окно 'toast' создаётся с нуля, и просто дождаться 'tauri://created'
@@ -64,6 +80,7 @@ export default function ToastWindow() {
     emit('toast-ready').catch(() => {});
     return () => {
       unlisten.then((f) => f());
+      unlistenHide.then((f) => f());
     };
   }, []);
 

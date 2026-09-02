@@ -497,6 +497,7 @@ export type Employee = {
   isPartner: boolean;
   partnerId: string | null;
   partnerName: string | null;
+  isBlocked: boolean;
 };
 
 export type Partner = {
@@ -713,6 +714,9 @@ export const api = {
 
   updateEmployee: (payload: EmployeeFormPayload & { adminId: string; employeeId: string }) =>
     invoke<Employee>('update_employee', { payload }),
+
+  setEmployeeBlocked: (payload: { adminId: string; employeeId: string; blocked: boolean }) =>
+    invoke<Employee>('set_employee_blocked', { payload }),
 
   listPartners: () => invoke<Partner[]>('list_partners'),
 
@@ -1112,18 +1116,28 @@ export const api = {
   listAgents: () => invoke<Agent[]>('list_agents'),
   resolveAgentApplication: (payload: { actorId: string; id: string; approve: boolean }) =>
     invoke<Agent>('resolve_agent_application', { payload }),
+  // fromStep — с какого поля попросить агента заполнить заново (name/phone/
+  // address/email/passport); omitted/undefined — заполнить полностью заново.
+  requestAgentReregistration: (payload: { actorId: string; agentId: string; fromStep?: string }) =>
+    invoke<Agent>('request_agent_reregistration', { payload }),
+  deleteAgent: (payload: { actorId: string; agentId: string }) => invoke<void>('delete_agent', { payload }),
   listAgentLeads: () => invoke<AgentLead[]>('list_agent_leads'),
   advanceAgentLeadStage: (payload: { actorId: string; leadId: string; stage: AgentLeadStage }) =>
     invoke<AgentLead>('advance_agent_lead_stage', { payload }),
   listAgentTrainingPosts: () => invoke<AgentTrainingPost[]>('list_agent_training_posts'),
   createAgentTrainingPost: (payload: { actorId: string; title: string; body: string }) =>
     invoke<AgentTrainingPost>('create_agent_training_post', { payload }),
+  updateAgentTrainingPost: (payload: { actorId: string; id: string; title: string; body: string }) =>
+    invoke<AgentTrainingPost>('update_agent_training_post', { payload }),
   deleteAgentTrainingPost: (payload: { actorId: string; id: string }) =>
     invoke<void>('delete_agent_training_post', { payload }),
   getAgentConsentSettings: (payload: { actorId: string }) => invoke<AgentConsentSettings>('get_agent_consent_settings', { payload }),
   setAgentConsentSettings: (payload: { adminId: string; enabled: boolean; textRu: string; textUz: string; textUzCyrl: string; chatLink?: string | null }) =>
     invoke<AgentConsentSettings>('set_agent_consent_settings', { payload }),
-  exportAgentsExcel: (payload: { actorId: string; outPath: string }) => invoke<string>('export_agents_excel', { payload }),
+  // Возвращает содержимое .xlsx как base64 (не пишет файл сам) — так работает
+  // и когда CRM подключена к серверу как клиент по сети; сохранение на диск
+  // делает сам фронтенд, см. Agents.tsx::handleExportExcel.
+  exportAgentsExcel: (payload: { actorId: string }) => invoke<string>('export_agents_excel', { payload }),
 
   getNotebookSettings: (payload: { actorId: string; employeeId: string }) =>
     invoke<NotebookSettings>('get_notebook_settings', { payload }),

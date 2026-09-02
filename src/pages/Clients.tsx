@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Plus, Search, Pencil, Contact, Trash2, Send, ExternalLink, ArrowRightLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { api, type Employee, type Client, type ClientHistoryEntry, type ClientService, type Regulation, type PartnerRegulation, type Partner } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
@@ -28,6 +28,7 @@ export default function Clients({
   const { t } = useLocale();
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -74,6 +75,17 @@ export default function Clients({
     if (scopedPartnerId !== undefined || !currentEmployee.isAdmin) return;
     api.listPartners().then(setPartners).catch(() => {});
   }, [scopedPartnerId, currentEmployee.isAdmin]);
+
+  // Переход по ссылке на конкретного клиента (уведомление о клиенте,
+  // оформленном через агента — см. Topbar.tsx::resolveNotificationTarget,
+  // relatedEntityType === 'client') — как только список загрузился, находим
+  // клиента по id и открываем его карточку.
+  useEffect(() => {
+    const openClientId = (location.state as any)?.openClientId;
+    if (!openClientId || clients.length === 0) return;
+    const client = clients.find((c) => c.id === openClientId);
+    if (client) setSelected(client);
+  }, [clients, location.state]);
 
   useEffect(() => {
     if (!selected) {

@@ -1139,6 +1139,10 @@ button.primary:hover { filter: brightness(0.95); }
   width: 860px;
 }
 
+.modal-card-xl {
+  width: 1240px;
+}
+
 .modal-close {
   position: absolute;
   top: 16px;

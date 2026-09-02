@@ -428,6 +428,8 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
   const [attachBusy, setAttachBusy] = useState(false);
   const [chatBusy, setChatBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const lastChatMsgIdRef = useRef<string | null>(null);
 
   // Чей тред сейчас открыт справа — по умолчанию свой
   const [activeThreadId, setActiveThreadId] = useState<string>(currentEmployee.id);
@@ -525,6 +527,24 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
       document.getElementById(`msg-${msg.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 150);
   }, [chat, location.state]);
+
+  // Прокрутка к последнему сообщению треда при открытии/переключении — этого
+  // не было вовсе (в отличие от Chat.tsx/Regulations.tsx), поэтому открытие
+  // проекта или переключение на чужой тред показывало верх списка. Пропускаем,
+  // если это переход по ссылке на конкретное сообщение — эффект выше уже сам
+  // скроллит куда нужно.
+  useEffect(() => {
+    if ((location.state as any)?.openMessageId) return;
+    const threadMessages = chat.filter((m) => m.targetEmployeeId === activeThreadId);
+    if (threadMessages.length === 0) return;
+    const lastId = threadMessages[threadMessages.length - 1].id;
+    if (lastId !== lastChatMsgIdRef.current) {
+      lastChatMsgIdRef.current = lastId;
+      chatEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      requestAnimationFrame(() => chatEndRef.current?.scrollIntoView({ behavior: 'auto' }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chat, activeThreadId]);
 
   const isManager = !!selected && (currentEmployee.isAdmin || selected.ownerId === currentEmployee.id);
   const isParticipant =
@@ -872,6 +892,7 @@ export default function Projects({ currentEmployee }: { currentEmployee: Employe
                         />
                       ))
                     )}
+                    <div ref={chatEndRef} />
                   </div>
 
                   {canPost ? (

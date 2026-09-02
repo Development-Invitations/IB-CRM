@@ -1036,7 +1036,7 @@ export default function Settings({ employee }: { employee: Employee }) {
 
           <p className="settings-hint">{t('settings.telegramBots.linkingHint')}</p>
 
-          <button className="modal-btn" onClick={handleSaveTelegramBots} disabled={tgBusy}>
+          <button className="modal-btn" onClick={handleSaveTelegramBots} disabled={tgBusy} style={{ marginTop: 10 }}>
             {tgBusy ? t('common.loading') : t('settings.telegramBots.saveBtn')}
           </button>
         </section>
@@ -1069,7 +1069,9 @@ export default function Settings({ employee }: { employee: Employee }) {
         <section className="settings-section">
           <h2>{t('settings.agentConsent.title')}</h2>
           <p className="settings-hint">{t('settings.agentConsent.hint')}</p>
-          <Checkbox checked={consentEnabled} onChange={setConsentEnabled} label={t('settings.agentConsent.enableLabel')} />
+          <div style={{ marginTop: 10 }}>
+            <Checkbox checked={consentEnabled} onChange={setConsentEnabled} label={t('settings.agentConsent.enableLabel')} />
+          </div>
 
           {consentEnabled && (
             <>

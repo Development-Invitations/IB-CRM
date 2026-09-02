@@ -326,6 +326,8 @@ export default function PartnerRegulations({
   const { enter: enterFullscreen, exit: exitFullscreen } = useContext(FullscreenContext);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const entriesRef = useRef<HTMLDivElement>(null);
+  const entriesEndRef = useRef<HTMLDivElement>(null);
+  const lastEntryIdRef = useRef<string | null>(null);
 
   const [regulations, setRegulations] = useState<PartnerRegulation[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -417,6 +419,20 @@ export default function PartnerRegulations({
   }, [selected?.id]);
 
   useEffect(() => { loadDetail(); }, [loadDetail]);
+
+  // Прокрутка к последней записи при открытии/обновлении треда — тот же
+  // приём, что в Chat.tsx/Regulations.tsx: двойной scrollIntoView (сразу и на
+  // следующем кадре), чтобы поздно подгружающиеся вложения не сдвигали
+  // последнюю запись выше видимой области после скролла.
+  useEffect(() => {
+    if (entries.length === 0) return;
+    const lastId = entries[entries.length - 1].id;
+    if (lastId !== lastEntryIdRef.current) {
+      lastEntryIdRef.current = lastId;
+      entriesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      requestAnimationFrame(() => entriesEndRef.current?.scrollIntoView({ behavior: 'auto' }));
+    }
+  }, [entries]);
 
   const filtered = search.trim()
     ? regulations.filter((r) => {
@@ -517,7 +533,6 @@ export default function PartnerRegulations({
       await api.addPartnerRegulationEntry({ actorId: currentEmployee.id, partnerRegulationId: selected.id, content: newEntry.trim(), attachmentData: attachData, attachmentName: attachName, deadline: newEntryDeadline || null });
       setNewEntry(''); setNewEntryDeadline(''); setAttachData(null); setAttachName(null);
       loadDetail();
-      setTimeout(() => entriesRef.current?.scrollTo({ top: entriesRef.current.scrollHeight, behavior: 'smooth' }), 200);
     } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('partnerRegulations.errorGeneric'));
     } finally {
@@ -627,6 +642,7 @@ export default function PartnerRegulations({
                   />
                 ))
               )}
+              <div ref={entriesEndRef} />
             </div>
 
             {!isClosed ? (

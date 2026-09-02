@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '1.6.0';
+export const APP_VERSION = '1.7.0';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,24 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '1.7.0',
+      items: [
+        'Агенты: админ теперь может отправить агента на уточнение данных — целиком заново или начиная с конкретного поля (кнопка в «Агенты»); агент получает об этом сообщение в боте с тем же вопросом, с которого нужно продолжить',
+        'Агента можно удалить из CRM — при удалении он также отключается от бота и (если бот администратор группы) выводится из чата агентов; его уже оформленные клиенты остаются в «Клиенты», но теряют привязку к агенту',
+        'Материал в «Обучении» для агентов теперь можно и редактировать, не только добавить/удалить',
+        'В боте у одобренного агента — постоянное меню внизу экрана (не только разовые кнопки в сообщении); после подтверждения бот сразу присылает памятку, что теперь доступно; «Мои клиенты» в боте показывает сводку — сколько оформлено, сколько ещё в работе',
+        'Агент теперь получает в боте уведомление, когда админ меняет статус его клиента в CRM («Думает» → «Согласен» и т. д.), а при оформлении клиента — открылась ссылка «Открыть клиента» из карточки агента; админам приходит уведомление о новом клиенте, оформленном через агента, с прямой ссылкой на него',
+        'Исправлено: уведомления о заявке агента и о новом клиенте от агента (и колокольчик, и всплывающий баннер) никуда не вели — теперь открывают раздел «Агенты» на нужной заявке/клиенте',
+        'Исправлено: всплывающий баннер уведомления мог остаться висеть на экране с уже неактуальным уведомлением, если его открывали через колокольчик, а не кликом по самому баннеру',
+        'Исправлено: скачивание Excel-списка агентов не работало при подключении CRM к серверу как клиент по сети — теперь работает в любом режиме',
+        'Исправлены отступы между разделами Telegram-ботов и согласия агента в Настройках',
+        'Модальное окно «Список агентов» стало шире — все колонки видно без горизонтальной прокрутки',
+        'Исправлено: открытие чатов Проектов и Регламентов не всегда показывало последнее сообщение — теперь при открытии и переключении между участниками сразу видно самую свежую запись',
+        'В Записной книжке правка заголовка заметки теперь подтверждается сообщением и остаётся видна сразу после сохранения (раньше окно сразу возвращалось к списку, который тут же пересортировывался, из-за чего казалось, что правка потерялась)',
+        'Админ теперь может заблокировать сотрудника — заблокированный не сможет войти в CRM, пока админ не снимет блокировку (кнопка в карточке сотрудника)',
+      ],
+    },
     {
       version: '1.6.0',
       items: [
@@ -649,6 +667,24 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '1.7.0',
+      items: [
+        "Agentlar: admin endi agentni ma'lumotlarni aniqlashtirish uchun qaytadan yuborishi mumkin — butunlay yoki aniq maydondan boshlab (\"Agentlar\"da tugma); agent bu haqda botda davom etish kerak bo'lgan savol bilan xabar oladi",
+        "Agentni CRM'dan o'chirish mumkin — o'chirilganda u botdan ham uziladi va (agar bot guruh admini bo'lsa) agentlar chatidan chiqariladi; uning allaqachon rasmiylashtirilgan mijozlari \"Mijozlar\"da qoladi, lekin agentga bog'lanishi olib tashlanadi",
+        "\"O'rgatish\"dagi agent materialini endi tahrirlash ham mumkin, nafaqat qo'shish/o'chirish",
+        "Tasdiqlangan agentda botda doimiy menyu paydo bo'ldi (ekran pastida, faqat bir martalik tugmalar emas); tasdiqlangandan so'ng bot darhol nima mumkinligi haqida xabar yuboradi; botdagi \"Mijozlarim\" endi qisqacha hisobot ko'rsatadi — nechtasi rasmiylashtirilgan, nechtasi jarayonda",
+        "Agent endi botda xabar oladi, qachon admin CRM'da uning mijozi holatini o'zgartirsa (\"O'ylamoqda\" → \"Rozi\" va h.k.), mijoz rasmiylashtirilganda esa agent kartochkasida \"Mijozni ochish\" havolasi paydo bo'ladi; adminlarga agent orqali rasmiylashtirilgan yangi mijoz haqida to'g'ridan-to'g'ri havola bilan xabar keladi",
+        "Tuzatildi: agent arizasi va agentdan yangi mijoz haqidagi bildirishnomalar (qo'ng'iroq ham, chiqib turuvchi banner ham) hech qayerga olib bormasdi — endi \"Agentlar\" bo'limini kerakli ariza/mijozda ochadi",
+        "Tuzatildi: bildirishnoma banneri ekranda eskirgan bildirishnoma bilan osilib qolishi mumkin edi, agar uni banner ustiga bosish o'rniga qo'ng'iroq orqali ochilsa",
+        "Tuzatildi: agentlar ro'yxatini Excel'ga yuklab olish CRM serverga tarmoq orqali mijoz sifatida ulanganda ishlamasdi — endi har qanday rejimda ishlaydi",
+        "Sozlamalarda Telegram-botlar va agent roziligi bo'limlari orasidagi bo'shliqlar tuzatildi",
+        "\"Agentlar ro'yxati\" oynasi kengaydi — barcha ustunlar gorizontal aylantirishsiz ko'rinadi",
+        "Tuzatildi: Loyihalar va Reglamentlar chatlarini ochish har doim ham oxirgi xabarni ko'rsatmasdi — endi ochilganda va ishtirokchilar orasida almashganda darhol eng so'nggi yozuv ko'rinadi",
+        "Yozuv daftarida sarlavhani tahrirlash endi xabar bilan tasdiqlanadi va saqlangandan keyin darhol ko'rinib turadi (avval oyna darhol ro'yxatga qaytar edi, ro'yxat esa shu zahoti qayta saralanardi, shuning uchun tahrir yo'qolgandek tuyulardi)",
+        "Admin endi xodimni bloklashi mumkin — bloklangan xodim admin blokni olib tashlamaguncha CRM'ga kira olmaydi (xodim kartochkasidagi tugma)",
+      ],
+    },
+    {
       version: '1.6.0',
       items: [
         "Yangi umumiy \"Agentlar\" bo'limi (barcha xodimlarga ko'rinadi) — mukofot evaziga mijoz olib keladigan jismoniy shaxs-referallar, CRM'ga o'z kirishisiz",
@@ -1281,6 +1317,24 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '1.7.0',
+      items: [
+        'Агентлар: админ энди агентни маълумотларни аниқлаштириш учун қайтадан юбориши мумкин — бутунлай ёки аниқ майдондан бошлаб ("Агентлар"да тугма); агент бу ҳақда ботда давом этиш керак бўлган савол билан хабар олади',
+        'Агентни CRM\'дан ўчириш мумкин — ўчирилганда у ботдан ҳам узилади ва (агар бот гуруҳ админи бўлса) агентлар чатидан чиқарилади; унинг аллақачон расмийлаштирилган мижозлари "Мижозлар"да қолади, лекин агентга боғланиши олиб ташланади',
+        '"Ўргатиш"даги агент материалини энди таҳрирлаш ҳам мумкин, нафақат қўшиш/ўчириш',
+        'Тасдиқланган агентда ботда доимий меню пайдо бўлди (экран пастида, фақат бир мартали тугмалар эмас); тасдиқлангандан сўнг бот дарҳол нима мумкинлиги ҳақида хабар юборади; ботдаги "Мижозларим" энди қисқача ҳисобот кўрсатади — нечтаси расмийлаштирилган, нечтаси жараёнда',
+        'Агент энди ботда хабар олади, қачон админ CRM\'да унинг мижози ҳолатини ўзгартирса ("Ўйламоқда" → "Рози" ва ҳ.к.), мижоз расмийлаштирилганда эса агент карточкасида "Мижозни очиш" ҳаволаси пайдо бўлади; админларга агент орқали расмийлаштирилган янги мижоз ҳақида тўғридан-тўғри ҳавола билан хабар келади',
+        'Тузатилди: агент аризаси ва агентдан янги мижоз ҳақидаги билдиришномалар (қўнғироқ ҳам, чиқиб турувчи баннер ҳам) ҳеч қаерга олиб бормасди — энди "Агентлар" бўлимини керакли ариза/мижозда очади',
+        'Тузатилди: билдиришнома баннери экранда эскирган билдиришнома билан осилиб қолиши мумкин эди, агар уни баннер устига босиш ўрнига қўнғироқ орқали очилса',
+        'Тузатилди: агентлар рўйхатини Excel\'га юклаб олиш CRM серверга тармоқ орқали мижоз сифатида уланганда ишламасди — энди ҳар қандай режимда ишлайди',
+        'Созламаларда Telegram-ботлар ва агент розилиги бўлимлари орасидаги бўшлиқлар тузатилди',
+        '"Агентлар рўйхати" ойнаси кенгайди — барча устунлар горизонтал айлантиришсиз кўринади',
+        'Тузатилди: Лойиҳалар ва Регламентлар чатларини очиш ҳар доим ҳам охирги хабарни кўрсатмасди — энди очилганда ва иштирокчилар орасида алмашганда дарҳол энг сўнгги ёзув кўринади',
+        'Ёзув дафтарида сарлавҳани таҳрирлаш энди хабар билан тасдиқланади ва сақлангандан кейин дарҳол кўриниб туради (аввал ойна дарҳол рўйхатга қайтар эди, рўйхат эса шу заҳоти қайта сараланарди, шунинг учун таҳрир йўқолгандек туюларди)',
+        'Админ энди ходимни блокласи мумкин — блокланган ходим админ блокни олиб ташламагунча CRM\'га кира олмайди (ходим карточкасидаги тугма)',
+      ],
+    },
     {
       version: '1.6.0',
       items: [

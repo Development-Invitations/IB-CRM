@@ -271,6 +271,11 @@ export function useNotifications({
     await api.markNotificationRead(n.id);
     setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)));
     setOpen(false);
+    // Если это же уведомление сейчас висит баннером в отдельном окне (см.
+    // ToastWindow.tsx) — гасим его: раньше баннер оставался на экране с уже
+    // обработанным уведомлением, если пользователь открывал его через
+    // колокольчик, а не кликом по самому баннеру.
+    emit('toast-hide', { notificationId: n.id }).catch(() => {});
     applyTarget(await resolveTarget(n));
   };
 

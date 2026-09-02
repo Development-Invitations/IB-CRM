@@ -14,7 +14,7 @@ export default function Modal({
   children?: ReactNode;
   onClose: () => void;
   actions?: ReactNode;
-  size?: 'lg';
+  size?: 'lg' | 'xl';
 }) {
   useEffect(() => {
     if (!open) return;
@@ -34,7 +34,7 @@ export default function Modal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className={`modal-card${size === 'lg' ? ' modal-card-lg' : ''}`}>
+      <div className={`modal-card${size === 'lg' ? ' modal-card-lg' : ''}${size === 'xl' ? ' modal-card-xl' : ''}`}>
         <button className="modal-close" onClick={onClose} aria-label="Закрыть" type="button">
           <X size={16} />
         </button>

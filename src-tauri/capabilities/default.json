@@ -34,6 +34,10 @@
     "fs:allow-appdata-write-recursive",
     "fs:allow-appdata-read-recursive",
     "fs:allow-appdata-meta-recursive",
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [{ "path": "$HOME/**" }]
+    },
     "shell:allow-open",
     "dialog:default"
   ]

@@ -152,13 +152,18 @@ export default function NotebookPanel({
     }
     setBusy(true);
     try {
-      if (activeNote) {
-        await api.updateNotebookNote({ actorId: employee.id, id: activeNote.id, title: title.trim(), content: content || null });
-      } else {
-        await api.createNotebookNote({ actorId: employee.id, employeeId: employee.id, title: title.trim(), content: content || null });
-      }
+      const saved = activeNote
+        ? await api.updateNotebookNote({ actorId: employee.id, id: activeNote.id, title: title.trim(), content: content || null })
+        : await api.createNotebookNote({ actorId: employee.id, employeeId: employee.id, title: title.trim(), content: content || null });
+      // Остаёмся в редакторе (не прыгаем обратно в список) — раньше
+      // немедленный возврат в список, пересортированный по updated_at
+      // (заметка уходит наверх), создавал у пользователя ложное впечатление,
+      // что правка заголовка не сохранилась (см. репорт "редактирую
+      // заголовок, сохраняю, захожу — ничего что редактировал нет"): реальных
+      // багов в сохранении не нашлось, но и подтверждения не было тоже.
+      setActiveNote(saved);
       await reloadNotes();
-      setView('list');
+      showToast('success', t('notebook.saveSuccess'));
     } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('notebook.errorGeneric'));
     } finally {

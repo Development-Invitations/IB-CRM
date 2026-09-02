@@ -72,6 +72,8 @@ struct Employee {
     partner_id: Option<String>,
     #[serde(rename = "partnerName")]
     partner_name: Option<String>,
+    #[serde(rename = "isBlocked")]
+    is_blocked: bool,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -372,8 +374,6 @@ struct SetAgentConsentSettingsPayload {
 struct ExportAgentsExcelPayload {
     #[serde(rename = "actorId")]
     actor_id: String,
-    #[serde(rename = "outPath")]
-    out_path: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -398,6 +398,42 @@ struct DeleteAgentTrainingPostPayload {
     #[serde(rename = "actorId")]
     actor_id: String,
     id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct UpdateAgentTrainingPostPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    id: String,
+    title: String,
+    body: String,
+}
+
+#[derive(serde::Deserialize)]
+struct RequestAgentReregistrationPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "agentId")]
+    agent_id: String,
+    #[serde(rename = "fromStep")]
+    from_step: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct DeleteAgentPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "agentId")]
+    agent_id: String,
+}
+
+#[derive(serde::Deserialize)]
+struct SetEmployeeBlockedPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+    blocked: bool,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -2322,6 +2358,7 @@ fn to_employee(e: db::EmployeeRecord) -> Employee {
         is_partner: e.is_partner,
         partner_id: e.partner_id,
         partner_name: e.partner_name,
+        is_blocked: e.is_blocked,
     }
 }
 
@@ -2953,6 +2990,12 @@ fn update_employee(payload: UpdateEmployeePayload, state: tauri::State<AppState>
         payload.birth_date.as_deref(),
     )
     .map(to_employee)
+}
+
+#[tauri::command]
+fn set_employee_blocked(payload: SetEmployeeBlockedPayload, state: tauri::State<AppState>) -> Result<Employee, String> {
+    let db = state.0.lock().unwrap();
+    db.set_employee_blocked(&payload.admin_id, &payload.employee_id, payload.blocked).map(to_employee)
 }
 
 #[tauri::command]
@@ -3973,6 +4016,17 @@ fn set_telegram_bot_settings(payload: SetTelegramBotSettingsPayload, state: taur
 
 // ---- Агенты (v1.6.0) ----
 
+// Общая проверка "агентский бот настроен и включён" перед тем, как спавнить
+// fire-and-forget Telegram-задачу — тот же паттерн, что resolve_telegram_task_spawn
+// выше, но для agents_bot (свой токен/роль). Возвращает готовый reqwest::Client
+// (не переиспользуем клиент между вызовами — эти уведомления редкие, в
+// отличие от long-polling цикла, где переиспользование клиента важно).
+pub(crate) fn agents_bot_ready(db: &Db) -> Option<(reqwest::Client, String)> {
+    let settings = db.get_telegram_bot_settings_internal("agents_bot");
+    let token = settings.token.filter(|t| !t.is_empty()).filter(|_| settings.enabled)?;
+    Some((reqwest::Client::new(), token))
+}
+
 #[tauri::command]
 fn list_agents(state: tauri::State<AppState>) -> Vec<Agent> {
     let db = state.0.lock().unwrap();
@@ -3982,7 +4036,48 @@ fn list_agents(state: tauri::State<AppState>) -> Vec<Agent> {
 #[tauri::command]
 fn resolve_agent_application(payload: ResolveAgentApplicationPayload, state: tauri::State<AppState>) -> Result<Agent, String> {
     let db = state.0.lock().unwrap();
-    db.resolve_agent_application(&payload.actor_id, &payload.id, payload.approve).map(to_agent)
+    let agent = db.resolve_agent_application(&payload.actor_id, &payload.id, payload.approve)?;
+    // Только на "подтвердить" — при отклонении бот и так уже отвечает
+    // status_rejected на следующий /start агента, отдельное уведомление не нужно.
+    if payload.approve {
+        if let Some((client, token)) = agents_bot_ready(&db) {
+            let db_arc = state.0.clone();
+            let chat_id = agent.telegram_chat_id.clone();
+            let locale = agent.locale.clone();
+            drop(db);
+            tauri::async_runtime::spawn(telegram::notify_agent_approved(db_arc, client, token, chat_id, locale));
+            return Ok(to_agent(agent));
+        }
+    }
+    Ok(to_agent(agent))
+}
+
+#[tauri::command]
+fn request_agent_reregistration(payload: RequestAgentReregistrationPayload, state: tauri::State<AppState>) -> Result<Agent, String> {
+    let db = state.0.lock().unwrap();
+    let agent = db.request_agent_reregistration(&payload.actor_id, &payload.agent_id, payload.from_step.as_deref())?;
+    if let Some((client, token)) = agents_bot_ready(&db) {
+        let chat_id = agent.telegram_chat_id.clone();
+        let locale = agent.locale.clone();
+        let step = payload.from_step.unwrap_or_else(|| "name".to_string());
+        drop(db);
+        tauri::async_runtime::spawn(telegram::notify_agent_reregister(client, token, chat_id, locale, step));
+    }
+    Ok(to_agent(agent))
+}
+
+#[tauri::command]
+fn delete_agent(payload: DeleteAgentPayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    let agent = db.delete_agent(&payload.actor_id, &payload.agent_id)?;
+    if let Some((client, token)) = agents_bot_ready(&db) {
+        let db_arc = state.0.clone();
+        let chat_id = agent.telegram_chat_id.clone();
+        let locale = agent.locale.clone();
+        drop(db);
+        tauri::async_runtime::spawn(telegram::notify_agent_deleted(db_arc, client, token, chat_id, locale));
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -3994,7 +4089,30 @@ fn list_agent_leads(state: tauri::State<AppState>) -> Vec<AgentLead> {
 #[tauri::command]
 fn advance_agent_lead_stage(payload: AdvanceAgentLeadStagePayload, state: tauri::State<AppState>) -> Result<AgentLead, String> {
     let db = state.0.lock().unwrap();
-    db.advance_agent_lead_stage(&payload.actor_id, &payload.lead_id, &payload.stage).map(to_agent_lead)
+    let lead = db.advance_agent_lead_stage(&payload.actor_id, &payload.lead_id, &payload.stage)?;
+    // "converted" не уведомляем отдельно тем же путём — там уже есть sale_done
+    // в момент самой записи продажи, а факт появления клиента виден в CRM
+    // через notify_all_admins("agent_lead_converted", ...) из db.rs.
+    if payload.stage != "converted" {
+        if let Some(agent) = db.get_agent(&lead.agent_id) {
+            if let Some((client, token)) = agents_bot_ready(&db) {
+                let chat_id = agent.telegram_chat_id.clone();
+                let locale = agent.locale.clone();
+                let client_name = lead.client_name.clone();
+                let stage = payload.stage.clone();
+                drop(db);
+                tauri::async_runtime::spawn(telegram::notify_agent_lead_stage_changed(client, token, chat_id, locale, client_name, stage));
+                return Ok(to_agent_lead(lead));
+            }
+        }
+    }
+    Ok(to_agent_lead(lead))
+}
+
+#[tauri::command]
+fn update_agent_training_post(payload: UpdateAgentTrainingPostPayload, state: tauri::State<AppState>) -> Result<AgentTrainingPost, String> {
+    let db = state.0.lock().unwrap();
+    db.update_agent_training_post(&payload.actor_id, &payload.id, &payload.title, &payload.body).map(to_agent_training_post)
 }
 
 #[tauri::command]
@@ -4028,16 +4146,23 @@ fn set_agent_consent_settings(payload: SetAgentConsentSettingsPayload, state: ta
         .map(to_agent_consent_settings)
 }
 
+// Возвращает готовый .xlsx как base64 (а не пишет файл сам на диск) — так
+// экспорт работает и когда CRM подключена к серверу как клиент по сети
+// (см. комментарий у report_export::generate_agents_workbook), в отличие от
+// generate_report_now, который по-прежнему пишет прямо в out_path и поэтому
+// сознательно не проксируется через dispatch.rs. Эта команда, наоборот,
+// безопасно проксируется — она просто возвращает данные, а файл на диск
+// сохраняет сам фронтенд (см. Agents.tsx::handleExportExcel).
 #[tauri::command]
 fn export_agents_excel(payload: ExportAgentsExcelPayload, state: tauri::State<AppState>) -> Result<String, String> {
+    use base64::Engine;
     let db = state.0.lock().unwrap();
     if !db.is_admin(&payload.actor_id) {
         return Err("Недостаточно прав".into());
     }
     let agents = db.list_agents();
-    let out_path = std::path::Path::new(&payload.out_path);
-    report_export::generate_agents_workbook(&agents, out_path)?;
-    Ok(payload.out_path)
+    let bytes = report_export::generate_agents_workbook(&agents)?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(&bytes))
 }
 
 #[tauri::command]
@@ -4445,6 +4570,7 @@ fn main() {
             rename_partner,
             admin_reset_password,
             update_employee,
+            set_employee_blocked,
             list_positions,
             create_position,
             list_departments,
@@ -4576,10 +4702,13 @@ fn main() {
             set_telegram_bot_settings,
             list_agents,
             resolve_agent_application,
+            request_agent_reregistration,
+            delete_agent,
             list_agent_leads,
             advance_agent_lead_stage,
             list_agent_training_posts,
             create_agent_training_post,
+            update_agent_training_post,
             delete_agent_training_post,
             get_agent_consent_settings,
             set_agent_consent_settings,

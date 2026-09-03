@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '1.8.1';
+export const APP_VERSION = '1.9.0';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,19 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '1.9.0',
+      items: [
+        'В боте: перед выбором услуг при записи продажи можно нажать на любую услугу и посмотреть её полное описание; в главном меню появилась кнопка «Каталог услуг» — агент может изучить весь каталог заранее, ещё до разговора с клиентом',
+        '«Наши услуги» теперь видит и открывает вся CRM, включая партнёров (раньше — только админ); клик по услуге показывает описание, добавлен поиск по названию и по коду; редактирование каталога по-прежнему только у админа',
+        'Исправлена вёрстка цены в «Наши услуги» — раньше при узкой колонке сумма разбивалась на отдельные строки по разрядам',
+        'Регистрация в боте: номер телефона теперь можно не только ввести вручную, но и отправить кнопкой «Поделиться номером»',
+        'Исправлено: постоянное меню бота нельзя было свернуть после открытия — теперь сворачивается и разворачивается стандартным способом Telegram',
+        'Приветствие бота теперь показывается один раз, на выбранном языке — раньше при первом запуске бот сразу присылал текст на всех 3 языках подряд, до выбора языка',
+        'Найдена и исправлена причина, по которой правки в Записной книжке и Блоге (тема, комментарии) иногда «не сохранялись»: пропадало только цветовое форматирование текста, применённое через панель редактора — цвет теперь сохраняется корректно',
+        'В Записной книжке — удаление заметки прямо из списка (не только изнутри неё) и дата создания у каждой заметки в списке',
+      ],
+    },
     {
       version: '1.8.1',
       items: [
@@ -690,6 +703,19 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '1.9.0',
+      items: [
+        "Botda: sotuvni yozishda xizmat tanlashdan oldin istalgan xizmatga bosib, uning to'liq tavsifini ko'rish mumkin; asosiy menyuda \"Xizmatlar katalogi\" tugmasi paydo bo'ldi — agent butun katalogni mijoz bilan gaplashishdan oldin o'rganib chiqishi mumkin",
+        "\"Bizning xizmatlar\"ni endi butun CRM ochadi, jumladan hamkorlar (avval — faqat admin); xizmatga bosish tavsifini ko'rsatadi, nomi va kodi bo'yicha qidiruv qo'shildi; katalogni tahrirlash avvalgidek faqat admin uchun",
+        "\"Bizning xizmatlar\"da narx ustunidagi vёrstka tuzatildi — tor ustunda summa raqam guruhlariga bo'linib alohida qatorlarga tushib ketardi",
+        "Botda ro'yxatdan o'tish: telefon raqamini endi qo'lda kiritish bilan bir qatorda \"Raqamni ulashish\" tugmasi orqali ham yuborish mumkin",
+        "Tuzatildi: botning doimiy menyusini ochgandan keyin yopib bo'lmasdi — endi Telegramning odatiy usulida ochiladi/yopiladi",
+        "Bot xush kelibsiz xabari endi bir marta, tanlangan tilda ko'rsatiladi — avval birinchi ishga tushirishda bot darhol barcha 3 tilda ketma-ket xabar yuborardi, til tanlanishidan oldin",
+        "Yozuv daftari va Blogda (mavzu, izohlar) tahrirlar ba'zan \"saqlanmasligi\" sababi topildi va tuzatildi: faqat tahrirlagich panelidan qo'llangan matn rangi formatlash yo'qolar edi — endi rang to'g'ri saqlanadi",
+        "Yozuv daftarida — yozuvni ro'yxatdan bevosita o'chirish (faqat ichidan emas) va ro'yxatda har bir yozuvning yaratilgan sanasi",
+      ],
+    },
+    {
       version: '1.8.1',
       items: [
         "Ilovaning fayl yozish huquqlari toraytirildi (agentlar Excel/surat eksporti) — endi faqat \"Yuklab olishlar\", \"Hujjatlar\" va \"Ish stoli\"ga, uy papkasidagi istalgan joyga emas",
@@ -1363,6 +1389,19 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '1.9.0',
+      items: [
+        'Ботда: сотувни ёзишда хизмат танлашдан олдин исталган хизматга босиб, унинг тўлиқ тавсифини кўриш мумкин; асосий менюда "Хизматлар каталоги" тугмаси пайдо бўлди — агент бутун каталогни мижоз билан гаплашишдан олдин ўрганиб чиқиши мумкин',
+        '"Бизнинг хизматлар"ни энди бутун CRM очади, жумладан ҳамкорлар (аввал — фақат админ); хизматга босиш тавсифини кўрсатади, номи ва коди бўйича қидирув қўшилди; каталогни таҳрирлаш аввалгидек фақат админ учун',
+        '"Бизнинг хизматлар"да нарх устунидаги вёрстка тузатилди — тор устунда сумма рақам гуруҳларига бўлиниб алоҳида қаторларга тушиб кетарди',
+        'Ботда рўйхатдан ўтиш: телефон рақамини энди қўлда киритиш билан бир қаторда "Рақамни улашиш" тугмаси орқали ҳам юбориш мумкин',
+        'Тузатилди: ботнинг доимий менюсини очгандан кейин ёпиб бўлмасди — энди Telegramнинг одатий усулида очилади/ёпилади',
+        'Бот хуш келибсиз хабари энди бир марта, танланган тилда кўрсатилади — аввал биринчи ишга туширишда бот дарҳол барча 3 тилда кетма-кет хабар юборарди, тил танланишидан олдин',
+        'Ёзув дафтари ва Блогда (мавзу, изоҳлар) таҳрирлар баъзан "сақланмаслиги" сабаби топилди ва тузатилди: фақат таҳрирлагич панелидан қўлланган матн ранги форматлаш йўқолар эди — энди ранг тўғри сақланади',
+        'Ёзув дафтарида — ёзувни рўйхатдан бевосита ўчириш (фақат ичидан эмас) ва рўйхатда ҳар бир ёзувнинг яратилган санаси',
+      ],
+    },
     {
       version: '1.8.1',
       items: [

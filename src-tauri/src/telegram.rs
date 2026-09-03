@@ -50,6 +50,7 @@ async fn set_agents_bot_commands(client: &reqwest::Client, token: &str) {
     let commands = json!([
         { "command": "start", "description": "Главное меню / регистрация" },
         { "command": "sale", "description": "Записать продажу" },
+        { "command": "services", "description": "Каталог услуг" },
         { "command": "materials", "description": "Полезная информация" },
         { "command": "leads", "description": "Мои клиенты" },
         { "command": "chat", "description": "Чат агентов" },
@@ -72,6 +73,46 @@ pub async fn send_message(
     if let Some((label, callback_data)) = reply_button {
         body["reply_markup"] = json!({ "inline_keyboard": [[{ "text": label, "callback_data": callback_data }]] });
     }
+    let resp = client.post(api_url(token, "sendMessage")).json(&body).send().await.map_err(|e| TelegramError(e.to_string()))?;
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        return Err(TelegramError(format!("sendMessage: {status} {text}")));
+    }
+    Ok(())
+}
+
+// Запрос номера телефона на шаге регистрации — временная (не постоянная,
+// в отличие от agent_menu_keyboard) reply-клавиатура с одной кнопкой
+// request_contact: true. Telegram при нажатии сам отправляет боту обычное
+// сообщение с полем "contact" (без участия пользователя в наборе номера);
+// набрать номер текстом при этом по-прежнему можно — обработчик шага
+// "phone" читает и то, и другое (пользователь: "вписать вручную или
+// поделиться контактом").
+async fn send_phone_request(client: &reqwest::Client, token: &str, chat_id: &str, text: &str, locale: &str) -> Result<(), TelegramError> {
+    let body = json!({
+        "chat_id": chat_id,
+        "text": text,
+        "reply_markup": {
+            "keyboard": [[{ "text": bot_text(locale, "share_contact_btn"), "request_contact": true }]],
+            "resize_keyboard": true,
+            "one_time_keyboard": true,
+        }
+    });
+    let resp = client.post(api_url(token, "sendMessage")).json(&body).send().await.map_err(|e| TelegramError(e.to_string()))?;
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        return Err(TelegramError(format!("sendMessage: {status} {text}")));
+    }
+    Ok(())
+}
+
+// Убирает временную клавиатуру запроса контакта (см. send_phone_request) —
+// шлётся вместе со следующим вопросом анкеты, чтобы кнопка "Поделиться
+// номером" не висела дальше там, где она уже не нужна.
+async fn send_message_remove_keyboard(client: &reqwest::Client, token: &str, chat_id: &str, text: &str) -> Result<(), TelegramError> {
+    let body = json!({ "chat_id": chat_id, "text": text, "reply_markup": { "remove_keyboard": true } });
     let resp = client.post(api_url(token, "sendMessage")).json(&body).send().await.map_err(|e| TelegramError(e.to_string()))?;
     if !resp.status().is_success() {
         let status = resp.status();
@@ -115,12 +156,21 @@ pub async fn send_menu(client: &reqwest::Client, token: &str, chat_id: &str, tex
 // нажатии бот отвечает самой ссылкой отдельным сообщением — Telegram сам
 // делает её кликабельной.
 fn agent_menu_keyboard(locale: &str, chat_link: Option<&str>) -> serde_json::Value {
-    let mut rows = vec![vec![bot_text(locale, "btn_sale")], vec![bot_text(locale, "btn_materials")], vec![bot_text(locale, "btn_my_leads")]];
+    let mut rows = vec![
+        vec![bot_text(locale, "btn_sale")],
+        vec![bot_text(locale, "btn_services")],
+        vec![bot_text(locale, "btn_materials")],
+        vec![bot_text(locale, "btn_my_leads")],
+    ];
     if chat_link.is_some() {
         rows.push(vec![bot_text(locale, "btn_chat")]);
     }
     let keyboard: Vec<Vec<serde_json::Value>> = rows.into_iter().map(|row| row.into_iter().map(|label| json!({ "text": label })).collect()).collect();
-    json!({ "keyboard": keyboard, "resize_keyboard": true, "is_persistent": true })
+    // is_persistent:true (было раньше) держит клавиатуру всегда развёрнутой и
+    // убирает у клиента Telegram стандартную возможность её свернуть значком
+    // у поля ввода (жалоба: "кнопка есть, жму — меню не закрывается") — без
+    // этого флага сворачивание/разворачивание работает штатно.
+    json!({ "keyboard": keyboard, "resize_keyboard": true })
 }
 
 async fn send_agent_menu_message(client: &reqwest::Client, token: &str, chat_id: &str, text: &str, locale: &str, chat_link: Option<&str>) -> Result<(), TelegramError> {
@@ -496,7 +546,8 @@ fn bot_text<'a>(locale: &str, key: &'a str) -> &'a str {
     match locale {
         "uz" => match key {
             "ask_name" => "Ismingiz kim? To'liq ismingizni kiriting.",
-            "ask_phone" => "Bog'lanish uchun telefon raqamingizni kiriting.",
+            "ask_phone" => "Bog'lanish uchun telefon raqamingizni kiriting yoki pastdagi tugma orqali ulashing.",
+            "share_contact_btn" => "📱 Raqamni ulashish",
             "ask_address" => "Yashash manzilingizni kiriting.",
             "ask_email" => "Elektron pochtangizni kiriting.",
             "ask_passport" => "Pasportning birinchi sahifasi fotosini yuboring (oddiy suratga olsangiz ham bo'ladi).",
@@ -511,6 +562,11 @@ fn bot_text<'a>(locale: &str, key: &'a str) -> &'a str {
             "btn_materials" => "📚 Foydali ma'lumot",
             "btn_my_leads" => "📊 Mijozlarim",
             "btn_chat" => "💬 Agentlar chati",
+            "btn_services" => "📦 Xizmatlar katalogi",
+            "services_catalog_title" => "Xizmatlar — batafsil uchun bosing:",
+            "no_services" => "Hozircha xizmatlar qo'shilmagan.",
+            "svc_price_label" => "Narxi",
+            "svc_no_description" => "Tavsif kiritilmagan.",
             "consent_agree_btn" => "✅ Roziman",
             "consent_reminder" => "Davom etish uchun rozilik tugmasini bosing.",
             "sale_ask_name" => "Mijozning F.I.O.?",
@@ -525,14 +581,15 @@ fn bot_text<'a>(locale: &str, key: &'a str) -> &'a str {
             "no_leads" => "Siz hali birorta mijoz qo'shmagansiz.",
             "not_available" => "Mavjud emas.",
             "start_hint" => "Boshlash uchun /start yuboring.",
-            "approved_intro" => "🎉 Siz agent sifatida tasdiqlandingiz!\n\nEndi sizga mavjud:\n💰 Sotuvni yozish — mijoz ma'lumotlarini kiritish\n📚 Foydali ma'lumot — sotuv uchun materiallar\n📊 Mijozlarim — mijozlaringiz ro'yxati va holati\n💬 Agentlar chati — umumiy chat\n\nTugmalar — ekran pastida.",
+            "approved_intro" => "🎉 Siz agent sifatida tasdiqlandingiz!\n\nEndi sizga mavjud:\n💰 Sotuvni yozish — mijoz ma'lumotlarini kiritish\n📦 Xizmatlar katalogi — mijozga taklif qilishdan oldin tanishing\n📚 Foydali ma'lumot — sotuv uchun materiallar\n📊 Mijozlarim — mijozlaringiz ro'yxati va holati\n💬 Agentlar chati — umumiy chat\n\nTugmalar — ekran pastida.",
             "reregister_notice" => "Administrator ro'yxatdan o'tish ma'lumotlarini aniqlashtirishni so'radi.",
             "deleted_notice" => "Sizning agent sifatidagi kirishingiz administrator tomonidan bekor qilindi.",
             _ => key,
         },
         "uz-cyrl" => match key {
             "ask_name" => "Исмингиз ким? Тўлиқ исмингизни киритинг.",
-            "ask_phone" => "Боғланиш учун телефон рақамингизни киритинг.",
+            "ask_phone" => "Боғланиш учун телефон рақамингизни киритинг ёки пастдаги тугма орқали улашинг.",
+            "share_contact_btn" => "📱 Рақамни улашиш",
             "ask_address" => "Яшаш манзилингизни киритинг.",
             "ask_email" => "Электрон почтангизни киритинг.",
             "ask_passport" => "Паспортнинг биринчи саҳифаси фотосини юборинг (оддий суратга олсангиз ҳам бўлади).",
@@ -547,6 +604,11 @@ fn bot_text<'a>(locale: &str, key: &'a str) -> &'a str {
             "btn_materials" => "📚 Фойдали маълумот",
             "btn_my_leads" => "📊 Мижозларим",
             "btn_chat" => "💬 Агентлар чати",
+            "btn_services" => "📦 Хизматлар каталоги",
+            "services_catalog_title" => "Хизматлар — батафсил учун босинг:",
+            "no_services" => "Ҳозирча хизматлар қўшилмаган.",
+            "svc_price_label" => "Нархи",
+            "svc_no_description" => "Тавсиф киритилмаган.",
             "consent_agree_btn" => "✅ Розиман",
             "consent_reminder" => "Давом этиш учун розилик тугмасини босинг.",
             "sale_ask_name" => "Мижознинг Ф.И.Ш.?",
@@ -561,14 +623,15 @@ fn bot_text<'a>(locale: &str, key: &'a str) -> &'a str {
             "no_leads" => "Сиз ҳали бирорта мижоз қўшмагансиз.",
             "not_available" => "Мавжуд эмас.",
             "start_hint" => "Бошлаш учун /start юборинг.",
-            "approved_intro" => "🎉 Сиз агент сифатида тасдиқландингиз!\n\nЭнди сизга мавжуд:\n💰 Сотувни ёзиш — мижоз маълумотларини киритиш\n📚 Фойдали маълумот — сотув учун материаллар\n📊 Мижозларим — мижозларингиз рўйхати ва ҳолати\n💬 Агентлар чати — умумий чат\n\nТугмалар — экран пастида.",
+            "approved_intro" => "🎉 Сиз агент сифатида тасдиқландингиз!\n\nЭнди сизга мавжуд:\n💰 Сотувни ёзиш — мижоз маълумотларини киритиш\n📦 Хизматлар каталоги — мижозга таклиф қилишдан олдин танишинг\n📚 Фойдали маълумот — сотув учун материаллар\n📊 Мижозларим — мижозларингиз рўйхати ва ҳолати\n💬 Агентлар чати — умумий чат\n\nТугмалар — экран пастида.",
             "reregister_notice" => "Администратор рўйхатдан ўтиш маълумотларини аниқлаштиришни сўради.",
             "deleted_notice" => "Сизнинг агент сифатидаги киришингиз администратор томонидан бекор қилинди.",
             _ => key,
         },
         _ => match key {
             "ask_name" => "Как вас зовут? Введите ФИО.",
-            "ask_phone" => "Укажите номер телефона для связи.",
+            "ask_phone" => "Укажите номер телефона для связи или поделитесь контактом через кнопку ниже.",
+            "share_contact_btn" => "📱 Поделиться номером",
             "ask_address" => "Укажите ваш адрес проживания.",
             "ask_email" => "Укажите вашу электронную почту.",
             "ask_passport" => "Пришлите фото первой страницы паспорта (можно просто сфотографировать).",
@@ -583,6 +646,11 @@ fn bot_text<'a>(locale: &str, key: &'a str) -> &'a str {
             "btn_materials" => "📚 Полезная информация",
             "btn_my_leads" => "📊 Мои клиенты",
             "btn_chat" => "💬 Чат агентов",
+            "btn_services" => "📦 Каталог услуг",
+            "services_catalog_title" => "Услуги — нажмите на услугу, чтобы посмотреть описание:",
+            "no_services" => "Пока нет добавленных услуг.",
+            "svc_price_label" => "Цена",
+            "svc_no_description" => "Описание не заполнено.",
             "consent_agree_btn" => "✅ Согласен",
             "consent_reminder" => "Чтобы продолжить, нажмите кнопку согласия.",
             "sale_ask_name" => "ФИО клиента?",
@@ -597,7 +665,7 @@ fn bot_text<'a>(locale: &str, key: &'a str) -> &'a str {
             "no_leads" => "Вы пока не добавили ни одного клиента.",
             "not_available" => "Недоступно.",
             "start_hint" => "Отправьте /start, чтобы начать.",
-            "approved_intro" => "🎉 Вас подтвердили как агента!\n\nТеперь вам доступно:\n💰 Записать продажу — внести данные клиента\n📚 Полезная информация — материалы для продаж\n📊 Мои клиенты — список и статус ваших клиентов\n💬 Чат агентов — общий чат\n\nКнопки — внизу экрана.",
+            "approved_intro" => "🎉 Вас подтвердили как агента!\n\nТеперь вам доступно:\n💰 Записать продажу — внести данные клиента\n📦 Каталог услуг — изучите перед тем, как предлагать клиенту\n📚 Полезная информация — материалы для продаж\n📊 Мои клиенты — список и статус ваших клиентов\n💬 Чат агентов — общий чат\n\nКнопки — внизу экрана.",
             "reregister_notice" => "Администратор попросил уточнить данные регистрации.",
             "deleted_notice" => "Ваш доступ агента отозван администратором.",
             _ => key,
@@ -751,15 +819,12 @@ async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client,
             let agent = db.lock().unwrap().get_agent_by_chat_id(&chat_id);
             match agent {
                 None => {
-                    // Приветствие — объясняет агенту, куда он попал и зачем
-                    // (пользователь: "придумать приветствие и рассказать
-                    // пользователю зачем он тут"), настраивается в CRM на 3
-                    // языках — здесь на этапе выбора языка ещё неизвестно,
-                    // какой из них показать, поэтому все 3 сразу одним
-                    // сообщением, как и сам выбор языка ниже.
-                    let welcome = db.lock().unwrap().get_agent_welcome_settings_internal();
-                    let welcome_text = format!("{}\n\n— — —\n\n{}\n\n— — —\n\n{}", welcome.text_ru, welcome.text_uz, welcome.text_uz_cyrl);
-                    let _ = send_message(client, token, &chat_id, &welcome_text, None).await;
+                    // Приветствие (настраивается в CRM на 3 языках) раньше
+                    // отправлялось здесь все 3 сразу, до выбора языка —
+                    // пользователь попросил показывать его ПОСЛЕ выбора языка
+                    // и только на выбранном, поэтому здесь остаётся только
+                    // сам выбор языка, а текст приветствия уходит в обработчик
+                    // "lang:*" ниже.
                     db.lock().unwrap().set_agent_bot_state(&chat_id, "register", "lang", "{}");
                     let _ = send_menu(
                         client,
@@ -803,6 +868,9 @@ async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client,
                 if t == bot_text(&locale, "btn_sale") || t == "/sale" {
                     start_agent_new_lead(db, client, token, &chat_id, &agent).await;
                     return;
+                } else if t == bot_text(&locale, "btn_services") || t == "/services" {
+                    send_service_catalog(db, client, token, &chat_id, &locale).await;
+                    return;
                 } else if t == bot_text(&locale, "btn_materials") || t == "/materials" {
                     send_agent_materials(db, client, token, &chat_id, &locale).await;
                     return;
@@ -832,13 +900,22 @@ async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client,
                     let Some(text) = text else { return };
                     draft["full_name"] = json!(text);
                     db.lock().unwrap().set_agent_bot_state(&chat_id, "register", "phone", &draft.to_string());
-                    let _ = send_message(client, token, &chat_id, bot_text(&locale, "ask_phone"), None).await;
+                    let _ = send_phone_request(client, token, &chat_id, bot_text(&locale, "ask_phone"), &locale).await;
                 }
                 "phone" => {
-                    let Some(text) = text else { return };
-                    draft["phone"] = json!(text);
+                    // Либо вручную набранный текст, либо контакт, отправленный
+                    // через кнопку send_phone_request (Telegram кладёт номер в
+                    // msg.contact.phone_number, поля "text" в таком сообщении нет).
+                    let phone_value = msg
+                        .get("contact")
+                        .and_then(|c| c.get("phone_number"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                        .or(text);
+                    let Some(phone_value) = phone_value else { return };
+                    draft["phone"] = json!(phone_value);
                     db.lock().unwrap().set_agent_bot_state(&chat_id, "register", "address", &draft.to_string());
-                    let _ = send_message(client, token, &chat_id, bot_text(&locale, "ask_address"), None).await;
+                    let _ = send_message_remove_keyboard(client, token, &chat_id, bot_text(&locale, "ask_address")).await;
                 }
                 "address" => {
                     let Some(text) = text else { return };
@@ -934,7 +1011,16 @@ async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client,
                         draft["service_choice_ids"] = json!(ids);
                         let list_text = services.iter().enumerate().map(|(i, s)| format!("{}. {}", i + 1, s.name)).collect::<Vec<_>>().join("\n");
                         db.lock().unwrap().set_agent_bot_state(&chat_id, "new_lead", "services", &draft.to_string());
-                        let _ = send_message(client, token, &chat_id, &format!("{}\n\n{}", bot_text(&locale, "sale_ask_services"), list_text), None).await;
+                        // Кнопки под тем же текстом — тап показывает карточку
+                        // услуги (service_info_text), сам выбор по-прежнему
+                        // делается вводом номеров через запятую (см. шаг
+                        // "services" ниже), это не меняется.
+                        let info_buttons: Vec<(String, String)> = services
+                            .iter()
+                            .enumerate()
+                            .map(|(i, s)| (format!("ℹ {}. {}", i + 1, s.name), format!("svc_info:{}", s.id)))
+                            .collect();
+                        let _ = send_menu(client, token, &chat_id, &format!("{}\n\n{}", bot_text(&locale, "sale_ask_services"), list_text), info_buttons).await;
                     }
                 }
                 "services" => {
@@ -971,6 +1057,13 @@ async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client,
         // в agents, обрабатываются раньше проверки "агент подтверждён".
         if let Some(locale) = data.strip_prefix("lang:") {
             let _ = answer_callback_query(client, token, &cb_id, None).await;
+            let welcome = db.lock().unwrap().get_agent_welcome_settings_internal();
+            let welcome_text = match locale {
+                "uz" => &welcome.text_uz,
+                "uz-cyrl" => &welcome.text_uz_cyrl,
+                _ => &welcome.text_ru,
+            };
+            let _ = send_message(client, token, &chat_id, welcome_text, None).await;
             let consent_enabled = db.lock().unwrap().get_agent_consent_settings_internal().enabled;
             let draft = json!({ "locale": locale });
             if consent_enabled {
@@ -979,6 +1072,18 @@ async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client,
             } else {
                 db.lock().unwrap().set_agent_bot_state(&chat_id, "register", "name", &draft.to_string());
                 let _ = send_message(client, token, &chat_id, bot_text(locale, "ask_name"), None).await;
+            }
+            return;
+        }
+        // Карточка услуги (см. send_service_catalog / шаг "services" выше) —
+        // доступна и до, и после подтверждения агента не важно, обрабатывается
+        // раньше проверки статуса, т.к. просмотр описания не требует прав.
+        if let Some(service_id) = data.strip_prefix("svc_info:") {
+            let _ = answer_callback_query(client, token, &cb_id, None).await;
+            let service = db.lock().unwrap().get_house_service(service_id);
+            let locale = db.lock().unwrap().get_agent_by_chat_id(&chat_id).map(|a| a.locale).unwrap_or_else(|| "ru".to_string());
+            if let Some(s) = service {
+                let _ = send_message(client, token, &chat_id, &service_info_text(&locale, &s), None).await;
             }
             return;
         }
@@ -1075,6 +1180,46 @@ async fn send_agent_materials(db: &Arc<Mutex<Db>>, client: &reqwest::Client, tok
         let text = posts.iter().take(5).map(|p| format!("📌 {}\n{}", p.title, p.body)).collect::<Vec<_>>().join("\n\n---\n\n");
         let _ = send_message(client, token, chat_id, &text, None).await;
     }
+}
+
+// Полная карточка одной услуги — по нажатию на инлайн-кнопку каталога (см.
+// send_service_catalog ниже) или на такую же кнопку прямо на шаге выбора
+// услуг при записи продажи (пользователь: "нажать на услугу посмотреть
+// описание прежде чем выбрать её"). Отдельным сообщением, а не алертом
+// answerCallbackQuery — у алерта Telegram жёсткий лимит ~200 символов,
+// описание услуги может быть длиннее.
+fn service_info_text(locale: &str, s: &crate::db::HouseServiceRecord) -> String {
+    let mut lines = vec![s.name.clone()];
+    if let Some(price) = &s.price {
+        lines.push(format!("{}: {} сум", bot_text(locale, "svc_price_label"), price));
+    }
+    lines.push(String::new());
+    lines.push(
+        s.description
+            .clone()
+            .filter(|d| !d.trim().is_empty())
+            .unwrap_or_else(|| bot_text(locale, "svc_no_description").to_string()),
+    );
+    lines.join("\n")
+}
+
+// Каталог услуг для самостоятельного изучения агентом вне записи продажи
+// (пользователь: "чтоб Агенты могли ознакомиться с услугами прежде чем
+// предлагать") — каждая услуга своей инлайн-кнопкой, по нажатию бот
+// присылает её карточку (service_info_text) через callback "svc_info:{id}",
+// общий для этого меню и для шага "services" в start_agent_new_lead.
+async fn send_service_catalog(db: &Arc<Mutex<Db>>, client: &reqwest::Client, token: &str, chat_id: &str, locale: &str) {
+    let services = db.lock().unwrap().list_house_services_internal();
+    if services.is_empty() {
+        let _ = send_message(client, token, chat_id, bot_text(locale, "no_services"), None).await;
+        return;
+    }
+    let buttons: Vec<(String, String)> = services
+        .iter()
+        .enumerate()
+        .map(|(i, s)| (format!("{}. {}", i + 1, s.name), format!("svc_info:{}", s.id)))
+        .collect();
+    let _ = send_menu(client, token, chat_id, bot_text(locale, "services_catalog_title"), buttons).await;
 }
 
 // Со сводкой оформлено/не оформлено — по просьбе пользователя ("нужно

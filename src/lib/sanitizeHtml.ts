@@ -4,7 +4,7 @@
 // под нашим контролем, не нужно тянуть внешнюю зависимость ради этого).
 
 const ALLOWED_TAGS = new Set([
-  'B', 'STRONG', 'I', 'EM', 'U', 'S', 'BR', 'P', 'DIV', 'SPAN',
+  'B', 'STRONG', 'I', 'EM', 'U', 'S', 'BR', 'P', 'DIV', 'SPAN', 'FONT',
   'H2', 'H3', 'UL', 'OL', 'LI', 'A', 'IMG', 'VIDEO', 'DETAILS', 'SUMMARY', 'BLOCKQUOTE',
 ]);
 
@@ -17,9 +17,18 @@ const ALLOWED_ATTRS: Record<string, string[]> = {
   // 'style' здесь не значит "любой CSS" — см. проверку значения ниже, разрешён
   // только сам цвет (то, что вставляет execCommand('foreColor') в Chromium).
   SPAN: ['style'],
+  // execCommand('foreColor') в WebView2/Chromium на самом деле чаще всего
+  // вставляет не <span style="color:...">, а устаревший <font color="...">
+  // (то же поведение унаследовано от старого IE-совместимого API) — раньше
+  // FONT не было в белом списке вообще, поэтому sanitizeBlogHtml разворачивал
+  // тег целиком: текст оставался, а применённый цвет молча пропадал при
+  // каждом сохранении. Внешне это выглядело как "изменения не сохраняются",
+  // хотя на самом деле терялось именно форматирование, а не сам текст.
+  FONT: ['color'],
 };
 
 const SAFE_COLOR = /^\s*color\s*:\s*(#[0-9a-fA-F]{3,8}|rgba?\([0-9.,\s%]+\))\s*;?\s*$/;
+const SAFE_COLOR_VALUE = /^\s*(#[0-9a-fA-F]{3,8}|rgba?\([0-9.,\s%]+\))\s*$/;
 
 function sanitizeNode(node: Node): void {
   const children = Array.from(node.childNodes);
@@ -47,6 +56,10 @@ function sanitizeNode(node: Node): void {
       }
       if (attr.name === 'style') {
         if (!SAFE_COLOR.test(attr.value)) el.removeAttribute('style');
+        continue;
+      }
+      if (attr.name === 'color') {
+        if (!SAFE_COLOR_VALUE.test(attr.value)) el.removeAttribute('color');
         continue;
       }
       if ((attr.name === 'href' || attr.name === 'src') && /^\s*javascript:/i.test(attr.value)) {

@@ -859,18 +859,30 @@ button.primary:hover { filter: brightness(0.95); }
   overflow-y: auto;
 }
 .notebook-note-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   cursor: pointer;
 }
 .notebook-note-item:hover { border-color: var(--color-accent); }
+.notebook-note-item-main {
+  flex: 1;
+  min-width: 0;
+}
 .notebook-note-item-title {
   font-weight: 600;
   font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.notebook-note-item-date {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
 }
 
 .notebook-note-title-input {
@@ -2927,6 +2939,9 @@ button.employees-add-btn {
 }
 
 .employees-search-input:focus { outline: none; border-color: var(--color-accent); }
+
+.house-service-view { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.house-service-view-description { white-space: pre-wrap; color: var(--color-text-muted); }
 
 /* ---- Статусы регламента ---- */
 .reg-status-active { background: color-mix(in srgb, var(--color-success) 18%, transparent); color: var(--color-success); }

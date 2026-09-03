@@ -1,5 +1,5 @@
 import { useEffect, useState, FormEvent } from 'react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { api, type Employee, type HouseService } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
@@ -8,14 +8,18 @@ import LoadingScreen from '../components/LoadingScreen';
 import { formatThousands, formatPercentInput } from '../lib/format';
 
 // Общий каталог "Наши услуги" (v0.7.0) — в отличие от PartnerServices.tsx, не
-// привязан к партнёру: один каталог на всю CRM, ведёт только админ (страница
-// доступна только ему — гейт на уровне роута в Dashboard.tsx). Выбирает
-// партнёр при создании СВОЕГО клиента (см. ClientFormModal.tsx).
+// привязан к партнёру: один каталог на всю CRM. Раньше страница была доступна
+// только админу; с v1.9.0 её видят ВСЕ сотрудники и партнёры (пользователь:
+// "чтоб можно было открыть просмотреть всем пользователям CRM партнерам") —
+// редактирование (добавить/изменить/удалить) при этом по-прежнему только у
+// админа, гейт теперь внутри компонента (canEdit), а не на уровне роута.
 export default function HouseServices({ currentEmployee }: { currentEmployee: Employee }) {
   const { t } = useLocale();
   const { showToast } = useToast();
+  const canEdit = currentEmployee.isAdmin;
   const [services, setServices] = useState<HouseService[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<HouseService | undefined>(undefined);
@@ -29,6 +33,7 @@ export default function HouseServices({ currentEmployee }: { currentEmployee: Em
 
   const [deleteTarget, setDeleteTarget] = useState<HouseService | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [viewTarget, setViewTarget] = useState<HouseService | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -47,6 +52,13 @@ export default function HouseServices({ currentEmployee }: { currentEmployee: Em
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const filteredServices = search.trim()
+    ? services.filter((s) => {
+        const q = search.trim().toLowerCase();
+        return s.name.toLowerCase().includes(q) || (s.code ?? '').toLowerCase().includes(q);
+      })
+    : services;
 
   const openCreate = () => {
     setEditing(undefined);
@@ -115,50 +127,77 @@ export default function HouseServices({ currentEmployee }: { currentEmployee: Em
     <div className="employees-page">
       <div className="employees-header">
         <h1>{t('houseServices.title')}</h1>
-        <button className="primary employees-add-btn" onClick={openCreate}>
-          <Plus size={16} /> {t('houseServices.addBtn')}
-        </button>
+        {canEdit && (
+          <button className="primary employees-add-btn" onClick={openCreate}>
+            <Plus size={16} /> {t('houseServices.addBtn')}
+          </button>
+        )}
+      </div>
+
+      <div className="employees-search-row">
+        <Search size={15} className="employees-search-icon" />
+        <input
+          className="employees-search-input"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t('houseServices.searchPlaceholder')}
+        />
       </div>
 
       {loading ? (
         <LoadingScreen compact />
       ) : services.length === 0 ? (
         <p className="settings-hint">{t('houseServices.empty')}</p>
+      ) : filteredServices.length === 0 ? (
+        <p className="settings-hint">{t('houseServices.searchEmpty')}</p>
       ) : (
         <table className="employees-table">
           <thead>
             <tr>
               <th>{t('houseServices.colName')}</th>
+              <th>{t('houseServices.colCode')}</th>
               <th>{t('houseServices.colPrice')}</th>
               <th>{t('houseServices.colReward')}</th>
-              <th />
+              {canEdit && <th />}
             </tr>
           </thead>
           <tbody>
-            {services.map((s) => (
-              <tr key={s.id} className="employees-row">
-                <td>
-                  <div>{s.name}</div>
-                  {s.code && <div className="settings-hint">{t('houseServices.codeLabel')}: {s.code}</div>}
-                  {s.description && <div className="settings-hint">{s.description}</div>}
-                </td>
-                <td>{s.price ? `${formatThousands(s.price)} сум` : '—'}</td>
+            {filteredServices.map((s) => (
+              <tr key={s.id} className="employees-row" onClick={() => setViewTarget(s)} style={{ cursor: 'pointer' }}>
+                <td>{s.name}</td>
+                <td>{s.code || '—'}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{s.price ? `${formatThousands(s.price)} сум` : '—'}</td>
                 <td>{s.rewardPercent ? `${s.rewardPercent}%` : '—'}</td>
-                <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                  <div className="table-row-actions">
-                    <button className="icon-btn" onClick={() => openEdit(s)} aria-label={t('employees.editBtn')}>
-                      <Pencil size={14} />
-                    </button>
-                    <button className="icon-btn" onClick={() => setDeleteTarget(s)} aria-label={t('houseServices.deleteBtn')}>
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </td>
+                {canEdit && (
+                  <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <div className="table-row-actions">
+                      <button className="icon-btn" onClick={() => openEdit(s)} aria-label={t('employees.editBtn')}>
+                        <Pencil size={14} />
+                      </button>
+                      <button className="icon-btn" onClick={() => setDeleteTarget(s)} aria-label={t('houseServices.deleteBtn')}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       )}
+
+      <Modal open={!!viewTarget} title={viewTarget?.name ?? ''} onClose={() => setViewTarget(null)}>
+        {viewTarget && (
+          <div className="house-service-view">
+            {viewTarget.code && <div><strong>{t('houseServices.codeLabel')}:</strong> {viewTarget.code}</div>}
+            {viewTarget.price && <div><strong>{t('houseServices.priceLabel')}:</strong> {formatThousands(viewTarget.price)} сум</div>}
+            {viewTarget.rewardPercent && <div><strong>{t('houseServices.rewardPercentLabel')}:</strong> {viewTarget.rewardPercent}%</div>}
+            <div className="house-service-view-description">
+              {viewTarget.description || t('houseServices.noDescription')}
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <Modal
         open={formOpen}

@@ -4,6 +4,7 @@ import { api, type Employee, type NotebookNote } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
 import { clamp } from '../lib/clamp';
+import { parseSqliteUtc } from '../lib/date';
 import {
   getStoredNotebookPinned,
   setStoredNotebookPinned,
@@ -15,6 +16,7 @@ import {
   type NotebookSize,
 } from '../lib/notebookPanelPrefs';
 import RichEditor from './RichEditor';
+import Modal from './Modal';
 
 const MIN_WIDTH = 280;
 const MIN_HEIGHT = 280;
@@ -49,6 +51,8 @@ export default function NotebookPanel({
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [busy, setBusy] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<NotebookNote | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   // Первое открытие (нет сохранённой позиции) — якорится под кнопкой в
   // шапке, как .notifications-panel; дальше свободно двигается. При каждом
@@ -185,6 +189,20 @@ export default function NotebookPanel({
     }
   };
 
+  const handleDeleteFromList = async () => {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    try {
+      await api.deleteNotebookNote({ actorId: employee.id, id: deleteTarget.id });
+      await reloadNotes();
+      setDeleteTarget(null);
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('notebook.errorGeneric'));
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   if (!open) return null;
 
   return (
@@ -213,7 +231,18 @@ export default function NotebookPanel({
               ) : (
                 notes.map((n) => (
                   <div key={n.id} className="notebook-note-item" onClick={() => openNote(n)}>
-                    <div className="notebook-note-item-title">{n.title}</div>
+                    <div className="notebook-note-item-main">
+                      <div className="notebook-note-item-title">{n.title}</div>
+                      <div className="notebook-note-item-date">{parseSqliteUtc(n.createdAt).toLocaleDateString()}</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="icon-btn-sm"
+                      title={t('notebook.deleteBtn')}
+                      onClick={(e) => { e.stopPropagation(); setDeleteTarget(n); }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
                   </div>
                 ))
               )}
@@ -246,6 +275,15 @@ export default function NotebookPanel({
       </div>
 
       {!pinned && <div className="notebook-resize-handle" onMouseDown={handleResizeMouseDown} />}
+
+      <Modal open={!!deleteTarget} title={t('notebook.deleteConfirmTitle')} onClose={() => setDeleteTarget(null)}
+        actions={<>
+          <button className="modal-btn" onClick={() => setDeleteTarget(null)} disabled={deleteBusy}>{t('common.cancel')}</button>
+          <button className="modal-btn danger" onClick={handleDeleteFromList} disabled={deleteBusy}>{deleteBusy ? t('common.loading') : t('notebook.deleteBtn')}</button>
+        </>}
+      >
+        {t('notebook.deleteConfirmBody', { name: deleteTarget?.title ?? '' })}
+      </Modal>
     </div>
   );
 }

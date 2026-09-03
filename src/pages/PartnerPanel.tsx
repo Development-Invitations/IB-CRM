@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Routes, Route, NavLink } from 'react-router-dom';
-import { Contact, FileText, Users, Briefcase, LogOut } from 'lucide-react';
+import { Contact, FileText, Users, Briefcase, Package, LogOut } from 'lucide-react';
 import { FullscreenContext } from './Dashboard';
 import Modal from '../components/Modal';
 import UpdatesButton from '../components/UpdatesButton';
@@ -8,6 +8,7 @@ import PartnerTopbar from '../components/PartnerTopbar';
 import ClientsPage from './Clients';
 import PartnerRegulationsPage from './PartnerRegulations';
 import PartnerServicesPage from './PartnerServices';
+import HouseServicesPage from './HouseServices';
 import PartnerEmployeesPage from './PartnerEmployees';
 import PartnerSettingsPage from './PartnerSettings';
 import PartnerHome from './PartnerHome';
@@ -40,6 +41,7 @@ export default function PartnerPanel({ employee, onLogout }: { employee: Employe
     { label: t('partnerPanel.navRegulations'), icon: FileText, path: 'regulations' },
     { label: t('partnerPanel.navEmployees'), icon: Users, path: 'employees' },
     { label: t('partnerPanel.navServices'), icon: Briefcase, path: 'services' },
+    { label: t('houseServices.navLabel'), icon: Package, path: 'house-services' },
   ];
 
   return (
@@ -74,6 +76,7 @@ export default function PartnerPanel({ employee, onLogout }: { employee: Employe
               <Route path="clients" element={<ClientsPage currentEmployee={employee} scopedPartnerId={partnerId} />} />
               <Route path="regulations" element={<PartnerRegulationsPage currentEmployee={employee} partnerId={partnerId} />} />
               <Route path="services" element={<PartnerServicesPage currentEmployee={employee} partnerId={partnerId} />} />
+              <Route path="house-services" element={<HouseServicesPage currentEmployee={employee} />} />
               <Route path="employees" element={<PartnerEmployeesPage currentEmployee={employee} partnerId={partnerId} />} />
               <Route path="chat" element={<ChatPage currentEmployee={employee} />} />
               <Route path="settings" element={<PartnerSettingsPage employee={employee} />} />

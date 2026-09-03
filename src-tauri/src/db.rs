@@ -5306,7 +5306,7 @@ impl Db {
         })
     }
 
-    fn get_house_service(&self, id: &str) -> Option<HouseServiceRecord> {
+    pub fn get_house_service(&self, id: &str) -> Option<HouseServiceRecord> {
         let sql = format!("{} WHERE hs.id = ?1", Self::HOUSE_SERVICE_SELECT);
         self.conn.query_row(&sql, params![id], Self::map_house_service_row).ok()
     }

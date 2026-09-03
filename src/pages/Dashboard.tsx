@@ -57,7 +57,7 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
   const modules = [
     { label: t('sidebar.employees'), icon: Users, path: 'employees' },
     ...(employee.isAdmin ? [{ label: t('partners.tabLabel'), icon: Handshake, path: 'partner-accounts' }] : []),
-    ...(employee.isAdmin ? [{ label: t('houseServices.navLabel'), icon: Briefcase, path: 'house-services' }] : []),
+    { label: t('houseServices.navLabel'), icon: Briefcase, path: 'house-services' },
     { label: t('agents.navLabel'), icon: UserRound, path: 'agents' },
     { label: t('sidebar.departments'), icon: Building2, path: 'departments' },
     { label: t('sidebar.clients'), icon: Contact, path: 'clients' },
@@ -114,7 +114,7 @@ export default function Dashboard({ employee, onLogout }: { employee: Employee; 
             <Route path="employees" element={<EmployeesPage currentEmployee={employee} />} />
             <Route path="employees/:id" element={<EmployeeProfile currentEmployee={employee} />} />
             <Route path="partner-accounts" element={employee.isAdmin ? <PartnerAccountsPage currentEmployee={employee} /> : <Navigate to="/dashboard" replace />} />
-            <Route path="house-services" element={employee.isAdmin ? <HouseServicesPage currentEmployee={employee} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="house-services" element={<HouseServicesPage currentEmployee={employee} />} />
             <Route path="agents" element={<AgentsPage currentEmployee={employee} />} />
             <Route path="departments" element={<DepartmentsPage currentEmployee={employee} />} />
             <Route path="clients" element={<ClientsPage currentEmployee={employee} />} />

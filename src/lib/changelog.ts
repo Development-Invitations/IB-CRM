@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '1.9.1';
+export const APP_VERSION = '1.9.2';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,12 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '1.9.2',
+      items: [
+        'Отменён эксперимент с MSI-инсталлятором из 1.9.1 — сборка MSI (WiX) падала в CI на этапе `light.exe` и из-за этого не публиковался вообще никакой релиз (даже обычный .exe); вернули только NSIS, как было в 1.9.0',
+      ],
+    },
     {
       version: '1.9.1',
       items: [
@@ -709,6 +715,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '1.9.2',
+      items: [
+        "1.9.1 dagi MSI o'rnatuvchisi tajribasi bekor qilindi — MSI (WiX) yig'ilishi CI'da `light.exe` bosqichida yiqilib, shu sababli hech qanday relizga (oddiy .exe ham) chiqmagan edi; faqat NSIS qaytarildi, 1.9.0 dagidek",
+      ],
+    },
+    {
       version: '1.9.1',
       items: [
         "Ikkinchi o'rnatuvchi variant qo'shildi — MSI (avvalgi NSIS bilan bir qatorda) — standart Windows Installer formati antivirus tomonidan xato ravishda tahdid sifatida kamroq aniqlanishi umidida",
@@ -1401,6 +1413,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '1.9.2',
+      items: [
+        'Ушбу 1.9.1 даги MSI ўрнатувчиси тажрибаси бекор қилинди — MSI (WiX) йиғилиши CI\'да `light.exe` босқичида йиқилиб, шу сабабли ҳеч қандай релизга (оддий .exe ҳам) чиқмаган эди; фақат NSIS қайтарилди, 1.9.0 дагидек',
+      ],
+    },
     {
       version: '1.9.1',
       items: [

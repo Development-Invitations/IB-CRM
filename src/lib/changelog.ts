@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '1.9.0';
+export const APP_VERSION = '1.9.1';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,12 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '1.9.1',
+      items: [
+        'Добавлен второй вариант установщика — MSI (наряду с прежним NSIS) в надежде, что стандартный формат Windows Installer будет реже ложно распознаваться антивирусом как угроза, чем самораспаковывающийся NSIS-инсталлятор',
+      ],
+    },
     {
       version: '1.9.0',
       items: [
@@ -703,6 +709,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '1.9.1',
+      items: [
+        "Ikkinchi o'rnatuvchi variant qo'shildi — MSI (avvalgi NSIS bilan bir qatorda) — standart Windows Installer formati antivirus tomonidan xato ravishda tahdid sifatida kamroq aniqlanishi umidida",
+      ],
+    },
+    {
       version: '1.9.0',
       items: [
         "Botda: sotuvni yozishda xizmat tanlashdan oldin istalgan xizmatga bosib, uning to'liq tavsifini ko'rish mumkin; asosiy menyuda \"Xizmatlar katalogi\" tugmasi paydo bo'ldi — agent butun katalogni mijoz bilan gaplashishdan oldin o'rganib chiqishi mumkin",
@@ -1389,6 +1401,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '1.9.1',
+      items: [
+        'Иккинчи ўрнатувчи вариант қўшилди — MSI (аввалги NSIS билан бир қаторда) — стандарт Windows Installer формати антивирус томонидан хато равишда таҳдид сифатида камроқ аниқланиши умидида',
+      ],
+    },
     {
       version: '1.9.0',
       items: [

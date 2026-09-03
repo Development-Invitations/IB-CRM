@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '1.7.0';
+export const APP_VERSION = '1.8.0';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,23 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '1.8.0',
+      items: [
+        'Раздел «Агенты» теперь обновляется сам, без перезахода на страницу',
+        'В карточке агента и в «Списке агентов» видно № агента; у клиента, оформленного из лида, виден его номер в CRM',
+        'Новый шаг регистрации в боте — номер карты для выплаты вознаграждения за продажу; в CRM он показан скрытым, полностью виден только админу по кнопке «Показать», и включён в выгрузку Excel',
+        'Админ может напрямую отредактировать данные агента в CRM (ФИО, телефон, адрес, почта, номер карты, новое фото паспорта) — без участия бота, например когда агент попросил об этом в чате агентов',
+        'При записи продажи бот теперь предлагает агенту выбрать одну или несколько услуг из каталога «Наши услуги» — при оформлении клиента они автоматически появляются в его истории услуг',
+        'В боте появилось командное меню (иконка рядом с полем ввода) с быстрыми командами — то же самое, что кнопки, но ещё и через меню Telegram',
+        'Добавлено приветствие бота — объясняет агенту, куда он попал и зачем, показывается при первом входе; текст задаётся в Настройках на 3 языках (с готовым текстом по умолчанию)',
+        'Разделы «Согласие агента» и «Приветствие бота» в Настройках свёрнуты в аккордеон, чтобы не занимать много места',
+        'Исправлено: удаление клиента, оформленного через агента, падало с ошибкой «FOREIGN KEY constraint failed» — теперь удаляется корректно',
+        'Исправлена вёрстка выбора шага в окне «Отправить на уточнение» (переключатели съезжали в сторону)',
+        'Добавлена отдельная выгрузка фото паспортов агентов — отдельными файлами в выбранную папку (не внутри Excel)',
+        'Усилена защита персональных данных агентов: список агентов теперь не отдаёт телефон/адрес/почту/фото паспорта никому, кроме админа, на уровне сервера (раньше это только скрывалось в интерфейсе)',
+      ],
+    },
     {
       version: '1.7.0',
       items: [
@@ -667,6 +684,23 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '1.8.0',
+      items: [
+        "\"Agentlar\" bo'limi endi sahifani qayta yuklamasdan o'zi yangilanadi",
+        "Agent kartochkasida va \"Agentlar ro'yxati\"da agent № ko'rinadi; liddan rasmiylashtirilgan mijozning CRM'dagi raqami ham ko'rinadi",
+        "Botda yangi ro'yxatdan o'tish qadami — sotuv uchun mukofot to'lash uchun karta raqami; CRM'da u yashiringan holda ko'rsatiladi, to'liq holda faqat admin \"Ko'rsatish\" tugmasi orqali ko'radi, Excel'ga ham kiritiladi",
+        "Admin agent ma'lumotlarini CRM'da to'g'ridan-to'g'ri tahrirlashi mumkin (F.I.Sh, telefon, manzil, pochta, karta raqami, yangi pasport surati) — botsiz, masalan agent buni agentlar chatida so'raganda",
+        "Sotuvni yozishda bot endi agentga \"Bizning xizmatlar\" katalogidan bitta yoki bir nechta xizmatni tanlashni taklif qiladi — mijoz rasmiylashtirilganda ular avtomatik uning xizmatlar tarixiga qo'shiladi",
+        "Botda buyruqlar menyusi paydo bo'ldi (matn kiritish maydoni yonidagi belgi) tezkor buyruqlar bilan — tugmalar bilan bir xil, lekin Telegram menyusi orqali ham",
+        "Bot salomlashuvi qo'shildi — agentga qayerga tushganini va nima uchunligini tushuntiradi, birinchi kirishda ko'rsatiladi; matni Sozlamalarda 3 tilda kiritiladi (tayyor standart matn bilan)",
+        "Sozlamalardagi \"Agent roziligi\" va \"Bot salomlashuvi\" bo'limlari ko'p joy egallamasligi uchun akkordionga yig'ildi",
+        "Tuzatildi: agent orqali rasmiylashtirilgan mijozni o'chirish \"FOREIGN KEY constraint failed\" xatosi bilan tushib qolardi — endi to'g'ri o'chiriladi",
+        "\"Aniqlashtirish uchun yuborish\" oynasidagi qadam tanlash verstkasi tuzatildi (radio tugmalar chetga surilib qolardi)",
+        "Agentlar pasport suratlarini alohida yuklab olish qo'shildi — tanlangan papkaga alohida fayllar sifatida (Excel ichida emas)",
+        "Agentlar shaxsiy ma'lumotlarining himoyasi kuchaytirildi: agentlar ro'yxati endi telefon/manzil/pochta/pasport suratini serverning o'zida faqat adminga beradi (avval bu faqat interfeysda yashiringan edi)",
+      ],
+    },
+    {
       version: '1.7.0',
       items: [
         "Agentlar: admin endi agentni ma'lumotlarni aniqlashtirish uchun qaytadan yuborishi mumkin — butunlay yoki aniq maydondan boshlab (\"Agentlar\"da tugma); agent bu haqda botda davom etish kerak bo'lgan savol bilan xabar oladi",
@@ -1317,6 +1351,23 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '1.8.0',
+      items: [
+        '"Агентлар" бўлими энди саҳифани қайта юкламасдан ўзи янгиланади',
+        'Агент карточкасида ва "Агентлар рўйхати"да агент № кўринади; лиддан расмийлаштирилган мижознинг CRM\'даги рақами ҳам кўринади',
+        'Ботда янги рўйхатдан ўтиш қадами — сотув учун мукофот тўлаш учун карта рақами; CRM\'да у яширинган ҳолда кўрсатилади, тўлиқ ҳолда фақат админ "Кўрсатиш" тугмаси орқали кўради, Excel\'га ҳам киритилади',
+        'Админ агент маълумотларини CRM\'да тўғридан-тўғри таҳрирлаши мумкин (Ф.И.Ш, телефон, манзил, почта, карта рақами, янги паспорт сурати) — ботсиз, масалан агент буни агентлар чатида сўраганда',
+        'Сотувни ёзишда бот энди агентга "Бизнинг хизматлар" каталогидан битта ёки бир нечта хизматни танлашни таклиф қилади — мижоз расмийлаштирилганда улар автоматик унинг хизматлар тарихига қўшилади',
+        'Ботда буйруқлар менюси пайдо бўлди (матн киритиш майдони ёнидаги белги) тезкор буйруқлар билан — тугмалар билан бир хил, лекин Telegram менюси орқали ҳам',
+        'Бот саломлашуви қўшилди — агентга қаерга тушганини ва нима учунлигини тушунтиради, биринчи киришда кўрсатилади; матни Созламаларда 3 тилда киритилади (тайёр стандарт матн билан)',
+        'Созламалардаги "Агент розилиги" ва "Бот саломлашуви" бўлимлари кўп жой эгалламаслиги учун аккордионга йиғилди',
+        'Тузатилди: агент орқали расмийлаштирилган мижозни ўчириш "FOREIGN KEY constraint failed" хатоси билан тушиб қоларди — энди тўғри ўчирилади',
+        '"Аниқлаштириш учун юбориш" ойнасидаги қадам танлаш версткаси тузатилди (радио тугмалар четга сурилиб қоларди)',
+        'Агентлар паспорт суратларини алоҳида юклаб олиш қўшилди — танланган папкага алоҳида файллар сифатида (Excel ичида эмас)',
+        'Агентлар шахсий маълумотларининг ҳимояси кучайтирилди: агентлар рўйхати энди телефон/манзил/почта/паспорт суратини сервернинг ўзида фақат админга беради (аввал бу фақат интерфейсда яширинган эди)',
+      ],
+    },
     {
       version: '1.7.0',
       items: [

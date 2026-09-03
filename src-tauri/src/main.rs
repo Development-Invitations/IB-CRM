@@ -276,6 +276,8 @@ struct Agent {
     passport_photo_data: Option<String>,
     #[serde(rename = "passportPhotoName")]
     passport_photo_name: Option<String>,
+    #[serde(rename = "cardNumber")]
+    card_number: Option<String>,
     #[serde(rename = "consentGiven")]
     consent_given: bool,
     #[serde(rename = "consentGivenAt")]
@@ -309,6 +311,10 @@ struct AgentLead {
     stage: String,
     #[serde(rename = "convertedClientId")]
     converted_client_id: Option<String>,
+    #[serde(rename = "convertedClientNumber")]
+    converted_client_number: Option<String>,
+    #[serde(rename = "serviceIds")]
+    service_ids: Option<String>,
     #[serde(rename = "createdAt")]
     created_at: String,
     #[serde(rename = "updatedAt")]
@@ -2461,6 +2467,7 @@ fn to_agent(a: db::AgentRecord) -> Agent {
         email: a.email,
         passport_photo_data: a.passport_photo_data,
         passport_photo_name: a.passport_photo_name,
+        card_number: a.card_number,
         consent_given: a.consent_given,
         consent_given_at: a.consent_given_at,
         locale: a.locale,
@@ -2483,6 +2490,8 @@ fn to_agent_lead(l: db::AgentLeadRecord) -> AgentLead {
         note: l.note,
         stage: l.stage,
         converted_client_id: l.converted_client_id,
+        converted_client_number: l.converted_client_number,
+        service_ids: l.service_ids,
         created_at: l.created_at,
         updated_at: l.updated_at,
     }
@@ -4027,10 +4036,110 @@ pub(crate) fn agents_bot_ready(db: &Db) -> Option<(reqwest::Client, String)> {
     Some((reqwest::Client::new(), token))
 }
 
+#[derive(serde::Deserialize)]
+struct ListAgentsPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+}
+
 #[tauri::command]
-fn list_agents(state: tauri::State<AppState>) -> Vec<Agent> {
+fn list_agents(payload: ListAgentsPayload, state: tauri::State<AppState>) -> Vec<Agent> {
     let db = state.0.lock().unwrap();
-    db.list_agents().into_iter().map(to_agent).collect()
+    db.list_agents_redacted(&payload.actor_id).into_iter().map(to_agent).collect()
+}
+
+#[derive(serde::Deserialize)]
+struct RevealAgentCardNumberPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "agentId")]
+    agent_id: String,
+}
+
+#[tauri::command]
+fn reveal_agent_card_number(payload: RevealAgentCardNumberPayload, state: tauri::State<AppState>) -> Result<String, String> {
+    let db = state.0.lock().unwrap();
+    db.reveal_agent_card_number(&payload.actor_id, &payload.agent_id)
+}
+
+#[derive(serde::Deserialize)]
+struct UpdateAgentProfilePayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "agentId")]
+    agent_id: String,
+    #[serde(rename = "fullName")]
+    full_name: String,
+    phone: Option<String>,
+    address: Option<String>,
+    email: Option<String>,
+    #[serde(rename = "cardNumber")]
+    card_number: Option<String>,
+    #[serde(rename = "passportPhotoData")]
+    passport_photo_data: Option<String>,
+    #[serde(rename = "passportPhotoName")]
+    passport_photo_name: Option<String>,
+}
+
+#[tauri::command]
+fn update_agent_profile(payload: UpdateAgentProfilePayload, state: tauri::State<AppState>) -> Result<Agent, String> {
+    let db = state.0.lock().unwrap();
+    db.update_agent_profile(
+        &payload.actor_id,
+        &payload.agent_id,
+        &payload.full_name,
+        payload.phone.as_deref(),
+        payload.address.as_deref(),
+        payload.email.as_deref(),
+        payload.card_number.as_deref(),
+        payload.passport_photo_data.as_deref(),
+        payload.passport_photo_name.as_deref(),
+    )
+    .map(to_agent)
+}
+
+#[derive(serde::Deserialize)]
+struct GetAgentWelcomeSettingsPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct AgentWelcomeSettings {
+    #[serde(rename = "textRu")]
+    text_ru: String,
+    #[serde(rename = "textUz")]
+    text_uz: String,
+    #[serde(rename = "textUzCyrl")]
+    text_uz_cyrl: String,
+}
+
+fn to_agent_welcome_settings(s: db::AgentWelcomeSettings) -> AgentWelcomeSettings {
+    AgentWelcomeSettings { text_ru: s.text_ru, text_uz: s.text_uz, text_uz_cyrl: s.text_uz_cyrl }
+}
+
+#[tauri::command]
+fn get_agent_welcome_settings(payload: GetAgentWelcomeSettingsPayload, state: tauri::State<AppState>) -> Result<AgentWelcomeSettings, String> {
+    let db = state.0.lock().unwrap();
+    db.get_agent_welcome_settings(&payload.actor_id).map(to_agent_welcome_settings)
+}
+
+#[derive(serde::Deserialize)]
+struct SetAgentWelcomeSettingsPayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    #[serde(rename = "textRu")]
+    text_ru: String,
+    #[serde(rename = "textUz")]
+    text_uz: String,
+    #[serde(rename = "textUzCyrl")]
+    text_uz_cyrl: String,
+}
+
+#[tauri::command]
+fn set_agent_welcome_settings(payload: SetAgentWelcomeSettingsPayload, state: tauri::State<AppState>) -> Result<AgentWelcomeSettings, String> {
+    let db = state.0.lock().unwrap();
+    db.set_agent_welcome_settings(&payload.admin_id, &payload.text_ru, &payload.text_uz, &payload.text_uz_cyrl).map(to_agent_welcome_settings)
 }
 
 #[tauri::command]
@@ -4163,6 +4272,47 @@ fn export_agents_excel(payload: ExportAgentsExcelPayload, state: tauri::State<Ap
     let agents = db.list_agents();
     let bytes = report_export::generate_agents_workbook(&agents)?;
     Ok(base64::engine::general_purpose::STANDARD.encode(&bytes))
+}
+
+#[derive(serde::Deserialize)]
+struct ExportAgentPhotosPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct AgentPhotoExportItem {
+    #[serde(rename = "agentNumber")]
+    agent_number: String,
+    #[serde(rename = "fullName")]
+    full_name: String,
+    #[serde(rename = "photoData")]
+    photo_data: String,
+}
+
+// Отдельная выгрузка фото паспортов (v1.7.0) — по прямой просьбе пользователя
+// НЕ встраивать их в Excel, а выгружать отдельными файлами. Как и
+// export_agents_excel выше — только возвращает данные (уже готовые data:
+// URL, декодировать/сохранять как файлы будет сам фронтенд через
+// @tauri-apps/plugin-fs, см. Agents.tsx::handleExportPhotos), поэтому
+// безопасно проксируется через dispatch.rs.
+#[tauri::command]
+fn export_agent_photos(payload: ExportAgentPhotosPayload, state: tauri::State<AppState>) -> Result<Vec<AgentPhotoExportItem>, String> {
+    let db = state.0.lock().unwrap();
+    if !db.is_admin(&payload.actor_id) {
+        return Err("Недостаточно прав".into());
+    }
+    Ok(db
+        .list_agents()
+        .into_iter()
+        .filter_map(|a| {
+            a.passport_photo_data.map(|photo_data| AgentPhotoExportItem {
+                agent_number: a.agent_number,
+                full_name: a.full_name,
+                photo_data,
+            })
+        })
+        .collect())
 }
 
 #[tauri::command]
@@ -4704,6 +4854,8 @@ fn main() {
             resolve_agent_application,
             request_agent_reregistration,
             delete_agent,
+            reveal_agent_card_number,
+            update_agent_profile,
             list_agent_leads,
             advance_agent_lead_stage,
             list_agent_training_posts,
@@ -4712,7 +4864,10 @@ fn main() {
             delete_agent_training_post,
             get_agent_consent_settings,
             set_agent_consent_settings,
+            get_agent_welcome_settings,
+            set_agent_welcome_settings,
             export_agents_excel,
+            export_agent_photos,
             generate_telegram_link_code,
             get_telegram_link_status,
             unlink_telegram,

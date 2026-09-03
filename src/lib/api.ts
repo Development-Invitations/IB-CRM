@@ -543,6 +543,10 @@ export type Agent = {
   email: string | null;
   passportPhotoData: string | null;
   passportPhotoName: string | null;
+  // В общем списке (list_agents) — маскированное значение вида "5561 ••••
+  // •••• ••••" (не для неадминов — там null); полный номер только через
+  // api.revealAgentCardNumber по явному запросу.
+  cardNumber: string | null;
   consentGiven: boolean;
   consentGivenAt: string | null;
   locale: string;
@@ -563,6 +567,8 @@ export type AgentLead = {
   note: string | null;
   stage: AgentLeadStage;
   convertedClientId: string | null;
+  convertedClientNumber: string | null;
+  serviceIds: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -582,6 +588,12 @@ export type AgentConsentSettings = {
   textUz: string;
   textUzCyrl: string;
   chatLink: string | null;
+};
+
+export type AgentWelcomeSettings = {
+  textRu: string;
+  textUz: string;
+  textUzCyrl: string;
 };
 
 export type TelegramLinkInfo = {
@@ -1113,14 +1125,34 @@ export const api = {
   unlinkTelegram: (payload: { actorId: string; employeeId: string }) =>
     invoke<void>('unlink_telegram', { payload }),
 
-  listAgents: () => invoke<Agent[]>('list_agents'),
+  // actorId нужен, чтобы сервер мог скрыть личные данные (телефон/адрес/
+  // почта/фото паспорта/номер карты) от не-админов — раньше эта команда не
+  // принимала актора вообще и отдавала всё всем без разбора.
+  listAgents: (payload: { actorId: string }) => invoke<Agent[]>('list_agents', { payload }),
   resolveAgentApplication: (payload: { actorId: string; id: string; approve: boolean }) =>
     invoke<Agent>('resolve_agent_application', { payload }),
   // fromStep — с какого поля попросить агента заполнить заново (name/phone/
-  // address/email/passport); omitted/undefined — заполнить полностью заново.
+  // address/email/passport/card); omitted/undefined — заполнить полностью заново.
   requestAgentReregistration: (payload: { actorId: string; agentId: string; fromStep?: string }) =>
     invoke<Agent>('request_agent_reregistration', { payload }),
   deleteAgent: (payload: { actorId: string; agentId: string }) => invoke<void>('delete_agent', { payload }),
+  // Полный номер карты — сознательно отдельный запрос "по требованию"
+  // (кнопка "Показать"), а не поле, приходящее сразу со списком.
+  revealAgentCardNumber: (payload: { actorId: string; agentId: string }) => invoke<string>('reveal_agent_card_number', { payload }),
+  // Прямое редактирование данных агента админом в CRM, без участия бота —
+  // сценарий "агент попросил в чате поменять телефон/номер карты и т. п.".
+  // passportPhotoData/Name — omit, если фото не меняется (сервер сохранит старое).
+  updateAgentProfile: (payload: {
+    actorId: string;
+    agentId: string;
+    fullName: string;
+    phone?: string | null;
+    address?: string | null;
+    email?: string | null;
+    cardNumber?: string | null;
+    passportPhotoData?: string | null;
+    passportPhotoName?: string | null;
+  }) => invoke<Agent>('update_agent_profile', { payload }),
   listAgentLeads: () => invoke<AgentLead[]>('list_agent_leads'),
   advanceAgentLeadStage: (payload: { actorId: string; leadId: string; stage: AgentLeadStage }) =>
     invoke<AgentLead>('advance_agent_lead_stage', { payload }),
@@ -1134,10 +1166,17 @@ export const api = {
   getAgentConsentSettings: (payload: { actorId: string }) => invoke<AgentConsentSettings>('get_agent_consent_settings', { payload }),
   setAgentConsentSettings: (payload: { adminId: string; enabled: boolean; textRu: string; textUz: string; textUzCyrl: string; chatLink?: string | null }) =>
     invoke<AgentConsentSettings>('set_agent_consent_settings', { payload }),
+  getAgentWelcomeSettings: (payload: { actorId: string }) => invoke<AgentWelcomeSettings>('get_agent_welcome_settings', { payload }),
+  setAgentWelcomeSettings: (payload: { adminId: string; textRu: string; textUz: string; textUzCyrl: string }) =>
+    invoke<AgentWelcomeSettings>('set_agent_welcome_settings', { payload }),
   // Возвращает содержимое .xlsx как base64 (не пишет файл сам) — так работает
   // и когда CRM подключена к серверу как клиент по сети; сохранение на диск
   // делает сам фронтенд, см. Agents.tsx::handleExportExcel.
   exportAgentsExcel: (payload: { actorId: string }) => invoke<string>('export_agents_excel', { payload }),
+  // Фото паспортов отдельно от Excel (по прямой просьбе пользователя) —
+  // каждое как отдельный data: URL, сохраняются отдельными файлами фронтендом.
+  exportAgentPhotos: (payload: { actorId: string }) =>
+    invoke<{ agentNumber: string; fullName: string; photoData: string }[]>('export_agent_photos', { payload }),
 
   getNotebookSettings: (payload: { actorId: string; employeeId: string }) =>
     invoke<NotebookSettings>('get_notebook_settings', { payload }),

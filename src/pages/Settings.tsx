@@ -277,6 +277,43 @@ export default function Settings({ employee }: { employee: Employee }) {
     }
   };
 
+  // Приветствие бота (v1.7.0) — в отличие от согласия выше, всегда
+  // показывается агенту (нет чекбокса "включить"). Обе секции — в аккордионе
+  // (по просьбе пользователя "чтоб много место не занимало"), закрыты по
+  // умолчанию, тот же CSS, что и у "Обучение" ниже (.changelog-accordion).
+  const [agentConsentOpen, setAgentConsentOpen] = useState(false);
+  const [agentWelcomeOpen, setAgentWelcomeOpen] = useState(false);
+  const [welcomeTextRu, setWelcomeTextRu] = useState('');
+  const [welcomeTextUz, setWelcomeTextUz] = useState('');
+  const [welcomeTextUzCyrl, setWelcomeTextUzCyrl] = useState('');
+  const [welcomeBusy, setWelcomeBusy] = useState(false);
+
+  useEffect(() => {
+    if (!employee.isAdmin) return;
+    api.getAgentWelcomeSettings({ actorId: employee.id }).then((s) => {
+      setWelcomeTextRu(s.textRu);
+      setWelcomeTextUz(s.textUz);
+      setWelcomeTextUzCyrl(s.textUzCyrl);
+    }).catch(() => {});
+  }, [employee.isAdmin, employee.id]);
+
+  const handleSaveAgentWelcome = async () => {
+    setWelcomeBusy(true);
+    try {
+      await api.setAgentWelcomeSettings({
+        adminId: employee.id,
+        textRu: welcomeTextRu,
+        textUz: welcomeTextUz,
+        textUzCyrl: welcomeTextUzCyrl,
+      });
+      showToast('success', t('settings.agentWelcome.saveSuccess'));
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('settings.errorGeneric'));
+    } finally {
+      setWelcomeBusy(false);
+    }
+  };
+
   // Авто-выгрузка отчётов (v0.5.0) — путь к папке имеет смысл только на
   // машине, которая реально пишет файл, поэтому вся секция (как и
   // Backup/installer выше) скрыта в клиент-режиме — см. docs/TZ.md v0.5.0.
@@ -1069,36 +1106,80 @@ export default function Settings({ employee }: { employee: Employee }) {
         <section className="settings-section">
           <h2>{t('settings.agentConsent.title')}</h2>
           <p className="settings-hint">{t('settings.agentConsent.hint')}</p>
-          <div style={{ marginTop: 10 }}>
-            <Checkbox checked={consentEnabled} onChange={setConsentEnabled} label={t('settings.agentConsent.enableLabel')} />
+          <div className="changelog-accordion" style={{ marginTop: 10 }}>
+            <div className="changelog-item">
+              <button type="button" className="changelog-item-header" onClick={() => setAgentConsentOpen((o) => !o)}>
+                <span>{t('settings.agentConsent.toggleLabel')}</span>
+                <ChevronDown size={16} className={`changelog-chevron ${agentConsentOpen ? 'open' : ''}`} />
+              </button>
+              {agentConsentOpen && (
+                <div className="training-body">
+                  <Checkbox checked={consentEnabled} onChange={setConsentEnabled} label={t('settings.agentConsent.enableLabel')} />
+
+                  {consentEnabled && (
+                    <>
+                      <div className="field" style={{ marginTop: 10 }}>
+                        <label>{t('settings.agentConsent.textRuLabel')}</label>
+                        <textarea rows={4} value={consentTextRu} onChange={(e) => setConsentTextRu(e.target.value)} />
+                      </div>
+                      <div className="field" style={{ marginTop: 10 }}>
+                        <label>{t('settings.agentConsent.textUzLabel')}</label>
+                        <textarea rows={4} value={consentTextUz} onChange={(e) => setConsentTextUz(e.target.value)} />
+                      </div>
+                      <div className="field" style={{ marginTop: 10 }}>
+                        <label>{t('settings.agentConsent.textUzCyrlLabel')}</label>
+                        <textarea rows={4} value={consentTextUzCyrl} onChange={(e) => setConsentTextUzCyrl(e.target.value)} />
+                      </div>
+                    </>
+                  )}
+
+                  <div className="field" style={{ marginTop: 10, maxWidth: 420 }}>
+                    <label>{t('settings.agentConsent.chatLinkLabel')}</label>
+                    <input value={agentChatLink} onChange={(e) => setAgentChatLink(e.target.value)} placeholder={t('settings.agentConsent.chatLinkPlaceholder')} />
+                    <p className="settings-hint">{t('settings.agentConsent.chatLinkHint')}</p>
+                  </div>
+
+                  <button className="modal-btn" onClick={handleSaveAgentConsent} disabled={consentBusy} style={{ marginTop: 10 }}>
+                    {consentBusy ? t('common.loading') : t('settings.telegramBots.saveBtn')}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
+        </section>
+      )}
 
-          {consentEnabled && (
-            <>
-              <div className="field" style={{ marginTop: 10 }}>
-                <label>{t('settings.agentConsent.textRuLabel')}</label>
-                <textarea rows={4} value={consentTextRu} onChange={(e) => setConsentTextRu(e.target.value)} />
-              </div>
-              <div className="field" style={{ marginTop: 10 }}>
-                <label>{t('settings.agentConsent.textUzLabel')}</label>
-                <textarea rows={4} value={consentTextUz} onChange={(e) => setConsentTextUz(e.target.value)} />
-              </div>
-              <div className="field" style={{ marginTop: 10 }}>
-                <label>{t('settings.agentConsent.textUzCyrlLabel')}</label>
-                <textarea rows={4} value={consentTextUzCyrl} onChange={(e) => setConsentTextUzCyrl(e.target.value)} />
-              </div>
-            </>
-          )}
-
-          <div className="field" style={{ marginTop: 10, maxWidth: 420 }}>
-            <label>{t('settings.agentConsent.chatLinkLabel')}</label>
-            <input value={agentChatLink} onChange={(e) => setAgentChatLink(e.target.value)} placeholder={t('settings.agentConsent.chatLinkPlaceholder')} />
-            <p className="settings-hint">{t('settings.agentConsent.chatLinkHint')}</p>
+      {employee.isAdmin && (
+        <section className="settings-section">
+          <h2>{t('settings.agentWelcome.title')}</h2>
+          <p className="settings-hint">{t('settings.agentWelcome.hint')}</p>
+          <div className="changelog-accordion" style={{ marginTop: 10 }}>
+            <div className="changelog-item">
+              <button type="button" className="changelog-item-header" onClick={() => setAgentWelcomeOpen((o) => !o)}>
+                <span>{t('settings.agentWelcome.toggleLabel')}</span>
+                <ChevronDown size={16} className={`changelog-chevron ${agentWelcomeOpen ? 'open' : ''}`} />
+              </button>
+              {agentWelcomeOpen && (
+                <div className="training-body">
+                  <div className="field">
+                    <label>{t('settings.agentWelcome.textRuLabel')}</label>
+                    <textarea rows={4} value={welcomeTextRu} onChange={(e) => setWelcomeTextRu(e.target.value)} />
+                  </div>
+                  <div className="field" style={{ marginTop: 10 }}>
+                    <label>{t('settings.agentWelcome.textUzLabel')}</label>
+                    <textarea rows={4} value={welcomeTextUz} onChange={(e) => setWelcomeTextUz(e.target.value)} />
+                  </div>
+                  <div className="field" style={{ marginTop: 10 }}>
+                    <label>{t('settings.agentWelcome.textUzCyrlLabel')}</label>
+                    <textarea rows={4} value={welcomeTextUzCyrl} onChange={(e) => setWelcomeTextUzCyrl(e.target.value)} />
+                  </div>
+                  <button className="modal-btn" onClick={handleSaveAgentWelcome} disabled={welcomeBusy} style={{ marginTop: 10 }}>
+                    {welcomeBusy ? t('common.loading') : t('settings.telegramBots.saveBtn')}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-
-          <button className="modal-btn" onClick={handleSaveAgentConsent} disabled={consentBusy} style={{ marginTop: 10 }}>
-            {consentBusy ? t('common.loading') : t('settings.telegramBots.saveBtn')}
-          </button>
         </section>
       )}
 

@@ -738,7 +738,21 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
             let p: crate::SetTelegramBotSettingsPayload = from_payload(payload)?;
             db.set_telegram_bot_settings(&p.admin_id, &p.role, p.enabled, p.token.as_deref()).map(crate::to_telegram_bot_settings).map(to_json)
         }
-        "list_agents" => Ok(to_json(db.list_agents().into_iter().map(crate::to_agent).collect::<Vec<_>>())),
+        "list_agents" => {
+            let p: crate::ListAgentsPayload = from_payload(payload)?;
+            Ok(to_json(db.list_agents_redacted(&p.actor_id).into_iter().map(crate::to_agent).collect::<Vec<_>>()))
+        }
+        "reveal_agent_card_number" => {
+            let p: crate::RevealAgentCardNumberPayload = from_payload(payload)?;
+            db.reveal_agent_card_number(&p.actor_id, &p.agent_id).map(to_json)
+        }
+        "update_agent_profile" => {
+            let p: crate::UpdateAgentProfilePayload = from_payload(payload)?;
+            db.update_agent_profile(
+                &p.actor_id, &p.agent_id, &p.full_name, p.phone.as_deref(), p.address.as_deref(), p.email.as_deref(),
+                p.card_number.as_deref(), p.passport_photo_data.as_deref(), p.passport_photo_name.as_deref(),
+            ).map(crate::to_agent).map(to_json)
+        }
         "resolve_agent_application" => {
             let p: crate::ResolveAgentApplicationPayload = from_payload(payload)?;
             let agent = db.resolve_agent_application(&p.actor_id, &p.id, p.approve)?;
@@ -809,6 +823,14 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
             db.set_agent_consent_settings(&p.admin_id, p.enabled, &p.text_ru, &p.text_uz, &p.text_uz_cyrl, p.chat_link.as_deref())
                 .map(crate::to_agent_consent_settings).map(to_json)
         }
+        "get_agent_welcome_settings" => {
+            let p: crate::GetAgentWelcomeSettingsPayload = from_payload(payload)?;
+            db.get_agent_welcome_settings(&p.actor_id).map(crate::to_agent_welcome_settings).map(to_json)
+        }
+        "set_agent_welcome_settings" => {
+            let p: crate::SetAgentWelcomeSettingsPayload = from_payload(payload)?;
+            db.set_agent_welcome_settings(&p.admin_id, &p.text_ru, &p.text_uz, &p.text_uz_cyrl).map(crate::to_agent_welcome_settings).map(to_json)
+        }
         // В отличие от generate_report_now (который пишет прямо в out_path на
         // диске сервера и поэтому сознательно не проксируется, см. ниже),
         // export_agents_excel только возвращает готовые байты .xlsx как
@@ -824,6 +846,23 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
             let agents = db.list_agents();
             let bytes = crate::report_export::generate_agents_workbook(&agents)?;
             Ok(to_json(base64::engine::general_purpose::STANDARD.encode(&bytes)))
+        }
+        // Тоже только возвращает данные (готовые data: URL) — сохраняет файлы
+        // сам фронтенд, см. main.rs::export_agent_photos.
+        "export_agent_photos" => {
+            let p: crate::ExportAgentPhotosPayload = from_payload(payload)?;
+            if !db.is_admin(&p.actor_id) {
+                return Err("Недостаточно прав".into());
+            }
+            let items: Vec<_> = db
+                .list_agents()
+                .into_iter()
+                .filter_map(|a| a.passport_photo_data.map(|photo_data| (a.agent_number, a.full_name, photo_data)))
+                .map(|(agent_number, full_name, photo_data)| {
+                    serde_json::json!({ "agentNumber": agent_number, "fullName": full_name, "photoData": photo_data })
+                })
+                .collect();
+            Ok(to_json(items))
         }
         "generate_telegram_link_code" => {
             let p: crate::GenerateTelegramLinkCodePayload = from_payload(payload)?;

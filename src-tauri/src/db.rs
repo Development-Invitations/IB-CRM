@@ -239,6 +239,7 @@ pub struct AgentRecord {
     pub email: Option<String>,
     pub passport_photo_data: Option<String>,
     pub passport_photo_name: Option<String>,
+    pub card_number: Option<String>,
     pub consent_given: bool,
     pub consent_given_at: Option<String>,
     pub locale: String,
@@ -260,6 +261,8 @@ pub struct AgentLeadRecord {
     pub note: Option<String>,
     pub stage: String,
     pub converted_client_id: Option<String>,
+    pub converted_client_number: Option<String>,
+    pub service_ids: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -270,6 +273,16 @@ pub struct AgentConsentSettings {
     pub text_uz: String,
     pub text_uz_cyrl: String,
     pub chat_link: Option<String>,
+}
+
+// Приветствие бота (v1.7.0) — в отличие от AgentConsentSettings выше, всегда
+// показывается (нет чекбокса "включить"), объясняет агенту, куда он попал и
+// зачем — по прямому запросу пользователя ("придумать приветствие и
+// рассказать пользователю зачем он тут").
+pub struct AgentWelcomeSettings {
+    pub text_ru: String,
+    pub text_uz: String,
+    pub text_uz_cyrl: String,
 }
 
 pub struct AgentTrainingPostRecord {
@@ -1236,6 +1249,19 @@ impl Db {
         // чтобы уникальность ИНН была видна и после того, как лид уже стал
         // клиентом (не только пока он ещё в agent_leads).
         add_column_if_missing(&conn, "clients", "inn TEXT");
+        // Номер карты агента для выплаты вознаграждения за продажу (v1.7.0) —
+        // отдельный шаг регистрации в боте, после фото паспорта. Хранится как
+        // есть (тот же уровень защиты, что у остальных персональных полей
+        // агента), но в отличие от них НЕ отдаётся в общем list_agents вообще
+        // никому в открытом виде — только маскированная версия, полный номер
+        // видит админ через отдельный reveal_agent_card_number (см. ниже).
+        add_column_if_missing(&conn, "agents", "card_number TEXT");
+        // Услуги из каталога "Наши услуги", которые агент прикрепил при
+        // записи продажи (v1.7.0) — храним как список id через запятую (тот
+        // же уровень нормализации, что и work_days у сотрудников), при
+        // конвертации лида в клиента каждая разворачивается в свою запись
+        // client_services (см. advance_agent_lead_stage).
+        add_column_if_missing(&conn, "agent_leads", "service_ids TEXT");
 
         let db = Db { conn, typing: Mutex::new(HashMap::new()) };
         db.notify_todays_birthdays();
@@ -3574,6 +3600,11 @@ impl Db {
         self.conn.execute("UPDATE regulations SET client_id = NULL WHERE client_id = ?1", params![id]).map_err(|e| e.to_string())?;
         self.conn.execute("UPDATE projects SET client_id = NULL WHERE client_id = ?1", params![id]).map_err(|e| e.to_string())?;
         self.conn.execute("UPDATE partner_regulations SET client_id = NULL WHERE client_id = ?1", params![id]).map_err(|e| e.to_string())?;
+        // agent_leads.converted_client_id (v1.6.0, Агенты) — тот же класс бага:
+        // новая ссылающаяся на clients колонка не была добавлена сюда при её
+        // введении, из-за чего удаление клиента, оформленного через агента,
+        // падало с "FOREIGN KEY constraint failed".
+        self.conn.execute("UPDATE agent_leads SET converted_client_id = NULL WHERE converted_client_id = ?1", params![id]).map_err(|e| e.to_string())?;
         self.conn.execute("DELETE FROM client_services WHERE client_id = ?1", params![id]).map_err(|e| e.to_string())?;
         self.conn.execute("DELETE FROM client_history WHERE client_id = ?1", params![id]).map_err(|e| e.to_string())?;
         self.conn.execute("DELETE FROM clients WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
@@ -5284,6 +5315,13 @@ impl Db {
         if self.get_employee(actor_id).is_none() {
             return Vec::new();
         }
+        self.list_house_services_internal()
+    }
+
+    // Без гейта по сотруднику — нужен агентскому боту (агент не сотрудник,
+    // actor_id-сотрудника у него просто нет) для показа списка услуг при
+    // записи продажи (v1.7.0, см. telegram.rs::handle_agents_bot_update).
+    pub fn list_house_services_internal(&self) -> Vec<HouseServiceRecord> {
         let sql = format!("{} ORDER BY hs.name ASC", Self::HOUSE_SERVICE_SELECT);
         let mut stmt = match self.conn.prepare(&sql) {
             Ok(s) => s,
@@ -6304,6 +6342,46 @@ impl Db {
         Ok(self.get_agent_consent_settings_internal())
     }
 
+    // Дефолтные тексты — заполнены сразу вменяемым содержанием (пользователь:
+    // "можешь сам тестово наполнить эти поля или дать готовые тексты"), а не
+    // пустой строкой — админ может отредактировать их в Настройках в любой момент.
+    pub fn get_agent_welcome_settings(&self, actor_id: &str) -> Result<AgentWelcomeSettings, String> {
+        if !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        Ok(self.get_agent_welcome_settings_internal())
+    }
+
+    pub fn get_agent_welcome_settings_internal(&self) -> AgentWelcomeSettings {
+        let get = |key: &str| -> Option<String> {
+            self.conn.query_row("SELECT value FROM app_meta WHERE key = ?1", params![key], |row| row.get(0)).ok()
+        };
+        const DEFAULT_RU: &str = "👋 Добро пожаловать в IB CRM Agent!\n\nЭтот бот — для агентов: вы приводите нам клиентов, а мы платим за это вознаграждение. Здесь вы регистрируетесь, после подтверждения администратором записываете сделки и следите за их статусом.";
+        const DEFAULT_UZ: &str = "👋 IB CRM Agent botiga xush kelibsiz!\n\nBu bot agentlar uchun: siz bizga mijoz olib kelasiz, biz esa buning uchun mukofot to'laymiz. Bu yerda ro'yxatdan o'tasiz, administrator tasdiqlagandan so'ng bitimlarni yozasiz va ularning holatini kuzatib borasiz.";
+        const DEFAULT_UZ_CYRL: &str = "👋 IB CRM Agent ботига хуш келибсиз!\n\nБу бот агентлар учун: сиз бизга мижоз олиб келасиз, биз эса бунинг учун мукофот тўлаймиз. Бу ерда рўйхатдан ўтасиз, администратор тасдиқлагандан сўнг битимларни ёзасиз ва уларнинг ҳолатини кузатиб борасиз.";
+        AgentWelcomeSettings {
+            text_ru: get("agent_welcome_text_ru").filter(|v| !v.is_empty()).unwrap_or_else(|| DEFAULT_RU.to_string()),
+            text_uz: get("agent_welcome_text_uz").filter(|v| !v.is_empty()).unwrap_or_else(|| DEFAULT_UZ.to_string()),
+            text_uz_cyrl: get("agent_welcome_text_uz_cyrl").filter(|v| !v.is_empty()).unwrap_or_else(|| DEFAULT_UZ_CYRL.to_string()),
+        }
+    }
+
+    pub fn set_agent_welcome_settings(&self, admin_id: &str, text_ru: &str, text_uz: &str, text_uz_cyrl: &str) -> Result<AgentWelcomeSettings, String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        let set = |key: &str, value: &str| {
+            self.conn.execute(
+                "INSERT INTO app_meta (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params![key, value],
+            )
+        };
+        set("agent_welcome_text_ru", text_ru.trim()).map_err(|e| e.to_string())?;
+        set("agent_welcome_text_uz", text_uz.trim()).map_err(|e| e.to_string())?;
+        set("agent_welcome_text_uz_cyrl", text_uz_cyrl.trim()).map_err(|e| e.to_string())?;
+        Ok(self.get_agent_welcome_settings_internal())
+    }
+
     // ID группового чата агентов для "кика" при удалении агента (banChatMember
     // в Telegram Bot API требует числовой chat_id, а не ссылку-приглашение,
     // которую хранит agent_chat_link/chat_link выше — из самой ссылки ID
@@ -6335,7 +6413,7 @@ impl Db {
         id, agent_number, full_name, phone, address, email,
         passport_photo_data, passport_photo_name,
         consent_given, consent_given_at, locale,
-        telegram_chat_id, status, created_at, resolved_at, resolved_by
+        telegram_chat_id, status, created_at, resolved_at, resolved_by, card_number
     FROM agents";
 
     fn map_agent_row(row: &rusqlite::Row) -> rusqlite::Result<AgentRecord> {
@@ -6356,6 +6434,7 @@ impl Db {
             created_at: row.get(13)?,
             resolved_at: row.get(14)?,
             resolved_by: row.get(15)?,
+            card_number: row.get(16)?,
         })
     }
 
@@ -6378,6 +6457,104 @@ impl Db {
         stmt.query_map([], Self::map_agent_row).map(|rows| rows.filter_map(|r| r.ok()).collect()).unwrap_or_default()
     }
 
+    // Оставляет видимыми первые 4 символа, остальные цифры/буквы заменяет на
+    // "•" — при этом пробелы-разделители сохраняются как есть, чтобы номер
+    // выглядел привычно ("5561 •••• •••• ••••"), а не одной слитной строкой.
+    fn mask_card_number(card: &str) -> String {
+        let mut visible_left = 4;
+        card.chars()
+            .map(|c| {
+                if c.is_whitespace() {
+                    c
+                } else if visible_left > 0 {
+                    visible_left -= 1;
+                    c
+                } else {
+                    '•'
+                }
+            })
+            .collect()
+    }
+
+    // Список агентов для общей страницы "Агенты" (видна всем сотрудникам) —
+    // по прямой просьбе пользователя персональные данные (телефон/адрес/
+    // почта/фото паспорта/номер карты) должны быть доступны ТОЛЬКО админу, а
+    // не просто скрыты в интерфейсе: раньше list_agents() отдавал их всем
+    // сотрудникам без разбора (фронтенд лишь не рисовал колонки), любой мог
+    // получить их напрямую через ту же команду. Номер карты не отдаётся в
+    // открытом виде даже админу — только маскированная версия, полный номер
+    // виден через отдельный reveal_agent_card_number (сознательная лишняя
+    // ступень: "просмотр по требованию", а не "сразу в списке").
+    pub fn list_agents_redacted(&self, actor_id: &str) -> Vec<AgentRecord> {
+        let is_admin = self.is_admin(actor_id);
+        self.list_agents()
+            .into_iter()
+            .map(|mut a| {
+                if !is_admin {
+                    a.phone = None;
+                    a.address = None;
+                    a.email = None;
+                    a.passport_photo_data = None;
+                    a.passport_photo_name = None;
+                    a.card_number = None;
+                } else {
+                    a.card_number = a.card_number.as_deref().map(Self::mask_card_number);
+                }
+                a
+            })
+            .collect()
+    }
+
+    // Полный номер карты — сознательно отдельная, редко вызываемая команда
+    // (а не поле в обычном списке), чтобы получить его можно было только
+    // явным действием админа ("Показать"), а не просто открыв страницу.
+    pub fn reveal_agent_card_number(&self, actor_id: &str, agent_id: &str) -> Result<String, String> {
+        if !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        let agent = self.get_agent(agent_id).ok_or_else(|| "Агент не найден".to_string())?;
+        agent.card_number.ok_or_else(|| "Номер карты не указан".to_string())
+    }
+
+    // Админ правит данные агента напрямую в CRM, без участия бота — сценарий
+    // пользователя: агент пишет в групповом чате свой ID и просит поменять
+    // данные, админ вносит правки сам. В отличие от request_agent_reregistration
+    // (агент сам перезаполняет форму в боте), тут ничего в бот не уходит.
+    // passport_photo_data/_name — Option: None значит "не менять", COALESCE
+    // в SQL сохраняет прежнее значение (поле большое, гонять его туда-обратно
+    // с фронта, если фото не менялось, незачем).
+    #[allow(clippy::too_many_arguments)]
+    pub fn update_agent_profile(
+        &self,
+        admin_id: &str,
+        agent_id: &str,
+        full_name: &str,
+        phone: Option<&str>,
+        address: Option<&str>,
+        email: Option<&str>,
+        card_number: Option<&str>,
+        passport_photo_data: Option<&str>,
+        passport_photo_name: Option<&str>,
+    ) -> Result<AgentRecord, String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        self.get_agent(agent_id).ok_or_else(|| "Агент не найден".to_string())?;
+        if full_name.trim().is_empty() {
+            return Err("Укажите ФИО агента".into());
+        }
+        self.conn
+            .execute(
+                "UPDATE agents SET full_name = ?1, phone = ?2, address = ?3, email = ?4, card_number = ?5,
+                 passport_photo_data = COALESCE(?6, passport_photo_data),
+                 passport_photo_name = COALESCE(?7, passport_photo_name)
+                 WHERE id = ?8",
+                params![full_name.trim(), phone, address, email, card_number, passport_photo_data, passport_photo_name, agent_id],
+            )
+            .map_err(|e| e.to_string())?;
+        self.get_agent(agent_id).ok_or_else(|| "Агент не найден".to_string())
+    }
+
     // Вызывается ботом при регистрации (см. telegram.rs::handle_agents_bot_update)
     // — без actor_id, инициатор не сотрудник CRM. Уведомляет всех админов
     // тем же helper'ом, что edit_requests/absence_requests.
@@ -6397,6 +6574,7 @@ impl Db {
         email: Option<&str>,
         passport_photo_data: Option<&str>,
         passport_photo_name: Option<&str>,
+        card_number: Option<&str>,
         consent_given: bool,
         locale: &str,
     ) -> Result<AgentRecord, String> {
@@ -6404,9 +6582,10 @@ impl Db {
             self.conn
                 .execute(
                     "UPDATE agents SET full_name = ?1, phone = ?2, address = ?3, email = ?4, passport_photo_data = ?5, passport_photo_name = ?6,
-                     consent_given = ?7, consent_given_at = CASE WHEN ?7 = 1 THEN datetime('now') ELSE consent_given_at END, locale = ?8,
-                     status = 'pending', resolved_at = NULL, resolved_by = NULL WHERE id = ?9",
-                    params![full_name.trim(), phone, address, email, passport_photo_data, passport_photo_name, consent_given as i64, locale, existing.id],
+                     card_number = ?7,
+                     consent_given = ?8, consent_given_at = CASE WHEN ?8 = 1 THEN datetime('now') ELSE consent_given_at END, locale = ?9,
+                     status = 'pending', resolved_at = NULL, resolved_by = NULL WHERE id = ?10",
+                    params![full_name.trim(), phone, address, email, passport_photo_data, passport_photo_name, card_number, consent_given as i64, locale, existing.id],
                 )
                 .map_err(|e| e.to_string())?;
             self.notify_all_admins(
@@ -6422,9 +6601,9 @@ impl Db {
         let agent_number = self.next_agent_number();
         self.conn
             .execute(
-                "INSERT INTO agents (id, agent_number, full_name, phone, address, email, passport_photo_data, passport_photo_name, consent_given, consent_given_at, locale, telegram_chat_id, status)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, CASE WHEN ?9 = 1 THEN datetime('now') ELSE NULL END, ?10, ?11, 'pending')",
-                params![id, agent_number, full_name.trim(), phone, address, email, passport_photo_data, passport_photo_name, consent_given as i64, locale, chat_id],
+                "INSERT INTO agents (id, agent_number, full_name, phone, address, email, passport_photo_data, passport_photo_name, card_number, consent_given, consent_given_at, locale, telegram_chat_id, status)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, CASE WHEN ?10 = 1 THEN datetime('now') ELSE NULL END, ?11, ?12, 'pending')",
+                params![id, agent_number, full_name.trim(), phone, address, email, passport_photo_data, passport_photo_name, card_number, consent_given as i64, locale, chat_id],
             )
             .map_err(|e| e.to_string())?;
         self.notify_all_admins(
@@ -6448,7 +6627,7 @@ impl Db {
             return Err("Недостаточно прав".into());
         }
         let agent = self.get_agent(agent_id).ok_or_else(|| "Агент не найден".to_string())?;
-        const STEPS: [&str; 5] = ["name", "phone", "address", "email", "passport"];
+        const STEPS: [&str; 6] = ["name", "phone", "address", "email", "passport", "card"];
         let start = from_step.filter(|s| STEPS.contains(s)).unwrap_or("name");
         let mut draft = json!({ "locale": agent.locale, "consent": agent.consent_given });
         for step in STEPS {
@@ -6460,6 +6639,13 @@ impl Db {
                 "phone" => draft["phone"] = json!(agent.phone),
                 "address" => draft["address"] = json!(agent.address),
                 "email" => draft["email"] = json!(agent.email),
+                // "passport" тут не последний шаг (после него ещё "card") —
+                // если резюмируем начиная с "card", уже присланное фото
+                // паспорта нужно сохранить в drafт, иначе оно потеряется.
+                "passport" => {
+                    draft["passport_photo_data"] = json!(agent.passport_photo_data);
+                    draft["passport_photo_name"] = json!(agent.passport_photo_name);
+                }
                 _ => {}
             }
         }
@@ -6509,9 +6695,10 @@ impl Db {
 
     const AGENT_LEAD_SELECT: &'static str = "SELECT
         al.id, al.agent_id, a.full_name, al.client_name, al.client_inn, al.client_phone, al.company_name, al.note,
-        al.stage, al.converted_client_id, al.created_at, al.updated_at
+        al.stage, al.converted_client_id, c.client_number, al.service_ids, al.created_at, al.updated_at
     FROM agent_leads al
-    JOIN agents a ON a.id = al.agent_id";
+    JOIN agents a ON a.id = al.agent_id
+    LEFT JOIN clients c ON c.id = al.converted_client_id";
 
     fn map_agent_lead_row(row: &rusqlite::Row) -> rusqlite::Result<AgentLeadRecord> {
         Ok(AgentLeadRecord {
@@ -6525,8 +6712,10 @@ impl Db {
             note: row.get(7)?,
             stage: row.get(8)?,
             converted_client_id: row.get(9)?,
-            created_at: row.get(10)?,
-            updated_at: row.get(11)?,
+            converted_client_number: row.get(10)?,
+            service_ids: row.get(11)?,
+            created_at: row.get(12)?,
+            updated_at: row.get(13)?,
         })
     }
 
@@ -6536,6 +6725,7 @@ impl Db {
     // Проверяем и против уже оформленных клиентов (clients.inn) — ИНН не
     // должен повторяться, даже если один лид уже стал клиентом, а другой
     // агент (или тот же) пытается завести того же клиента заново.
+    #[allow(clippy::too_many_arguments)]
     pub fn create_agent_lead(
         &self,
         agent_id: &str,
@@ -6543,6 +6733,7 @@ impl Db {
         client_inn: &str,
         client_phone: Option<&str>,
         company_name: Option<&str>,
+        service_ids: Option<&str>,
     ) -> Result<AgentLeadRecord, String> {
         let agent = self.get_agent(agent_id).ok_or_else(|| "Агент не найден".to_string())?;
         if agent.status != "approved" {
@@ -6567,8 +6758,8 @@ impl Db {
         let id = Uuid::new_v4().to_string();
         self.conn
             .execute(
-                "INSERT INTO agent_leads (id, agent_id, client_name, client_inn, client_phone, company_name) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![id, agent_id, client_name.trim(), inn, client_phone, company_name],
+                "INSERT INTO agent_leads (id, agent_id, client_name, client_inn, client_phone, company_name, service_ids) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![id, agent_id, client_name.trim(), inn, client_phone, company_name, service_ids],
             )
             .map_err(|e| e.to_string())?;
         self.notify_all_admins(
@@ -6624,6 +6815,16 @@ impl Db {
             self.conn
                 .execute("UPDATE clients SET origin_agent_id = ?1, inn = ?2 WHERE id = ?3", params![lead.agent_id, lead.client_inn, client.id])
                 .map_err(|e| e.to_string())?;
+            // Услуги, которые агент прикрепил при записи продажи (см.
+            // telegram.rs::handle_agents_bot_update, шаг "services") —
+            // разворачиваем в полноценную историю client_services, тем же
+            // способом, что add_client_service.
+            if let Some(ids) = lead.service_ids.as_deref() {
+                for hsid in ids.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+                    let price = self.get_house_service(hsid).and_then(|s| s.price);
+                    self.record_client_service(&client.id, Some(hsid), None, price.as_deref(), actor_id);
+                }
+            }
             self.conn
                 .execute(
                     "UPDATE agent_leads SET stage = 'converted', converted_client_id = ?1, updated_at = datetime('now') WHERE id = ?2",

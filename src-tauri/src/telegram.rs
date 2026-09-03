@@ -38,6 +38,26 @@ async fn get_me(client: &reqwest::Client, token: &str) -> Result<String, Telegra
         .ok_or_else(|| TelegramError("getMe: username отсутствует в ответе".into()))
 }
 
+// Командное меню бота (иконка рядом с полем ввода в Telegram-клиенте, см.
+// setMyCommands в Bot API) — по просьбе пользователя со скриншотом чужого
+// бота, где эта иконка открывает список команд. Даём и Cb, и слэш-команды
+// работают одинаково: слэш-команда просто прилетает как обычный текст
+// "/xxx" и ловится тем же сравнением, что и лейблы постоянной клавиатуры
+// (см. handle_agents_bot_update). Один вызов на весь список — Telegram сам
+// хранит его на своей стороне, повторный setMyCommands с тем же набором
+// ничего не ломает, поэтому safe вызывать при каждом запуске приложения.
+async fn set_agents_bot_commands(client: &reqwest::Client, token: &str) {
+    let commands = json!([
+        { "command": "start", "description": "Главное меню / регистрация" },
+        { "command": "sale", "description": "Записать продажу" },
+        { "command": "materials", "description": "Полезная информация" },
+        { "command": "leads", "description": "Мои клиенты" },
+        { "command": "chat", "description": "Чат агентов" },
+    ]);
+    let body = json!({ "commands": commands });
+    let _ = client.post(api_url(token, "setMyCommands")).json(&body).send().await;
+}
+
 pub async fn send_message(
     client: &reqwest::Client,
     token: &str,
@@ -308,6 +328,7 @@ async fn agents_poll_loop(db: Arc<Mutex<Db>>, app_handle: tauri::AppHandle) {
             if let Ok(username) = get_me(&short_client, &token).await {
                 db.lock().unwrap().set_telegram_bot_username("agents_bot", &username);
             }
+            set_agents_bot_commands(&short_client, &token).await;
         }
 
         let offset = db.lock().unwrap().get_telegram_update_offset("agents_bot");
@@ -479,6 +500,7 @@ fn bot_text<'a>(locale: &str, key: &'a str) -> &'a str {
             "ask_address" => "Yashash manzilingizni kiriting.",
             "ask_email" => "Elektron pochtangizni kiriting.",
             "ask_passport" => "Pasportning birinchi sahifasi fotosini yuboring (oddiy suratga olsangiz ham bo'ladi).",
+            "ask_card" => "Sotuv uchun mukofot to'lash uchun karta raqamingizni yuboring (masalan: 5561 1586 0000 0000).",
             "passport_invalid" => "Pasport surati yoki fayli kerak — iltimos, rasm yuboring.",
             "registration_sent" => "Ariza yuborildi ✅ Administrator tasdiqlashini kuting.",
             "registration_failed" => "Arizani yuborib bo'lmadi, /start orqali qayta urinib ko'ring.",
@@ -496,6 +518,7 @@ fn bot_text<'a>(locale: &str, key: &'a str) -> &'a str {
             "sale_inn_duplicate" => "Bu STIR bilan mijoz allaqachon ro'yxatga olingan — yozib bo'lmaydi.",
             "sale_ask_phone" => "Mijozning telefon raqami?",
             "sale_ask_company" => "Mijoz kompaniyasining nomi? (yo'q bo'lsa \"-\" yuboring)",
+            "sale_ask_services" => "Qaysi xizmatlar bo'yicha kelishildi? Raqamlarini vergul bilan yuboring (masalan: 1,3), hech biri bo'lmasa — \"-\":",
             "sale_done" => "Mijoz qo'shildi ✅ Bitim qanday rivojlanishi haqida xabar beramiz.",
             "sale_failed" => "Mijozni qo'shib bo'lmadi.",
             "no_materials" => "Hozircha materiallar yo'q.",
@@ -513,6 +536,7 @@ fn bot_text<'a>(locale: &str, key: &'a str) -> &'a str {
             "ask_address" => "Яшаш манзилингизни киритинг.",
             "ask_email" => "Электрон почтангизни киритинг.",
             "ask_passport" => "Паспортнинг биринчи саҳифаси фотосини юборинг (оддий суратга олсангиз ҳам бўлади).",
+            "ask_card" => "Сотув учун мукофот тўлаш учун карта рақамингизни юборинг (масалан: 5561 1586 0000 0000).",
             "passport_invalid" => "Паспорт сурати ёки файли керак — илтимос, расм юборинг.",
             "registration_sent" => "Ариза юборилди ✅ Администратор тасдиқлашини кутинг.",
             "registration_failed" => "Аризани юбориб бўлмади, /start орқали қайта уриниб кўринг.",
@@ -530,6 +554,7 @@ fn bot_text<'a>(locale: &str, key: &'a str) -> &'a str {
             "sale_inn_duplicate" => "Бу СТИР билан мижоз аллақачон рўйхатга олинган — ёзиб бўлмайди.",
             "sale_ask_phone" => "Мижознинг телефон рақами?",
             "sale_ask_company" => "Мижоз компаниясининг номи? (йўқ бўлса \"-\" юборинг)",
+            "sale_ask_services" => "Қайси хизматлар бўйича келишилди? Рақамларини вергул билан юборинг (масалан: 1,3), ҳеч бири бўлмаса — \"-\":",
             "sale_done" => "Мижоз қўшилди ✅ Битим қандай ривожланиши ҳақида хабар берамиз.",
             "sale_failed" => "Мижозни қўшиб бўлмади.",
             "no_materials" => "Ҳозирча материаллар йўқ.",
@@ -547,6 +572,7 @@ fn bot_text<'a>(locale: &str, key: &'a str) -> &'a str {
             "ask_address" => "Укажите ваш адрес проживания.",
             "ask_email" => "Укажите вашу электронную почту.",
             "ask_passport" => "Пришлите фото первой страницы паспорта (можно просто сфотографировать).",
+            "ask_card" => "Пришлите номер карты для выплаты вознаграждения за продажу (например: 5561 1586 0000 0000).",
             "passport_invalid" => "Нужно фото или файл паспорта — пришлите, пожалуйста, изображение.",
             "registration_sent" => "Заявка отправлена ✅ Ждите подтверждения администратора.",
             "registration_failed" => "Не удалось отправить заявку, попробуйте ещё раз через /start.",
@@ -564,6 +590,7 @@ fn bot_text<'a>(locale: &str, key: &'a str) -> &'a str {
             "sale_inn_duplicate" => "Клиент с таким ИНН уже зарегистрирован — записать нельзя.",
             "sale_ask_phone" => "Телефон клиента?",
             "sale_ask_company" => "Название компании клиента? (если нет — отправьте «-»)",
+            "sale_ask_services" => "По каким услугам договорились? Пришлите номера через запятую (например: 1,3), если ни одной — «-»:",
             "sale_done" => "Клиент добавлен ✅ Мы сообщим, как продвинется сделка.",
             "sale_failed" => "Не удалось добавить клиента.",
             "no_materials" => "Пока нет материалов.",
@@ -653,6 +680,7 @@ pub async fn notify_agent_reregister(client: reqwest::Client, token: String, cha
         "address" => "ask_address",
         "email" => "ask_email",
         "passport" => "ask_passport",
+        "card" => "ask_card",
         _ => "ask_name",
     };
     let text = format!("{}\n\n{}", bot_text(&locale, "reregister_notice"), bot_text(&locale, ask_key));
@@ -723,6 +751,15 @@ async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client,
             let agent = db.lock().unwrap().get_agent_by_chat_id(&chat_id);
             match agent {
                 None => {
+                    // Приветствие — объясняет агенту, куда он попал и зачем
+                    // (пользователь: "придумать приветствие и рассказать
+                    // пользователю зачем он тут"), настраивается в CRM на 3
+                    // языках — здесь на этапе выбора языка ещё неизвестно,
+                    // какой из них показать, поэтому все 3 сразу одним
+                    // сообщением, как и сам выбор языка ниже.
+                    let welcome = db.lock().unwrap().get_agent_welcome_settings_internal();
+                    let welcome_text = format!("{}\n\n— — —\n\n{}\n\n— — —\n\n{}", welcome.text_ru, welcome.text_uz, welcome.text_uz_cyrl);
+                    let _ = send_message(client, token, &chat_id, &welcome_text, None).await;
                     db.lock().unwrap().set_agent_bot_state(&chat_id, "register", "lang", "{}");
                     let _ = send_menu(
                         client,
@@ -760,16 +797,19 @@ async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client,
             let approved_agent = db.lock().unwrap().get_agent_by_chat_id(&chat_id).filter(|a| a.status == "approved");
             if let (Some(agent), Some(t)) = (approved_agent, text.as_deref()) {
                 let locale = agent.locale.clone();
-                if t == bot_text(&locale, "btn_sale") {
+                // Слэш-команды — тот же набор действий, что и кнопки постоянной
+                // клавиатуры, но доступны ещё и через "меню команд" Telegram
+                // (иконка рядом с полем ввода, см. set_my_commands ниже).
+                if t == bot_text(&locale, "btn_sale") || t == "/sale" {
                     start_agent_new_lead(db, client, token, &chat_id, &agent).await;
                     return;
-                } else if t == bot_text(&locale, "btn_materials") {
+                } else if t == bot_text(&locale, "btn_materials") || t == "/materials" {
                     send_agent_materials(db, client, token, &chat_id, &locale).await;
                     return;
-                } else if t == bot_text(&locale, "btn_my_leads") {
+                } else if t == bot_text(&locale, "btn_my_leads") || t == "/leads" {
                     send_agent_my_leads(db, client, token, &chat_id, &agent.id, &locale).await;
                     return;
-                } else if t == bot_text(&locale, "btn_chat") {
+                } else if t == bot_text(&locale, "btn_chat") || t == "/chat" {
                     send_agent_chat_link(db, client, token, &chat_id, &locale).await;
                     return;
                 }
@@ -815,7 +855,11 @@ async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client,
                 "passport" => {
                     // Самый важный шаг регистрации — фото/файл паспорта
                     // обязателен, текстом его пропустить нельзя (в отличие от
-                    // необязательных полей в других формах бота).
+                    // необязательных полей в других формах бота). Раньше это
+                    // был последний шаг — теперь после него ещё "card" (номер
+                    // карты для выплаты вознаграждения), поэтому просто
+                    // сохраняем фото в draft и продвигаемся дальше, не
+                    // завершая регистрацию здесь.
                     let Some((file_id, mime)) = extract_photo_file_id(msg) else {
                         let _ = send_message(client, token, &chat_id, bot_text(&locale, "passport_invalid"), None).await;
                         return;
@@ -827,10 +871,19 @@ async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client,
                             return;
                         }
                     };
+                    draft["passport_photo_data"] = json!(photo_data);
+                    draft["passport_photo_name"] = json!("passport.jpg");
+                    db.lock().unwrap().set_agent_bot_state(&chat_id, "register", "card", &draft.to_string());
+                    let _ = send_message(client, token, &chat_id, bot_text(&locale, "ask_card"), None).await;
+                }
+                "card" => {
+                    let Some(text) = text else { return };
                     let full_name = draft.get("full_name").and_then(|v| v.as_str()).unwrap_or_default().to_string();
                     let phone = draft.get("phone").and_then(|v| v.as_str()).map(|s| s.to_string());
                     let address = draft.get("address").and_then(|v| v.as_str()).map(|s| s.to_string());
                     let email = draft.get("email").and_then(|v| v.as_str()).map(|s| s.to_string());
+                    let passport_photo_data = draft.get("passport_photo_data").and_then(|v| v.as_str()).map(|s| s.to_string());
+                    let passport_photo_name = draft.get("passport_photo_name").and_then(|v| v.as_str()).map(|s| s.to_string());
                     let consent_given = draft.get("consent").and_then(|v| v.as_bool()).unwrap_or(false);
                     db.lock().unwrap().clear_agent_bot_state(&chat_id);
                     let result = db.lock().unwrap().create_agent_application(
@@ -839,8 +892,9 @@ async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client,
                         phone.as_deref(),
                         address.as_deref(),
                         email.as_deref(),
-                        Some(&photo_data),
-                        Some("passport.jpg"),
+                        passport_photo_data.as_deref(),
+                        passport_photo_name.as_deref(),
+                        Some(&text),
                         consent_given,
                         &locale,
                     );
@@ -868,19 +922,38 @@ async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client,
                     let _ = send_message(client, token, &chat_id, bot_text(&locale, "sale_ask_company"), None).await;
                 }
                 "company" => {
-                    let agent_id = draft.get("agent_id").and_then(|v| v.as_str()).unwrap_or_default().to_string();
-                    let client_name = draft.get("client_name").and_then(|v| v.as_str()).unwrap_or_default().to_string();
-                    let client_inn = draft.get("client_inn").and_then(|v| v.as_str()).unwrap_or_default().to_string();
-                    let client_phone = draft.get("client_phone").and_then(|v| v.as_str()).map(|s| s.to_string());
                     let company_name = if text == "-" { None } else { Some(text.clone()) };
-                    db.lock().unwrap().clear_agent_bot_state(&chat_id);
-                    let result = db.lock().unwrap().create_agent_lead(&agent_id, &client_name, &client_inn, client_phone.as_deref(), company_name.as_deref());
-                    let reply = match result {
-                        Ok(_) => bot_text(&locale, "sale_done"),
-                        Err(e) if e.contains("ИНН") => bot_text(&locale, "sale_inn_duplicate"),
-                        Err(_) => bot_text(&locale, "sale_failed"),
+                    draft["company_name"] = json!(company_name);
+                    let services = db.lock().unwrap().list_house_services_internal();
+                    if services.is_empty() {
+                        // Каталог "Наши услуги" пуст — нечего выбирать, сразу завершаем запись.
+                        db.lock().unwrap().clear_agent_bot_state(&chat_id);
+                        finalize_new_lead(db, client, token, &chat_id, &locale, &draft, None).await;
+                    } else {
+                        let ids: Vec<String> = services.iter().map(|s| s.id.clone()).collect();
+                        draft["service_choice_ids"] = json!(ids);
+                        let list_text = services.iter().enumerate().map(|(i, s)| format!("{}. {}", i + 1, s.name)).collect::<Vec<_>>().join("\n");
+                        db.lock().unwrap().set_agent_bot_state(&chat_id, "new_lead", "services", &draft.to_string());
+                        let _ = send_message(client, token, &chat_id, &format!("{}\n\n{}", bot_text(&locale, "sale_ask_services"), list_text), None).await;
+                    }
+                }
+                "services" => {
+                    let choice_ids: Vec<String> = draft
+                        .get("service_choice_ids")
+                        .and_then(|v| v.as_array())
+                        .map(|a| a.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect())
+                        .unwrap_or_default();
+                    let selected: Vec<String> = if text.trim() == "-" {
+                        Vec::new()
+                    } else {
+                        text.split(|c: char| c == ',' || c.is_whitespace())
+                            .filter_map(|s| s.trim().parse::<usize>().ok())
+                            .filter_map(|n| n.checked_sub(1).and_then(|i| choice_ids.get(i).cloned()))
+                            .collect()
                     };
-                    let _ = send_message(client, token, &chat_id, reply, None).await;
+                    let service_ids = if selected.is_empty() { None } else { Some(selected.join(",")) };
+                    db.lock().unwrap().clear_agent_bot_state(&chat_id);
+                    finalize_new_lead(db, client, token, &chat_id, &locale, &draft, service_ids).await;
                 }
                 _ => {}
             }
@@ -949,6 +1022,39 @@ async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client,
             }
         }
     }
+}
+
+// Завершение формы "новый клиент" — общий хвост для случая, когда в
+// каталоге "Наши услуги" есть из чего выбирать (шаг "services") и когда
+// каталог пуст (пропускаем шаг выбора и завершаем сразу из шага "company").
+async fn finalize_new_lead(
+    db: &Arc<Mutex<Db>>,
+    client: &reqwest::Client,
+    token: &str,
+    chat_id: &str,
+    locale: &str,
+    draft: &serde_json::Value,
+    service_ids: Option<String>,
+) {
+    let agent_id = draft.get("agent_id").and_then(|v| v.as_str()).unwrap_or_default().to_string();
+    let client_name = draft.get("client_name").and_then(|v| v.as_str()).unwrap_or_default().to_string();
+    let client_inn = draft.get("client_inn").and_then(|v| v.as_str()).unwrap_or_default().to_string();
+    let client_phone = draft.get("client_phone").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let company_name = draft.get("company_name").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let result = db.lock().unwrap().create_agent_lead(
+        &agent_id,
+        &client_name,
+        &client_inn,
+        client_phone.as_deref(),
+        company_name.as_deref(),
+        service_ids.as_deref(),
+    );
+    let reply = match result {
+        Ok(_) => bot_text(locale, "sale_done"),
+        Err(e) if e.contains("ИНН") => bot_text(locale, "sale_inn_duplicate"),
+        Err(_) => bot_text(locale, "sale_failed"),
+    };
+    let _ = send_message(client, token, chat_id, reply, None).await;
 }
 
 // ---- Общие действия главного меню агента — переиспользуются и тапом по

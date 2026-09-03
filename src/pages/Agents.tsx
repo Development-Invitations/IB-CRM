@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { save as saveFileDialog } from '@tauri-apps/plugin-dialog';
+import { listen } from '@tauri-apps/api/event';
+import { save as saveFileDialog, open as openDialog } from '@tauri-apps/plugin-dialog';
 import { writeFile } from '@tauri-apps/plugin-fs';
-import { Check, X, Plus, Pencil, Trash2, UserRound, Download, List, RotateCcw, ExternalLink } from 'lucide-react';
-import { api, type Employee, type Agent, type AgentLead, type AgentLeadStage, type AgentTrainingPost } from '../lib/api';
+import { Check, X, Plus, Pencil, Trash2, UserRound, Download, List, RotateCcw, ExternalLink, Eye } from 'lucide-react';
+import { api, type Employee, type Agent, type AgentLead, type AgentLeadStage, type AgentTrainingPost, type HouseService } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
 import { parseSqliteUtc } from '../lib/date';
-import { classifyAttachment } from '../lib/attachment';
+import { classifyAttachment, prepareAttachment } from '../lib/attachment';
 import Drawer from '../components/Drawer';
 import Modal from '../components/Modal';
 import LoadingScreen from '../components/LoadingScreen';
 
-const REREGISTER_STEPS = ['full', 'name', 'phone', 'address', 'email', 'passport'] as const;
+const REREGISTER_STEPS = ['full', 'name', 'phone', 'address', 'email', 'passport', 'card'] as const;
 type ReregisterStep = (typeof REREGISTER_STEPS)[number];
 
 // Раздел "Агенты" (v1.6.0) — физлица-рефереры без входа в CRM, регистрируются
@@ -32,6 +33,7 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
   const [agents, setAgents] = useState<Agent[]>([]);
   const [leads, setLeads] = useState<AgentLead[]>([]);
   const [posts, setPosts] = useState<AgentTrainingPost[]>([]);
+  const [houseServices, setHouseServices] = useState<HouseService[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Agent | null>(null);
   const [resolveBusy, setResolveBusy] = useState(false);
@@ -40,6 +42,21 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
   const [fullListOpen, setFullListOpen] = useState(false);
   const [lightboxAgent, setLightboxAgent] = useState<Agent | null>(null);
   const [exportBusy, setExportBusy] = useState(false);
+  const [exportPhotosBusy, setExportPhotosBusy] = useState(false);
+
+  // Полный номер карты — раскрывается по требованию (кнопка "Показать"),
+  // не приходит сразу со списком (см. api.listAgents/revealAgentCardNumber).
+  const [revealedCards, setRevealedCards] = useState<Record<string, string>>({});
+  const [revealBusy, setRevealBusy] = useState<string | null>(null);
+
+  const [editAgentTarget, setEditAgentTarget] = useState<Agent | null>(null);
+  const [editFullName, setEditFullName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editCardNumber, setEditCardNumber] = useState('');
+  const [editPassportFile, setEditPassportFile] = useState<{ data: string; name: string } | null>(null);
+  const [editBusy, setEditBusy] = useState(false);
 
   const [postFormOpen, setPostFormOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<AgentTrainingPost | null>(null);
@@ -54,9 +71,12 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
   const [deleteAgentTarget, setDeleteAgentTarget] = useState<Agent | null>(null);
   const [deleteAgentBusy, setDeleteAgentBusy] = useState(false);
 
-  const load = () => {
-    setLoading(true);
-    Promise.all([api.listAgents(), api.listAgentLeads(), api.listAgentTrainingPosts()])
+  // silent — при фоновом обновлении (тикер уведомлений, см. ниже) не
+  // показываем спиннер поверх уже открытой страницы: раньше единственным
+  // способом увидеть новую заявку/лид было перезайти в раздел заново.
+  const load = (silent = false) => {
+    if (!silent) setLoading(true);
+    Promise.all([api.listAgents({ actorId: currentEmployee.id }), api.listAgentLeads(), api.listAgentTrainingPosts()])
       .then(([a, l, p]) => {
         setAgents(a);
         setLeads(l);
@@ -66,12 +86,24 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
       })
       .catch(() => {
         setLoading(false);
-        showToast('error', t('common.loadError'));
+        if (!silent) showToast('error', t('common.loadError'));
       });
   };
 
   useEffect(() => {
+    api.listHouseServices({ actorId: currentEmployee.id }).then(setHouseServices).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     load();
+    // Тот же тикер, что уже будит опрос уведомлений каждые ~8 сек
+    // (main.rs::setup, "notification-tick") — иначе раздел "Агенты" не узнавал
+    // о новой заявке/лиде/материале, пока страницу не перезагрузят вручную.
+    const unlisten = listen('notification-tick', () => load(true));
+    return () => {
+      unlisten.then((f) => f());
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -200,6 +232,99 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
     }
   };
 
+  const handleRevealCard = async (agent: Agent) => {
+    setRevealBusy(agent.id);
+    try {
+      const full = await api.revealAgentCardNumber({ actorId: currentEmployee.id, agentId: agent.id });
+      setRevealedCards((prev) => ({ ...prev, [agent.id]: full }));
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('agents.errorGeneric'));
+    } finally {
+      setRevealBusy(null);
+    }
+  };
+
+  const openEditAgent = (agent: Agent) => {
+    setEditAgentTarget(agent);
+    setEditFullName(agent.fullName);
+    setEditPhone(agent.phone || '');
+    setEditAddress(agent.address || '');
+    setEditEmail(agent.email || '');
+    setEditCardNumber(revealedCards[agent.id] || '');
+    setEditPassportFile(null);
+  };
+
+  const handleEditPassportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const prepared = await prepareAttachment(file);
+      setEditPassportFile(prepared);
+    } catch {
+      showToast('error', t('agents.errorGeneric'));
+    }
+  };
+
+  const handleSaveAgentProfile = async () => {
+    if (!editAgentTarget) return;
+    if (!editFullName.trim()) {
+      showToast('error', t('agents.editProfileNameRequired'));
+      return;
+    }
+    setEditBusy(true);
+    try {
+      const updated = await api.updateAgentProfile({
+        actorId: currentEmployee.id,
+        agentId: editAgentTarget.id,
+        fullName: editFullName.trim(),
+        phone: editPhone.trim() || null,
+        address: editAddress.trim() || null,
+        email: editEmail.trim() || null,
+        cardNumber: editCardNumber.trim() || null,
+        passportPhotoData: editPassportFile?.data,
+        passportPhotoName: editPassportFile?.name,
+      });
+      if (editCardNumber.trim()) {
+        setRevealedCards((prev) => ({ ...prev, [updated.id]: editCardNumber.trim() }));
+      }
+      showToast('success', t('agents.editProfileSuccess'));
+      setEditAgentTarget(null);
+      load();
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('agents.errorGeneric'));
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
+  const handleExportPhotos = async () => {
+    const dir = await openDialog({ directory: true });
+    if (!dir || typeof dir !== 'string') return;
+    setExportPhotosBusy(true);
+    try {
+      const items = await api.exportAgentPhotos({ actorId: currentEmployee.id });
+      if (items.length === 0) {
+        showToast('error', t('agents.exportPhotosEmpty'));
+        return;
+      }
+      for (const item of items) {
+        const match = item.photoData.match(/^data:([^;]+);base64,(.*)$/s);
+        if (!match) continue;
+        const ext = match[1].split('/')[1] || 'jpg';
+        const binary = atob(match[2]);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const safeName = item.fullName.replace(/[\\/:*?"<>|]/g, '_');
+        await writeFile(`${dir}/${item.agentNumber}_${safeName}.${ext}`, bytes);
+      }
+      showToast('success', t('agents.exportPhotosSuccess'));
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('agents.errorGeneric'));
+    } finally {
+      setExportPhotosBusy(false);
+    }
+  };
+
   const handleExportExcel = async () => {
     const destPath = await saveFileDialog({
       defaultPath: 'ib-crm-agenty.xlsx',
@@ -310,10 +435,10 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
         </table>
       )}
 
-      <div className="department-members-title" style={{ marginTop: 24 }}>
+      <div className="department-members-title" style={{ marginTop: 28 }}>
         {t('agents.trainingTitle')}
       </div>
-      <p className="settings-hint">{t('agents.trainingHint')}</p>
+      <p className="settings-hint" style={{ marginBottom: 12 }}>{t('agents.trainingHint')}</p>
       {posts.length === 0 ? (
         <p className="settings-hint">{t('agents.trainingEmpty')}</p>
       ) : (
@@ -339,7 +464,7 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
         </ul>
       )}
       {currentEmployee.isAdmin && (
-        <button type="button" className="modal-btn" onClick={openNewPost} style={{ marginTop: 8 }}>
+        <button type="button" className="modal-btn" onClick={openNewPost} style={{ marginTop: 16 }}>
           <Plus size={14} /> {t('agents.addPostBtn')}
         </button>
       )}
@@ -354,6 +479,7 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
               </div>
               <div>
                 <div className="employee-card-name">{selected.fullName}</div>
+                <div className="settings-hint">{selected.agentNumber}</div>
                 <span className={`absence-status absence-status-${selected.status}`}>{t(`agents.status.${selected.status}`)}</span>
               </div>
               {currentEmployee.isAdmin && (
@@ -383,6 +509,16 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
                         {l.companyName ? ` · ${l.companyName}` : ''}
                         {l.clientPhone ? ` · ${l.clientPhone}` : ''}
                       </div>
+                      {l.serviceIds && (
+                        <div className="settings-hint client-history-meta">
+                          {t('agents.leadServicesLabel')}:{' '}
+                          {l.serviceIds
+                            .split(',')
+                            .map((id) => houseServices.find((s) => s.id === id)?.name)
+                            .filter(Boolean)
+                            .join(', ')}
+                        </div>
+                      )}
                     </div>
                     <span className={`absence-status absence-status-lead-${l.stage}`}>{t(`agents.stage.${l.stage}`)}</span>
                     {l.stage === 'converted' && l.convertedClientId && (
@@ -393,6 +529,7 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
                         onClick={() => navigate('/dashboard/clients', { state: { openClientId: l.convertedClientId } })}
                       >
                         <ExternalLink size={12} /> {t('agents.openClientBtn')}
+                        {l.convertedClientNumber ? ` (${l.convertedClientNumber})` : ''}
                       </button>
                     )}
                     {currentEmployee.isAdmin && l.stage !== 'converted' && (
@@ -427,6 +564,9 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
         size="xl"
         actions={
           <>
+            <button className="modal-btn" onClick={handleExportPhotos} disabled={exportPhotosBusy}>
+              <Download size={14} /> {exportPhotosBusy ? t('common.loading') : t('agents.exportPhotosBtn')}
+            </button>
             <button className="modal-btn" onClick={handleExportExcel} disabled={exportBusy}>
               <Download size={14} /> {exportBusy ? t('common.loading') : t('agents.exportBtn')}
             </button>
@@ -445,6 +585,7 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
                 <th>{t('agents.colPhone')}</th>
                 <th>{t('agents.colAddress')}</th>
                 <th>{t('agents.colEmail')}</th>
+                <th>{t('agents.colCard')}</th>
                 <th>{t('agents.colStatus')}</th>
                 <th>{t('agents.colPassport')}</th>
                 <th />
@@ -459,6 +600,26 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
                   <td>{a.address || '—'}</td>
                   <td>{a.email || '—'}</td>
                   <td>
+                    {a.cardNumber ? (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+                        {revealedCards[a.id] || a.cardNumber}
+                        {!revealedCards[a.id] && (
+                          <button
+                            type="button"
+                            className="icon-btn"
+                            title={t('agents.revealCardBtn')}
+                            disabled={revealBusy === a.id}
+                            onClick={() => handleRevealCard(a)}
+                          >
+                            <Eye size={13} />
+                          </button>
+                        )}
+                      </span>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td>
                     <span className={`absence-status absence-status-${a.status}`}>{t(`agents.status.${a.status}`)}</span>
                   </td>
                   <td>
@@ -472,6 +633,9 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
+                      <button type="button" className="icon-btn" title={t('agents.editProfileBtn')} onClick={() => openEditAgent(a)}>
+                        <Pencil size={14} />
+                      </button>
                       <button
                         type="button"
                         className="icon-btn"
@@ -503,6 +667,50 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
           </button>
         </div>
       )}
+
+      {/* Прямое редактирование данных агента админом, без бота — сценарий:
+          агент написал в чате агентов свой ID и попросил поменять данные. */}
+      <Modal
+        open={!!editAgentTarget}
+        title={t('agents.editProfileBtn')}
+        onClose={() => setEditAgentTarget(null)}
+        actions={
+          <>
+            <button className="modal-btn" onClick={() => setEditAgentTarget(null)}>
+              {t('common.cancel')}
+            </button>
+            <button className="modal-btn danger" onClick={handleSaveAgentProfile} disabled={editBusy}>
+              {editBusy ? t('common.loading') : t('common.save')}
+            </button>
+          </>
+        }
+      >
+        <div className="field">
+          <label>{t('agents.editProfileNameLabel')}</label>
+          <input value={editFullName} onChange={(e) => setEditFullName(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>{t('agents.colPhone')}</label>
+          <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>{t('agents.colAddress')}</label>
+          <input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>{t('agents.colEmail')}</label>
+          <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>{t('agents.colCard')}</label>
+          <input value={editCardNumber} onChange={(e) => setEditCardNumber(e.target.value)} placeholder="5561 1586 0000 0000" />
+        </div>
+        <div className="field">
+          <label>{t('agents.editProfilePassportLabel')}</label>
+          <input type="file" accept="image/*" onChange={handleEditPassportFile} />
+          {editPassportFile && <p className="settings-hint">{editPassportFile.name}</p>}
+        </div>
+      </Modal>
 
       <Modal
         open={postFormOpen}
@@ -553,7 +761,13 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
             {REREGISTER_STEPS.map((step) => (
               <label key={step} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input type="radio" name="reregister-step" checked={reregisterStep === step} onChange={() => setReregisterStep(step)} />
+                <input
+                  type="radio"
+                  name="reregister-step"
+                  checked={reregisterStep === step}
+                  onChange={() => setReregisterStep(step)}
+                  style={{ width: 'auto', flexShrink: 0 }}
+                />
                 {t(`agents.reregisterStep.${step}`)}
               </label>
             ))}

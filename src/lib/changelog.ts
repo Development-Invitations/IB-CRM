@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '1.8.0';
+export const APP_VERSION = '1.8.1';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,12 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '1.8.1',
+      items: [
+        'Сужены права приложения на запись файлов (экспорт Excel/фото агентов) — теперь только в «Загрузки», «Документы» и «Рабочий стол», а не в любое место домашней папки',
+      ],
+    },
     {
       version: '1.8.0',
       items: [
@@ -684,6 +690,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '1.8.1',
+      items: [
+        "Ilovaning fayl yozish huquqlari toraytirildi (agentlar Excel/surat eksporti) — endi faqat \"Yuklab olishlar\", \"Hujjatlar\" va \"Ish stoli\"ga, uy papkasidagi istalgan joyga emas",
+      ],
+    },
+    {
       version: '1.8.0',
       items: [
         "\"Agentlar\" bo'limi endi sahifani qayta yuklamasdan o'zi yangilanadi",
@@ -1351,6 +1363,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '1.8.1',
+      items: [
+        'Илованинг файл ёзиш ҳуқуқлари торайтирилди (агентлар Excel/сурат экспорти) — энди фақат "Юклаб олишлар", "Ҳужжатлар" ва "Иш столи"га, уй папкасидаги исталган жойга эмас',
+      ],
+    },
     {
       version: '1.8.0',
       items: [

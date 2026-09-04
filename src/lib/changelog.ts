@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '1.9.2';
+export const APP_VERSION = '1.9.3';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '1.9.3',
+      items: [
+        'Исправлено: карточка агента (и открытая карточка при смене статуса клиента) визуально «прыгала» — закрывалась и открывалась заново — при подтверждении заявки, смене статуса лида и других действиях в разделе «Агенты»; теперь обновление данных после действия не перезагружает всю страницу',
+        'Исправлено: при переводе клиента в статус «Оформлен» агент не получал никакого уведомления в боте (ошибочно считалось, что это уже покрыто сообщением при самой записи продажи) — теперь агенту приходит отдельное сообщение о том, что клиент оформлен и нужно ждать выплату',
+        'Повышена отказоустойчивость обоих Telegram-ботов: ошибка при обработке одного сообщения от одного пользователя больше не может «уронить» бота целиком до перезапуска приложения — раньше в редких случаях после такой ошибки бот переставал отвечать вообще всем, пока CRM не перезапускали',
+      ],
+    },
     {
       version: '1.9.2',
       items: [
@@ -715,6 +723,14 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '1.9.3',
+      items: [
+        "Tuzatildi: agent kartochkasi (va mijoz holati o'zgarganda ochiq kartochka) vizual ravishda \"sakrardi\" — yopilib qayta ochilardi — arizani tasdiqlashda, lid holatini o'zgartirishda va \"Agentlar\" bo'limidagi boshqa amallarda; endi amaldan keyin ma'lumotlar butun sahifani qayta yuklamasdan yangilanadi",
+        "Tuzatildi: mijoz \"Rasmiylashtirildi\" holatiga o'tkazilganda agent botda hech qanday bildirishnoma olmasdi (bu allaqachon sotuvni yozish paytidagi xabar bilan qoplangan deb noto'g'ri hisoblangan edi) — endi agentga mijoz rasmiylashtirilgani va to'lovni kutish kerakligi haqida alohida xabar keladi",
+        "Ikkala Telegram-botning barqarorligi oshirildi: bitta foydalanuvchidan kelgan bitta xabarni qayta ishlashdagi xato endi butun botni ilova qayta ishga tushirilgunga qadar \"yiqita olmaydi\" — avval kamdan-kam hollarda shunday xatodan keyin bot hech kimga umuman javob bermay qolardi",
+      ],
+    },
+    {
       version: '1.9.2',
       items: [
         "1.9.1 dagi MSI o'rnatuvchisi tajribasi bekor qilindi — MSI (WiX) yig'ilishi CI'da `light.exe` bosqichida yiqilib, shu sababli hech qanday relizga (oddiy .exe ham) chiqmagan edi; faqat NSIS qaytarildi, 1.9.0 dagidek",
@@ -1413,6 +1429,14 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '1.9.3',
+      items: [
+        'Тузатилди: агент карточкаси (ва мижоз ҳолати ўзгарганда очиқ карточка) визуал равишда "сакрарди" — ёпилиб қайта очиларди — аризани тасдиқлашда, лид ҳолатини ўзгартиришда ва "Агентлар" бўлимидаги бошқа амалларда; энди амалдан кейин маълумотлар бутун саҳифани қайта юкламасдан янгиланади',
+        'Тузатилди: мижоз "Расмийлаштирилди" ҳолатига ўтказилганда агент ботда ҳеч қандай билдиришнома олмасди (бу аллақачон сотувни ёзиш пайтидаги хабар билан қопланган деб нотўғри ҳисобланган эди) — энди агентга мижоз расмийлаштирилгани ва тўловни кутиш кераклиги ҳақида алоҳида хабар келади',
+        'Иккала Telegram-ботнинг барқарорлиги оширилди: битта фойдаланувчидан келган битта хабарни қайта ишлашдаги хато энди бутун ботни илова қайта ишга туширилгунга қадар "йиқита олмайди" — аввал камдан-кам ҳолларда шундай хатодан кейин бот ҳеч кимга умуман жавоб бермай қоларди',
+      ],
+    },
     {
       version: '1.9.2',
       items: [

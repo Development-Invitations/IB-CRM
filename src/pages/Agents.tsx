@@ -132,7 +132,7 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
     setResolveBusy(true);
     try {
       await api.resolveAgentApplication({ actorId: currentEmployee.id, id: agent.id, approve });
-      load();
+      load(true);
     } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('agents.errorGeneric'));
     } finally {
@@ -144,7 +144,7 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
     setStageBusy(lead.id);
     try {
       await api.advanceAgentLeadStage({ actorId: currentEmployee.id, leadId: lead.id, stage });
-      load();
+      load(true);
     } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('agents.errorGeneric'));
     } finally {
@@ -168,7 +168,7 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
       setEditingPost(null);
       setPostTitle('');
       setPostBody('');
-      load();
+      load(true);
     } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('agents.errorGeneric'));
     } finally {
@@ -193,7 +193,7 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
   const handleDeletePost = async (id: string) => {
     try {
       await api.deleteAgentTrainingPost({ actorId: currentEmployee.id, id });
-      load();
+      load(true);
     } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('agents.errorGeneric'));
     }
@@ -224,7 +224,7 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
       await api.deleteAgent({ actorId: currentEmployee.id, agentId: deleteAgentTarget.id });
       setDeleteAgentTarget(null);
       setSelected((prev) => (prev?.id === deleteAgentTarget.id ? null : prev));
-      load();
+      load(true);
     } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('agents.errorGeneric'));
     } finally {
@@ -289,7 +289,7 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
       }
       showToast('success', t('agents.editProfileSuccess'));
       setEditAgentTarget(null);
-      load();
+      load(true);
     } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('agents.errorGeneric'));
     } finally {

@@ -339,7 +339,22 @@ async fn poll_loop(db: Arc<Mutex<Db>>, app_handle: tauri::AppHandle) {
             Ok(updates) => {
                 let mut max_update_id = offset - 1;
                 for update in &updates {
-                    handle_update(&db, &short_client, &token, update, &app_handle).await;
+                    // Через spawn, а не напрямую .await — паника внутри
+                    // обработки ОДНОГО апдейта (где угодно в handle_update)
+                    // раньше убивала весь этот цикл насовсем (до перезапуска
+                    // приложения), и бот переставал отвечать вообще на всё,
+                    // а не только на то, что вызвало панику. JoinHandle
+                    // превращает панику в Err, здесь просто игнорируем —
+                    // остальные апдейты обрабатываются как обычно.
+                    let db2 = db.clone();
+                    let client2 = short_client.clone();
+                    let token2 = token.clone();
+                    let update2 = update.clone();
+                    let app_handle2 = app_handle.clone();
+                    let _ = tauri::async_runtime::spawn(async move {
+                        handle_update(&db2, &client2, &token2, &update2, &app_handle2).await;
+                    })
+                    .await;
                     if let Some(id) = update.get("update_id").and_then(|v| v.as_i64()) {
                         max_update_id = max_update_id.max(id);
                     }
@@ -386,7 +401,16 @@ async fn agents_poll_loop(db: Arc<Mutex<Db>>, app_handle: tauri::AppHandle) {
             Ok(updates) => {
                 let mut max_update_id = offset - 1;
                 for update in &updates {
-                    handle_agents_bot_update(&db, &short_client, &token, update).await;
+                    // См. аналогичный комментарий в poll_loop выше — паника на
+                    // одном апдейте не должна навсегда убивать весь цикл опроса.
+                    let db2 = db.clone();
+                    let client2 = short_client.clone();
+                    let token2 = token.clone();
+                    let update2 = update.clone();
+                    let _ = tauri::async_runtime::spawn(async move {
+                        handle_agents_bot_update(&db2, &client2, &token2, &update2).await;
+                    })
+                    .await;
                     if let Some(id) = update.get("update_id").and_then(|v| v.as_i64()) {
                         max_update_id = max_update_id.max(id);
                     }
@@ -703,14 +727,28 @@ fn build_leads_summary(locale: &str, leads: &[crate::db::AgentLeadRecord]) -> St
 }
 
 // Уведомление агенту, когда админ меняет стадию его лида в CRM (кроме
-// "converted" — там отдельный, более развёрнутый sale_done уже не подходит,
-// нужен именно факт смены статуса).
+// "converted" — там отдельная, более развёрнутая карточка, см.
+// lead_converted_message ниже).
 fn lead_stage_message(locale: &str, client_name: &str, stage: &str) -> String {
     let label = stage_label(locale, stage);
     match locale {
         "uz" => format!("ℹ️ \"{client_name}\" mijozi bo'yicha holat o'zgardi: {label}"),
         "uz-cyrl" => format!("ℹ️ \"{client_name}\" мижози бўйича ҳолат ўзгарди: {label}"),
         _ => format!("ℹ️ По клиенту «{client_name}» статус изменился: {label}"),
+    }
+}
+
+// Раньше при переводе лида в "Оформлен" агент вообще не получал сообщения —
+// код ошибочно полагался на "sale_done" (шлётся в момент самой ЗАПИСИ
+// продажи, задолго до того, как админ проведёт клиента по стадиям и
+// оформит) как будто это одно и то же. Пользователь прямо указал, что нужно
+// именно здесь: сообщить агенту, что оплата ожидается, и с ним свяжутся
+// после того, как клиент оплатит.
+fn lead_converted_message(locale: &str, client_name: &str) -> String {
+    match locale {
+        "uz" => format!("🎉 Mijoz \"{client_name}\" rasmiylashtirildi! Mukofot to'lovini kuting — mijoz to'lov qilgach, siz bilan bog'lanamiz."),
+        "uz-cyrl" => format!("🎉 Мижоз \"{client_name}\" расмийлаштирилди! Мукофот тўловини кутинг — мижоз тўлов қилгач, сиз билан боғланамиз."),
+        _ => format!("🎉 Клиент «{client_name}» оформлен! Ждите выплату вознаграждения — как только клиент оплатит, с вами свяжутся."),
     }
 }
 
@@ -771,10 +809,18 @@ pub async fn notify_agent_deleted(db: Arc<Mutex<Db>>, client: reqwest::Client, t
 
 // Админ продвинул стадию лида в CRM ("Думает"/"Согласен"/... — пользователь:
 // "нужно ID клиента чтоб Агенту приходили уведомления что по такому клиенту
-// статус поменялся"). Стадию "converted" сюда не зовут — там уже есть
-// отдельный, более развёрнутый sale_done в момент самой записи продажи.
+// статус поменялся"). Стадию "converted" сюда не зовут — для неё отдельная
+// функция notify_agent_lead_converted ниже, с более развёрнутым текстом.
 pub async fn notify_agent_lead_stage_changed(client: reqwest::Client, token: String, chat_id: String, locale: String, client_name: String, stage: String) {
     let text = lead_stage_message(&locale, &client_name, &stage);
+    let _ = send_message(&client, &token, &chat_id, &text, None).await;
+}
+
+// Лид переведён в "Оформлен" — раньше эта стадия ошибочно не уведомляла
+// агента вообще (код полагался на sale_done, который шлётся в момент самой
+// ЗАПИСИ продажи, а не оформления клиента админом спустя какое-то время).
+pub async fn notify_agent_lead_converted(client: reqwest::Client, token: String, chat_id: String, locale: String, client_name: String) {
+    let text = lead_converted_message(&locale, &client_name);
     let _ = send_message(&client, &token, &chat_id, &text, None).await;
 }
 

@@ -790,9 +790,13 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
         "advance_agent_lead_stage" => {
             let p: crate::AdvanceAgentLeadStagePayload = from_payload(payload)?;
             let lead = db.advance_agent_lead_stage(&p.actor_id, &p.lead_id, &p.stage)?;
-            if p.stage != "converted" {
-                if let Some(agent) = db.get_agent(&lead.agent_id) {
-                    if let Some((client, token)) = crate::agents_bot_ready(db) {
+            if let Some(agent) = db.get_agent(&lead.agent_id) {
+                if let Some((client, token)) = crate::agents_bot_ready(db) {
+                    if p.stage == "converted" {
+                        tauri::async_runtime::spawn(crate::telegram::notify_agent_lead_converted(
+                            client, token, agent.telegram_chat_id.clone(), agent.locale.clone(), lead.client_name.clone(),
+                        ));
+                    } else {
                         tauri::async_runtime::spawn(crate::telegram::notify_agent_lead_stage_changed(
                             client, token, agent.telegram_chat_id.clone(), agent.locale.clone(), lead.client_name.clone(), p.stage.clone(),
                         ));

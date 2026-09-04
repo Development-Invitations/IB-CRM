@@ -4199,20 +4199,21 @@ fn list_agent_leads(state: tauri::State<AppState>) -> Vec<AgentLead> {
 fn advance_agent_lead_stage(payload: AdvanceAgentLeadStagePayload, state: tauri::State<AppState>) -> Result<AgentLead, String> {
     let db = state.0.lock().unwrap();
     let lead = db.advance_agent_lead_stage(&payload.actor_id, &payload.lead_id, &payload.stage)?;
-    // "converted" не уведомляем отдельно тем же путём — там уже есть sale_done
-    // в момент самой записи продажи, а факт появления клиента виден в CRM
-    // через notify_all_admins("agent_lead_converted", ...) из db.rs.
-    if payload.stage != "converted" {
-        if let Some(agent) = db.get_agent(&lead.agent_id) {
-            if let Some((client, token)) = agents_bot_ready(&db) {
-                let chat_id = agent.telegram_chat_id.clone();
-                let locale = agent.locale.clone();
-                let client_name = lead.client_name.clone();
-                let stage = payload.stage.clone();
-                drop(db);
+    if let Some(agent) = db.get_agent(&lead.agent_id) {
+        if let Some((client, token)) = agents_bot_ready(&db) {
+            let chat_id = agent.telegram_chat_id.clone();
+            let locale = agent.locale.clone();
+            let client_name = lead.client_name.clone();
+            let stage = payload.stage.clone();
+            drop(db);
+            // "converted" — отдельное, более развёрнутое сообщение (ждите
+            // выплату), не общее "статус изменился" (см. telegram.rs).
+            if stage == "converted" {
+                tauri::async_runtime::spawn(telegram::notify_agent_lead_converted(client, token, chat_id, locale, client_name));
+            } else {
                 tauri::async_runtime::spawn(telegram::notify_agent_lead_stage_changed(client, token, chat_id, locale, client_name, stage));
-                return Ok(to_agent_lead(lead));
             }
+            return Ok(to_agent_lead(lead));
         }
     }
     Ok(to_agent_lead(lead))

@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '1.9.7';
+export const APP_VERSION = '1.9.8';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,12 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '1.9.8',
+      items: [
+        'Технический релиз: безопасная повторная попытка добавить MSI-инсталлятор рядом с NSIS — теперь отдельным шагом сборки, который не может сорвать публикацию основного релиза, даже если сам не соберётся',
+      ],
+    },
     {
       version: '1.9.7',
       items: [
@@ -754,6 +760,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '1.9.8',
+      items: [
+        "Texnik reliz: NSIS bilan bir qatorda MSI o'rnatuvchisini xavfsiz qayta qo'shishga urinish — endi alohida yig'ish bosqichi sifatida, u o'zi yig'ilmasa ham asosiy relizni chiqishiga xalaqit bermaydi",
+      ],
+    },
+    {
       version: '1.9.7',
       items: [
         "Tuzatildi: Sozlamalarda ochiq bo'lim ichidagi tushuvchi ro'yxat (masalan, mavzu tanlash) pastdagi keyingi bo'lim bilan kesilib qolardi — endi u boshqalar ustidan to'g'ri ochiladi",
@@ -1491,6 +1503,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '1.9.8',
+      items: [
+        'Техник релиз: NSIS билан бир қаторда MSI ўрнатувчисини хавфсиз қайта қўшишга уриниш — энди алоҳида йиғиш босқичи сифатида, у ўзи йиғилмаса ҳам асосий релизни чиқишига халақит бермайди',
+      ],
+    },
     {
       version: '1.9.7',
       items: [

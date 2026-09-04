@@ -60,3 +60,43 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+  # Второй, необязательный формат установщика (MSI) — некоторые эвристики
+  # антивирусов (см. docs/TZ.md v1.9.1/v1.9.2) реагируют на самораспаковывающийся
+  # NSIS чаще, чем на стандартный Windows Installer. Отдельная job, а не второй
+  # таргет в tauri.conf.json (как было в v1.9.1) — та попытка уронила ВЕСЬ релиз
+  # (WiX упал на light.exe, из-за чего не опубликовался даже рабочий NSIS).
+  # continue-on-error здесь и на job, и неявно (job останавливается на упавшем
+  # шаге, но это не валит весь workflow) — если MSI опять не соберётся, основной
+  # релиз (публикуется job'ой выше) всё равно выходит без проблем; просто не
+  # будет .msi-файла среди assets этого релиза.
+  build-msi:
+    needs: publish-tauri
+    continue-on-error: true
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: install frontend dependencies
+        run: npm install
+
+      - name: build msi
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npx tauri build --bundles msi
+
+      - name: attach msi to the already-published release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ github.ref_name }} src-tauri/target/release/bundle/msi/*.msi --clobber

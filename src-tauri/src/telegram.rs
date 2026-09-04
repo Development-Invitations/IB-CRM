@@ -1121,7 +1121,7 @@ async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client,
                         let info_buttons: Vec<(String, String)> = services
                             .iter()
                             .enumerate()
-                            .map(|(i, s)| (format!("ℹ {}. {}", i + 1, s.name), format!("svc_info:{}", s.id)))
+                            .map(|(i, s)| (format!("ℹ {}. {}", i + 1, truncate_label(&s.name, 40)), format!("svc_info:{}", s.id)))
                             .collect();
                         send_menu_with_fallback(client, token, &chat_id, &format!("{}\n\n{}", bot_text(&locale, "sale_ask_services"), list_text), info_buttons).await;
                     }
@@ -1320,23 +1320,45 @@ async fn send_menu_with_fallback(client: &reqwest::Client, token: &str, chat_id:
     }
 }
 
+// Bot API нигде явно не документирует лимит длины InlineKeyboardButton.text
+// (в отличие от callback_data — там жёсткие 1-64 байта), но на практике
+// именно необычно длинная кнопка — самое вероятное объяснение того, что
+// sendMessage со списком услуг стабильно отклонялся целиком (пользователь
+// подтвердил: услуги в CRM есть, а бот не присылает вообще ничего, кроме
+// заголовка) — если у услуги длинное название, кнопка "N. Название" могла
+// быть намного длиннее короткой строки вроде названия услуги в описании.
+// Обрезаем на всякий случай везде, где название услуги идёт в текст кнопки.
+fn truncate_label(s: &str, max_chars: usize) -> String {
+    if s.chars().count() <= max_chars {
+        return s.to_string();
+    }
+    let truncated: String = s.chars().take(max_chars.saturating_sub(1)).collect();
+    format!("{truncated}…")
+}
+
 // Каталог услуг для самостоятельного изучения агентом вне записи продажи
 // (пользователь: "чтоб Агенты могли ознакомиться с услугами прежде чем
-// предлагать") — каждая услуга своей инлайн-кнопкой, по нажатию бот
-// присылает её карточку (service_info_text) через callback "svc_info:{id}",
-// общий для этого меню и для шага "services" в start_agent_new_lead.
+// предлагать") — список названий отдельным текстом (не только в подписях
+// кнопок!) — раньше при неудаче send_menu (см. send_menu_with_fallback)
+// агент видел один заголовок без единой услуги, потому что имена услуг были
+// ТОЛЬКО в подписях кнопок, которые вместе с кнопками и пропадали. Каждая
+// услуга дополнительно своей инлайн-кнопкой — по нажатию бот присылает её
+// карточку (service_info_text) через callback "svc_info:{id}", общий для
+// этого меню и для шага "services" в start_agent_new_lead.
 async fn send_service_catalog(db: &Arc<Mutex<Db>>, client: &reqwest::Client, token: &str, chat_id: &str, locale: &str) {
     let services = db.lock().unwrap().list_house_services_internal();
     if services.is_empty() {
         let _ = send_message(client, token, chat_id, bot_text(locale, "no_services"), None).await;
         return;
     }
+    let list_text = services.iter().enumerate().map(|(i, s)| format!("{}. {}", i + 1, s.name)).collect::<Vec<_>>().join("\n");
     let buttons: Vec<(String, String)> = services
         .iter()
         .enumerate()
-        .map(|(i, s)| (format!("{}. {}", i + 1, s.name), format!("svc_info:{}", s.id)))
+        .map(|(i, s)| (format!("{}. {}", i + 1, truncate_label(&s.name, 40)), format!("svc_info:{}", s.id)))
         .collect();
-    send_menu_with_fallback(client, token, chat_id, bot_text(locale, "services_catalog_title"), buttons).await;
+    let text = format!("{}\n\n{}", bot_text(locale, "services_catalog_title"), list_text);
+    send_menu_with_fallback(client, token, chat_id, &text, buttons).await;
 }
 
 // Со сводкой оформлено/не оформлено — по просьбе пользователя ("нужно

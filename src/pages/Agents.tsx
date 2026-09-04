@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { listen } from '@tauri-apps/api/event';
 import { save as saveFileDialog, open as openDialog } from '@tauri-apps/plugin-dialog';
 import { writeFile } from '@tauri-apps/plugin-fs';
-import { Check, X, Plus, Pencil, Trash2, UserRound, Download, List, RotateCcw, ExternalLink, Eye } from 'lucide-react';
+import { Check, X, Plus, Pencil, Trash2, UserRound, Download, List, RotateCcw, ExternalLink, Eye, EyeOff } from 'lucide-react';
 import { api, type Employee, type Agent, type AgentLead, type AgentLeadStage, type AgentTrainingPost, type HouseService } from '../lib/api';
 import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
@@ -275,6 +275,17 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
     } finally {
       setRevealBusy(null);
     }
+  };
+
+  // Скрыть обратно уже показанный номер карты — без повторного запроса к
+  // серверу, просто убираем из локального состояния (полный номер и так уже
+  // был получен один раз, повторный reveal при необходимости запросит его снова).
+  const handleHideCard = (agentId: string) => {
+    setRevealedCards((prev) => {
+      const next = { ...prev };
+      delete next[agentId];
+      return next;
+    });
   };
 
   const openEditAgent = (agent: Agent) => {
@@ -657,17 +668,15 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
                     {a.cardNumber ? (
                       <span style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
                         {revealedCards[a.id] || a.cardNumber}
-                        {!revealedCards[a.id] && (
-                          <button
-                            type="button"
-                            className="icon-btn"
-                            title={t('agents.revealCardBtn')}
-                            disabled={revealBusy === a.id}
-                            onClick={() => handleRevealCard(a)}
-                          >
-                            <Eye size={13} />
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          className="icon-btn"
+                          title={t(revealedCards[a.id] ? 'agents.hideCardBtn' : 'agents.revealCardBtn')}
+                          disabled={revealBusy === a.id}
+                          onClick={() => (revealedCards[a.id] ? handleHideCard(a.id) : handleRevealCard(a))}
+                        >
+                          {revealedCards[a.id] ? <EyeOff size={13} /> : <Eye size={13} />}
+                        </button>
                       </span>
                     ) : (
                       '—'

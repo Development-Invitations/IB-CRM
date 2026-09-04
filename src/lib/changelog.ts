@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '1.9.4';
+export const APP_VERSION = '1.9.5';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '1.9.5',
+      items: [
+        'Исправлено: каталог услуг и список услуг при записи продажи в боте могли прийти вообще без названий услуг (только заголовок) — теперь список услуг всегда виден обычным текстом независимо от того, работают ли кнопки «почитать описание»; заодно укорочены слишком длинные названия услуг в подписях кнопок — вероятная причина, по которой Telegram иногда отклонял сообщение целиком',
+        'Номер карты агента в «Списке агентов» теперь можно не только показать, но и скрыть обратно',
+        '«Список агентов» лучше подстраивается под размер экрана на средних мониторах',
+      ],
+    },
     {
       version: '1.9.4',
       items: [
@@ -731,6 +739,14 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '1.9.5',
+      items: [
+        "Tuzatildi: botda xizmatlar katalogi va sotuvni yozishdagi xizmatlar ro'yxati xizmat nomlarisiz, faqat sarlavha bilan kelishi mumkin edi — endi ro'yxat \"tavsifni o'qish\" tugmalari ishlaydimi yoki yo'qmi, baribir oddiy matn sifatida ko'rinadi; shuningdek tugmalar yozuvidagi juda uzun xizmat nomlari qisqartirildi — Telegram xabarni butunlay rad etishining ehtimoliy sababi",
+        "\"Agentlar ro'yxati\"da agent karta raqamini endi nafaqat ko'rsatish, balki qayta yashirish ham mumkin",
+        "\"Agentlar ro'yxati\" o'rta o'lchamdagi monitorlarga yaxshiroq moslashadi",
+      ],
+    },
+    {
       version: '1.9.4',
       items: [
         "Tuzatildi: bildirishnoma orqali ochilgan agent kartochkasi yopilgandan keyin bir necha soniyada o'zi qayta ochilaverardi",
@@ -1445,6 +1461,14 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '1.9.5',
+      items: [
+        'Тузатилди: ботда хизматлар каталоги ва сотувни ёзишдаги хизматлар рўйхати хизмат номларисиз, фақат сарлавҳа билан келиши мумкин эди — энди рўйхат "тавсифни ўқиш" тугмалари ишлайдими ёки йўқми, барибир оддий матн сифатида кўринади; шунингдек тугмалар ёзувидаги жуда узун хизмат номлари қисқартирилди — Telegram хабарни бутунлай рад этишининг эҳтимолий сабаби',
+        '"Агентлар рўйхати"да агент карта рақамини энди нафақат кўрсатиш, балки қайта яшириш ҳам мумкин',
+        '"Агентлар рўйхати" ўрта ўлчамдаги мониторларга яхшироқ мослашади',
+      ],
+    },
     {
       version: '1.9.4',
       items: [

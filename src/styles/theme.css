@@ -1152,7 +1152,7 @@ button.primary:hover { filter: brightness(0.95); }
 }
 
 .modal-card-xl {
-  width: 1240px;
+  width: min(1240px, 96vw);
 }
 
 .modal-close {

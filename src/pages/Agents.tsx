@@ -9,6 +9,7 @@ import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
 import { parseSqliteUtc } from '../lib/date';
 import { classifyAttachment, prepareAttachment } from '../lib/attachment';
+import { formatThousands } from '../lib/format';
 import Drawer from '../components/Drawer';
 import Modal from '../components/Modal';
 import LoadingScreen from '../components/LoadingScreen';
@@ -112,17 +113,23 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
   // открываем нужную карточку агента.
   useEffect(() => {
     const state = location.state as { openAgentId?: string; openLeadId?: string } | undefined;
-    if (!state) return;
+    if (!state || (!state.openAgentId && !state.openLeadId)) return;
+    let found: Agent | null = null;
     if (state.openAgentId) {
-      const a = agents.find((x) => x.id === state.openAgentId);
-      if (a) setSelected(a);
+      found = agents.find((x) => x.id === state.openAgentId) ?? null;
     } else if (state.openLeadId) {
       const lead = leads.find((x) => x.id === state.openLeadId);
-      if (lead) {
-        const a = agents.find((x) => x.id === lead.agentId);
-        if (a) setSelected(a);
-      }
+      found = lead ? agents.find((x) => x.id === lead.agentId) ?? null : null;
     }
+    if (found) {
+      setSelected(found);
+      // Сразу очищаем location.state — иначе на КАЖДОМ следующем фоновом
+      // опросе (agents/leads меняют ссылку каждые ~8с) этот эффект срабатывал
+      // заново и принудительно переоткрывал уже закрытую карточку агента
+      // (жалоба пользователя: "постоянное открывание карточки агента").
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agents, leads, location.state]);
 
   const pending = agents.filter((a) => a.status === 'pending');
@@ -144,6 +151,32 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
     setStageBusy(lead.id);
     try {
       await api.advanceAgentLeadStage({ actorId: currentEmployee.id, leadId: lead.id, stage });
+      load(true);
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('agents.errorGeneric'));
+    } finally {
+      setStageBusy(null);
+    }
+  };
+
+  // Сумма вознаграждения агента за лид — цена услуги × процент вознаграждения,
+  // сумма по всем услугам лида (тот же расчёт независимо повторён на стороне
+  // бота, см. db.rs::lead_reward_amount, — там своя аудитория "Мои клиенты").
+  const leadRewardAmount = (lead: AgentLead): number => {
+    if (!lead.serviceIds) return 0;
+    return lead.serviceIds.split(',').reduce((sum, id) => {
+      const svc = houseServices.find((s) => s.id === id);
+      if (!svc) return sum;
+      const price = Number((svc.price || '').replace(/\D/g, '')) || 0;
+      const percent = Number(svc.rewardPercent) || 0;
+      return sum + (price * percent) / 100;
+    }, 0);
+  };
+
+  const handleMarkPaid = async (lead: AgentLead) => {
+    setStageBusy(lead.id);
+    try {
+      await api.markAgentLeadPaid({ actorId: currentEmployee.id, leadId: lead.id });
       load(true);
     } catch (err: any) {
       showToast('error', typeof err === 'string' ? err : t('agents.errorGeneric'));
@@ -531,6 +564,27 @@ export default function Agents({ currentEmployee }: { currentEmployee: Employee 
                         <ExternalLink size={12} /> {t('agents.openClientBtn')}
                         {l.convertedClientNumber ? ` (${l.convertedClientNumber})` : ''}
                       </button>
+                    )}
+                    {l.stage === 'converted' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', width: '100%', marginTop: 4 }}>
+                        <span className="settings-hint">
+                          {t('agents.rewardAmountLabel')}: {formatThousands(String(leadRewardAmount(l)))} сум
+                        </span>
+                        <span className={`absence-status absence-status-lead-${l.paymentStatus === 'paid' ? 'converted' : 'new'}`}>
+                          {t(l.paymentStatus === 'paid' ? 'agents.paidLabel' : 'agents.paymentPendingLabel')}
+                        </span>
+                        {currentEmployee.isAdmin && l.paymentStatus !== 'paid' && (
+                          <button
+                            type="button"
+                            className="modal-btn"
+                            style={{ fontSize: 12, padding: '4px 8px' }}
+                            disabled={stageBusy === l.id}
+                            onClick={() => handleMarkPaid(l)}
+                          >
+                            {t('agents.markPaidBtn')}
+                          </button>
+                        )}
+                      </div>
                     )}
                     {currentEmployee.isAdmin && l.stage !== 'converted' && (
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', width: '100%', marginTop: 6 }}>

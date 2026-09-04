@@ -315,6 +315,10 @@ struct AgentLead {
     converted_client_number: Option<String>,
     #[serde(rename = "serviceIds")]
     service_ids: Option<String>,
+    #[serde(rename = "paymentStatus")]
+    payment_status: String,
+    #[serde(rename = "paidAt")]
+    paid_at: Option<String>,
     #[serde(rename = "createdAt")]
     created_at: String,
     #[serde(rename = "updatedAt")]
@@ -389,6 +393,14 @@ struct AdvanceAgentLeadStagePayload {
     #[serde(rename = "leadId")]
     lead_id: String,
     stage: String,
+}
+
+#[derive(serde::Deserialize)]
+struct MarkAgentLeadPaidPayload {
+    #[serde(rename = "actorId")]
+    actor_id: String,
+    #[serde(rename = "leadId")]
+    lead_id: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -2492,6 +2504,8 @@ fn to_agent_lead(l: db::AgentLeadRecord) -> AgentLead {
         converted_client_id: l.converted_client_id,
         converted_client_number: l.converted_client_number,
         service_ids: l.service_ids,
+        payment_status: l.payment_status,
+        paid_at: l.paid_at,
         created_at: l.created_at,
         updated_at: l.updated_at,
     }
@@ -4220,6 +4234,24 @@ fn advance_agent_lead_stage(payload: AdvanceAgentLeadStagePayload, state: tauri:
 }
 
 #[tauri::command]
+fn mark_agent_lead_paid(payload: MarkAgentLeadPaidPayload, state: tauri::State<AppState>) -> Result<AgentLead, String> {
+    let db = state.0.lock().unwrap();
+    let lead = db.mark_agent_lead_paid(&payload.actor_id, &payload.lead_id)?;
+    if let Some(agent) = db.get_agent(&lead.agent_id) {
+        if let Some((client, token)) = agents_bot_ready(&db) {
+            let chat_id = agent.telegram_chat_id.clone();
+            let locale = agent.locale.clone();
+            let client_name = lead.client_name.clone();
+            let amount = lead.service_ids.as_deref().map(|ids| db.lead_reward_amount(ids)).unwrap_or(0);
+            drop(db);
+            tauri::async_runtime::spawn(telegram::notify_agent_lead_paid(client, token, chat_id, locale, client_name, amount));
+            return Ok(to_agent_lead(lead));
+        }
+    }
+    Ok(to_agent_lead(lead))
+}
+
+#[tauri::command]
 fn update_agent_training_post(payload: UpdateAgentTrainingPostPayload, state: tauri::State<AppState>) -> Result<AgentTrainingPost, String> {
     let db = state.0.lock().unwrap();
     db.update_agent_training_post(&payload.actor_id, &payload.id, &payload.title, &payload.body).map(to_agent_training_post)
@@ -4859,6 +4891,7 @@ fn main() {
             update_agent_profile,
             list_agent_leads,
             advance_agent_lead_stage,
+            mark_agent_lead_paid,
             list_agent_training_posts,
             create_agent_training_post,
             update_agent_training_post,

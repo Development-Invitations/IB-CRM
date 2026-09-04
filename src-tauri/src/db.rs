@@ -263,6 +263,8 @@ pub struct AgentLeadRecord {
     pub converted_client_id: Option<String>,
     pub converted_client_number: Option<String>,
     pub service_ids: Option<String>,
+    pub payment_status: String,
+    pub paid_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -1262,6 +1264,13 @@ impl Db {
         // конвертации лида в клиента каждая разворачивается в свою запись
         // client_services (см. advance_agent_lead_stage).
         add_column_if_missing(&conn, "agent_leads", "service_ids TEXT");
+        // Отметка "выплатили/не выплатили" вознаграждение агенту за оформленного
+        // клиента (v1.9.4, пользователь: "админ отмечает сколько выдали сколько
+        // осталось... нажал сообщить об оплате, агенту пришло уведомление") —
+        // только для лидов на стадии "converted", проставляется отдельной
+        // кнопкой в CRM (см. mark_agent_lead_paid), не автоматически.
+        add_column_if_missing(&conn, "agent_leads", "payment_status TEXT NOT NULL DEFAULT 'pending'");
+        add_column_if_missing(&conn, "agent_leads", "paid_at TEXT");
 
         let db = Db { conn, typing: Mutex::new(HashMap::new()) };
         db.notify_todays_birthdays();
@@ -6695,7 +6704,7 @@ impl Db {
 
     const AGENT_LEAD_SELECT: &'static str = "SELECT
         al.id, al.agent_id, a.full_name, al.client_name, al.client_inn, al.client_phone, al.company_name, al.note,
-        al.stage, al.converted_client_id, c.client_number, al.service_ids, al.created_at, al.updated_at
+        al.stage, al.converted_client_id, c.client_number, al.service_ids, al.payment_status, al.paid_at, al.created_at, al.updated_at
     FROM agent_leads al
     JOIN agents a ON a.id = al.agent_id
     LEFT JOIN clients c ON c.id = al.converted_client_id";
@@ -6714,8 +6723,10 @@ impl Db {
             converted_client_id: row.get(9)?,
             converted_client_number: row.get(10)?,
             service_ids: row.get(11)?,
-            created_at: row.get(12)?,
-            updated_at: row.get(13)?,
+            payment_status: row.get(12)?,
+            paid_at: row.get(13)?,
+            created_at: row.get(14)?,
+            updated_at: row.get(15)?,
         })
     }
 
@@ -6844,6 +6855,50 @@ impl Db {
                 .map_err(|e| e.to_string())?;
         }
         let sql = format!("{} WHERE al.id = ?1", Self::AGENT_LEAD_SELECT);
+        self.conn.query_row(&sql, params![lead_id], Self::map_agent_lead_row).map_err(|e| e.to_string())
+    }
+
+    // Сумма вознаграждения агента за лид — сумма (цена услуги × процент
+    // вознаграждения / 100) по каждой услуге, прикреплённой к лиду. price
+    // хранится как ввёл админ в "Наши услуги" (с пробелами-разделителями
+    // разрядов, см. HouseServices.tsx::formatThousands на фронте) — здесь
+    // отфильтровываем всё, кроме цифр, а не храним/парсим "чистое" число
+    // отдельно, чтобы не заводить два представления одной и той же цены.
+    pub fn lead_reward_amount(&self, service_ids: &str) -> i64 {
+        let mut total = 0.0_f64;
+        for hsid in service_ids.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+            let Some(s) = self.get_house_service(hsid) else { continue };
+            let price: f64 = s
+                .price
+                .as_deref()
+                .map(|p| p.chars().filter(|c| c.is_ascii_digit()).collect::<String>())
+                .and_then(|digits| digits.parse().ok())
+                .unwrap_or(0.0);
+            let percent: f64 = s.reward_percent.as_deref().and_then(|p| p.parse().ok()).unwrap_or(0.0);
+            total += price * percent / 100.0;
+        }
+        total.round() as i64
+    }
+
+    // Админ отметил, что вознаграждение агенту фактически выплачено
+    // (пользователь: "сделал оплату, кнопка сообщить об оплате, нажал —
+    // агенту пришло уведомление") — только для уже оформленных лидов,
+    // ставится вручную, автоматически при конвертации НЕ проставляется.
+    pub fn mark_agent_lead_paid(&self, actor_id: &str, lead_id: &str) -> Result<AgentLeadRecord, String> {
+        if !self.is_admin(actor_id) {
+            return Err("Недостаточно прав".into());
+        }
+        let sql = format!("{} WHERE al.id = ?1", Self::AGENT_LEAD_SELECT);
+        let lead = self.conn.query_row(&sql, params![lead_id], Self::map_agent_lead_row).map_err(|_| "Лид не найден".to_string())?;
+        if lead.stage != "converted" {
+            return Err("Клиент ещё не оформлен".into());
+        }
+        if lead.payment_status == "paid" {
+            return Err("Выплата уже отмечена".into());
+        }
+        self.conn
+            .execute("UPDATE agent_leads SET payment_status = 'paid', paid_at = datetime('now') WHERE id = ?1", params![lead_id])
+            .map_err(|e| e.to_string())?;
         self.conn.query_row(&sql, params![lead_id], Self::map_agent_lead_row).map_err(|e| e.to_string())
     }
 

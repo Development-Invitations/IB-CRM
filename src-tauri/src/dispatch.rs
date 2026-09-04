@@ -805,6 +805,19 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
             }
             Ok(to_json(crate::to_agent_lead(lead)))
         }
+        "mark_agent_lead_paid" => {
+            let p: crate::MarkAgentLeadPaidPayload = from_payload(payload)?;
+            let lead = db.mark_agent_lead_paid(&p.actor_id, &p.lead_id)?;
+            if let Some(agent) = db.get_agent(&lead.agent_id) {
+                if let Some((client, token)) = crate::agents_bot_ready(db) {
+                    let amount = lead.service_ids.as_deref().map(|ids| db.lead_reward_amount(ids)).unwrap_or(0);
+                    tauri::async_runtime::spawn(crate::telegram::notify_agent_lead_paid(
+                        client, token, agent.telegram_chat_id.clone(), agent.locale.clone(), lead.client_name.clone(), amount,
+                    ));
+                }
+            }
+            Ok(to_json(crate::to_agent_lead(lead)))
+        }
         "list_agent_training_posts" => Ok(to_json(db.list_agent_training_posts().into_iter().map(crate::to_agent_training_post).collect::<Vec<_>>())),
         "create_agent_training_post" => {
             let p: crate::CreateAgentTrainingPostPayload = from_payload(payload)?;

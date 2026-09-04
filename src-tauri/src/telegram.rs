@@ -710,7 +710,24 @@ fn stage_emoji(stage: &str) -> &'static str {
     }
 }
 
-fn build_leads_summary(locale: &str, leads: &[crate::db::AgentLeadRecord]) -> String {
+// Строка с суммой вознаграждения под оформленным клиентом (пользователь:
+// "смотря на сумму выбранной услуги и процент вознаграждения в боте Мои
+// клиенты когда смотришь должна быть сумма выплаты... и пометка выплатили") —
+// только для стадии "converted", остальным стадиям вознаграждение считать
+// ещё не из чего (услуги фиксируются, но комиссия обсуждается по факту сделки).
+fn lead_payment_line(locale: &str, amount: i64, paid: bool) -> String {
+    let amount_text = format_amount(amount);
+    match (locale, paid) {
+        ("uz", true) => format!("   💰 {amount_text} so'm — to'landi"),
+        ("uz", false) => format!("   💰 {amount_text} so'm — to'lov kutilmoqda"),
+        ("uz-cyrl", true) => format!("   💰 {amount_text} сўм — тўланди"),
+        ("uz-cyrl", false) => format!("   💰 {amount_text} сўм — тўлов кутилмоқда"),
+        (_, true) => format!("   💰 {amount_text} сум — выплачено"),
+        (_, false) => format!("   💰 {amount_text} сум — ожидает выплаты"),
+    }
+}
+
+fn build_leads_summary(db: &Db, locale: &str, leads: &[crate::db::AgentLeadRecord]) -> String {
     let converted = leads.iter().filter(|l| l.stage == "converted").count();
     let pending = leads.len() - converted;
     let header = match locale {
@@ -720,7 +737,15 @@ fn build_leads_summary(locale: &str, leads: &[crate::db::AgentLeadRecord]) -> St
     };
     let lines = leads
         .iter()
-        .map(|l| format!("{} {} — {}", stage_emoji(&l.stage), l.client_name, stage_label(locale, &l.stage)))
+        .map(|l| {
+            let base = format!("{} {} — {}", stage_emoji(&l.stage), l.client_name, stage_label(locale, &l.stage));
+            if l.stage == "converted" {
+                let amount = l.service_ids.as_deref().map(|ids| db.lead_reward_amount(ids)).unwrap_or(0);
+                format!("{base}\n{}", lead_payment_line(locale, amount, l.payment_status == "paid"))
+            } else {
+                base
+            }
+        })
         .collect::<Vec<_>>()
         .join("\n");
     format!("{header}\n\n{lines}")
@@ -821,6 +846,38 @@ pub async fn notify_agent_lead_stage_changed(client: reqwest::Client, token: Str
 // ЗАПИСИ продажи, а не оформления клиента админом спустя какое-то время).
 pub async fn notify_agent_lead_converted(client: reqwest::Client, token: String, chat_id: String, locale: String, client_name: String) {
     let text = lead_converted_message(&locale, &client_name);
+    let _ = send_message(&client, &token, &chat_id, &text, None).await;
+}
+
+// "5000000" -> "5 000 000" — тот же принцип, что formatThousands на фронте
+// (src/lib/format.ts), только на стороне бота: суммы вознаграждения считает
+// и форматирует Rust (db.rs::lead_reward_amount), а не CRM.
+fn format_amount(n: i64) -> String {
+    let s = n.unsigned_abs().to_string();
+    let grouped: String = s
+        .as_bytes()
+        .rchunks(3)
+        .rev()
+        .map(|c| std::str::from_utf8(c).unwrap())
+        .collect::<Vec<_>>()
+        .join(" ");
+    if n < 0 { format!("-{grouped}") } else { grouped }
+}
+
+fn lead_paid_message(locale: &str, client_name: &str, amount: i64) -> String {
+    let amount_text = format_amount(amount);
+    match locale {
+        "uz" => format!("💰 Mijoz \"{client_name}\" bo'yicha mukofot to'landi: {amount_text} so'm."),
+        "uz-cyrl" => format!("💰 Мижоз \"{client_name}\" бўйича мукофот тўланди: {amount_text} сўм."),
+        _ => format!("💰 По клиенту «{client_name}» вознаграждение выплачено: {amount_text} сум."),
+    }
+}
+
+// Админ отметил выплату (см. Db::mark_agent_lead_paid) — пользователь:
+// "нажал сообщить об оплате, агенту пришло уведомление что вы получили
+// вознаграждение".
+pub async fn notify_agent_lead_paid(client: reqwest::Client, token: String, chat_id: String, locale: String, client_name: String, amount: i64) {
+    let text = lead_paid_message(&locale, &client_name, amount);
     let _ = send_message(&client, &token, &chat_id, &text, None).await;
 }
 
@@ -1066,7 +1123,7 @@ async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client,
                             .enumerate()
                             .map(|(i, s)| (format!("ℹ {}. {}", i + 1, s.name), format!("svc_info:{}", s.id)))
                             .collect();
-                        let _ = send_menu(client, token, &chat_id, &format!("{}\n\n{}", bot_text(&locale, "sale_ask_services"), list_text), info_buttons).await;
+                        send_menu_with_fallback(client, token, &chat_id, &format!("{}\n\n{}", bot_text(&locale, "sale_ask_services"), list_text), info_buttons).await;
                     }
                 }
                 "services" => {
@@ -1249,6 +1306,20 @@ fn service_info_text(locale: &str, s: &crate::db::HouseServiceRecord) -> String 
     lines.join("\n")
 }
 
+// send_menu иногда не проходит — Telegram может отклонить запрос с инлайн-
+// кнопками по причинам, которые заранее не предугадать (например, слишком
+// длинный список). Раньше в таком случае агент вообще не видел список услуг
+// (ошибка молча проглатывалась через "let _ ="), из-за чего шаг выбора услуг
+// выглядел "зависшим" — сообщение просто не приходило. Теперь при неудаче
+// шлём тот же текст обычным сообщением без кнопок: возможность тапнуть и
+// почитать описание пропадает, но сам список и возможность выбрать номер —
+// нет, это должно работать в любом случае.
+async fn send_menu_with_fallback(client: &reqwest::Client, token: &str, chat_id: &str, text: &str, buttons: Vec<(String, String)>) {
+    if send_menu(client, token, chat_id, text, buttons).await.is_err() {
+        let _ = send_message(client, token, chat_id, text, None).await;
+    }
+}
+
 // Каталог услуг для самостоятельного изучения агентом вне записи продажи
 // (пользователь: "чтоб Агенты могли ознакомиться с услугами прежде чем
 // предлагать") — каждая услуга своей инлайн-кнопкой, по нажатию бот
@@ -1265,18 +1336,29 @@ async fn send_service_catalog(db: &Arc<Mutex<Db>>, client: &reqwest::Client, tok
         .enumerate()
         .map(|(i, s)| (format!("{}. {}", i + 1, s.name), format!("svc_info:{}", s.id)))
         .collect();
-    let _ = send_menu(client, token, chat_id, bot_text(locale, "services_catalog_title"), buttons).await;
+    send_menu_with_fallback(client, token, chat_id, bot_text(locale, "services_catalog_title"), buttons).await;
 }
 
 // Со сводкой оформлено/не оформлено — по просьбе пользователя ("нужно
 // пояснение клиентов которые оформлены или не оформлены аналитика с бота").
 async fn send_agent_my_leads(db: &Arc<Mutex<Db>>, client: &reqwest::Client, token: &str, chat_id: &str, agent_id: &str, locale: &str) {
-    let leads: Vec<_> = db.lock().unwrap().list_agent_leads().into_iter().filter(|l| l.agent_id == agent_id).collect();
-    if leads.is_empty() {
-        let _ = send_message(client, token, chat_id, bot_text(locale, "no_leads"), None).await;
-    } else {
-        let text = build_leads_summary(locale, &leads);
-        let _ = send_message(client, token, chat_id, &text, None).await;
+    // Текст (в т.ч. суммы вознаграждения через db.lead_reward_amount)
+    // считаем целиком внутри блока, пока гвард жив, и явно дропаем его ДО
+    // await — MutexGuard не Send, а вся обработка апдейта теперь оборачивается
+    // в tauri::async_runtime::spawn (см. agents_poll_loop), которому нужен
+    // Send-фьючер целиком.
+    let text = {
+        let guard = db.lock().unwrap();
+        let leads: Vec<_> = guard.list_agent_leads().into_iter().filter(|l| l.agent_id == agent_id).collect();
+        if leads.is_empty() { None } else { Some(build_leads_summary(&guard, locale, &leads)) }
+    };
+    match text {
+        Some(text) => {
+            let _ = send_message(client, token, chat_id, &text, None).await;
+        }
+        None => {
+            let _ = send_message(client, token, chat_id, bot_text(locale, "no_leads"), None).await;
+        }
     }
 }
 

@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '1.9.3';
+export const APP_VERSION = '1.9.4';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '1.9.4',
+      items: [
+        'Исправлено: карточка агента, открытая по клику из уведомления, сама переоткрывалась после закрытия каждые несколько секунд',
+        'Исправлено: если бот не мог отправить список услуг с кнопками «почитать описание» (по любой причине), агент вообще не видел список и шаг записи продажи выглядел зависшим — теперь в этом случае список всё равно приходит обычным текстом, без кнопок, но с возможностью выбрать',
+        'Новое: сумма вознаграждения агента по оформленному клиенту (цена услуги × процент вознаграждения) теперь видна и в карточке агента в CRM, и в «Мои клиенты» в боте; админ отмечает выплату кнопкой «Сообщить об оплате» — агенту в бота приходит уведомление о выплаченной сумме, а в «Мои клиенты» появляется пометка «Выплачено»',
+      ],
+    },
     {
       version: '1.9.3',
       items: [
@@ -723,6 +731,14 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '1.9.4',
+      items: [
+        "Tuzatildi: bildirishnoma orqali ochilgan agent kartochkasi yopilgandan keyin bir necha soniyada o'zi qayta ochilaverardi",
+        "Tuzatildi: agar bot xizmatlar ro'yxatini \"tavsifni o'qish\" tugmalari bilan yubora olmasa (har qanday sababga ko'ra), agent ro'yxatni umuman ko'rmasdi va sotuvni yozish qadami \"muzlab qolgan\" ko'rinardi — endi bunday holatda ro'yxat baribir oddiy matn sifatida keladi, tugmalarsiz, lekin tanlash imkoniyati bilan",
+        "Yangi: rasmiylashtirilgan mijoz bo'yicha agent mukofoti summasi (xizmat narxi × mukofot foizi) endi CRM'dagi agent kartochkasida ham, botdagi \"Mijozlarim\"da ham ko'rinadi; admin \"To'lov haqida xabar berish\" tugmasi bilan to'lovni belgilaydi — agentga botda to'langan summa haqida bildirishnoma keladi, \"Mijozlarim\"da esa \"To'landi\" belgisi paydo bo'ladi",
+      ],
+    },
+    {
       version: '1.9.3',
       items: [
         "Tuzatildi: agent kartochkasi (va mijoz holati o'zgarganda ochiq kartochka) vizual ravishda \"sakrardi\" — yopilib qayta ochilardi — arizani tasdiqlashda, lid holatini o'zgartirishda va \"Agentlar\" bo'limidagi boshqa amallarda; endi amaldan keyin ma'lumotlar butun sahifani qayta yuklamasdan yangilanadi",
@@ -1429,6 +1445,14 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '1.9.4',
+      items: [
+        'Тузатилди: билдиришнома орқали очилган агент карточкаси ёпилгандан кейин бир неча сонияда ўзи қайта очилаверарди',
+        'Тузатилди: агар бот хизматлар рўйхатини "тавсифни ўқиш" тугмалари билан юбора олмаса (ҳар қандай сабабга кўра), агент рўйхатни умуман кўрмасди ва сотувни ёзиш қадами "музлаб қолган" кўринарди — энди бундай ҳолатда рўйхат барибир оддий матн сифатида келади, тугмаларсиз, лекин танлаш имконияти билан',
+        'Янги: расмийлаштирилган мижоз бўйича агент мукофоти суммаси (хизмат нархи × мукофот фоизи) энди CRM\'даги агент карточкасида ҳам, ботдаги "Мижозларим"да ҳам кўринади; админ "Тўлов ҳақида хабар бериш" тугмаси билан тўловни белгилайди — агентга ботда тўланган сумма ҳақида билдиришнома келади, "Мижозларим"да эса "Тўланди" белгиси пайдо бўлади',
+      ],
+    },
     {
       version: '1.9.3',
       items: [

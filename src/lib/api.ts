@@ -569,6 +569,8 @@ export type AgentLead = {
   convertedClientId: string | null;
   convertedClientNumber: string | null;
   serviceIds: string | null;
+  paymentStatus: 'pending' | 'paid';
+  paidAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -1156,6 +1158,8 @@ export const api = {
   listAgentLeads: () => invoke<AgentLead[]>('list_agent_leads'),
   advanceAgentLeadStage: (payload: { actorId: string; leadId: string; stage: AgentLeadStage }) =>
     invoke<AgentLead>('advance_agent_lead_stage', { payload }),
+  markAgentLeadPaid: (payload: { actorId: string; leadId: string }) =>
+    invoke<AgentLead>('mark_agent_lead_paid', { payload }),
   listAgentTrainingPosts: () => invoke<AgentTrainingPost[]>('list_agent_training_posts'),
   createAgentTrainingPost: (payload: { actorId: string; title: string; body: string }) =>
     invoke<AgentTrainingPost>('create_agent_training_post', { payload }),

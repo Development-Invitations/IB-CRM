@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '1.9.8';
+export const APP_VERSION = '1.9.9';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,12 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '1.9.9',
+      items: [
+        'Технический релиз: включён подробный лог сборки MSI-инсталлятора, чтобы наконец увидеть настоящую причину падения WiX вместо общей "failed to run light.exe"',
+      ],
+    },
     {
       version: '1.9.8',
       items: [
@@ -760,6 +766,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '1.9.9',
+      items: [
+        "Texnik reliz: MSI o'rnatuvchisini yig'ishning batafsil logi yoqildi — WiX nima uchun yiqilayotganining haqiqiy sababini ko'rish uchun, oddiy \"failed to run light.exe\" o'rniga",
+      ],
+    },
+    {
       version: '1.9.8',
       items: [
         "Texnik reliz: NSIS bilan bir qatorda MSI o'rnatuvchisini xavfsiz qayta qo'shishga urinish — endi alohida yig'ish bosqichi sifatida, u o'zi yig'ilmasa ham asosiy relizni chiqishiga xalaqit bermaydi",
@@ -1503,6 +1515,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '1.9.9',
+      items: [
+        'Техник релиз: MSI ўрнатувчисини йиғишнинг батафсил логи ёқилди — WiX нима учун йиқилаётганининг ҳақиқий сабабини кўриш учун, оддий "failed to run light.exe" ўрнига',
+      ],
+    },
     {
       version: '1.9.8',
       items: [

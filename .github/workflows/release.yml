@@ -94,7 +94,12 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npx tauri build --bundles msi
+        # -vv — без этого tauri-bundler глушит реальный вывод candle.exe/
+        # light.exe и наружу попадает только обёрточное "failed to run
+        # light.exe" без единой подробности (см. два предыдущих провала в
+        # docs/TZ.md v1.9.1/v1.9.8) — с флагом должна появиться настоящая
+        # WiX-ошибка (ICE-валидация, битые ссылки на ресурсы и т. п.).
+        run: npx tauri build --bundles msi -vv
 
       - name: attach msi to the already-published release
         env:

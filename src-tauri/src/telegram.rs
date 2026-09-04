@@ -591,6 +591,7 @@ fn bot_text<'a>(locale: &str, key: &'a str) -> &'a str {
             "no_services" => "Hozircha xizmatlar qo'shilmagan.",
             "svc_price_label" => "Narxi",
             "svc_no_description" => "Tavsif kiritilmagan.",
+            "svc_back_to_list" => "◄ Ro'yxatga qaytish",
             "consent_agree_btn" => "✅ Roziman",
             "consent_reminder" => "Davom etish uchun rozilik tugmasini bosing.",
             "sale_ask_name" => "Mijozning F.I.O.?",
@@ -633,6 +634,7 @@ fn bot_text<'a>(locale: &str, key: &'a str) -> &'a str {
             "no_services" => "Ҳозирча хизматлар қўшилмаган.",
             "svc_price_label" => "Нархи",
             "svc_no_description" => "Тавсиф киритилмаган.",
+            "svc_back_to_list" => "◄ Рўйхатга қайтиш",
             "consent_agree_btn" => "✅ Розиман",
             "consent_reminder" => "Давом этиш учун розилик тугмасини босинг.",
             "sale_ask_name" => "Мижознинг Ф.И.Ш.?",
@@ -675,6 +677,7 @@ fn bot_text<'a>(locale: &str, key: &'a str) -> &'a str {
             "no_services" => "Пока нет добавленных услуг.",
             "svc_price_label" => "Цена",
             "svc_no_description" => "Описание не заполнено.",
+            "svc_back_to_list" => "◄ Вернуться к списку",
             "consent_agree_btn" => "✅ Согласен",
             "consent_reminder" => "Чтобы продолжить, нажмите кнопку согласия.",
             "sale_ask_name" => "ФИО клиента?",
@@ -972,7 +975,7 @@ async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client,
                     start_agent_new_lead(db, client, token, &chat_id, &agent).await;
                     return;
                 } else if t == bot_text(&locale, "btn_services") || t == "/services" {
-                    send_service_catalog(db, client, token, &chat_id, &locale).await;
+                    send_service_catalog_page(db, client, token, &chat_id, &locale, 0).await;
                     return;
                 } else if t == bot_text(&locale, "btn_materials") || t == "/materials" {
                     send_agent_materials(db, client, token, &chat_id, &locale).await;
@@ -1178,16 +1181,36 @@ async fn handle_agents_bot_update(db: &Arc<Mutex<Db>>, client: &reqwest::Client,
             }
             return;
         }
-        // Карточка услуги (см. send_service_catalog / шаг "services" выше) —
+        // Карточка услуги (см. send_service_catalog_page / шаг "services" выше) —
         // доступна и до, и после подтверждения агента не важно, обрабатывается
         // раньше проверки статуса, т.к. просмотр описания не требует прав.
-        if let Some(service_id) = data.strip_prefix("svc_info:") {
+        // Формат "svc_info:{id}:{origin}" — origin это либо номер страницы
+        // каталога (тогда после карточки — кнопка "Назад к списку" на ту же
+        // страницу), либо "sale" — тап со шага выбора услуг при продаже
+        // (там своя постраничная нумерация ни при чём, назад не нужен). UUID
+        // не содержит ':', поэтому безопасно делить по ПОСЛЕДНЕМУ разделителю.
+        if let Some(rest) = data.strip_prefix("svc_info:") {
+            let (service_id, origin) = rest.rsplit_once(':').unwrap_or((rest, "sale"));
             let _ = answer_callback_query(client, token, &cb_id, None).await;
             let service = db.lock().unwrap().get_house_service(service_id);
             let locale = db.lock().unwrap().get_agent_by_chat_id(&chat_id).map(|a| a.locale).unwrap_or_else(|| "ru".to_string());
             if let Some(s) = service {
-                let _ = send_message(client, token, &chat_id, &service_info_text(&locale, &s), None).await;
+                let text = service_info_text(&locale, &s);
+                if let Ok(page) = origin.parse::<usize>() {
+                    let _ = send_menu(client, token, &chat_id, &text, vec![(bot_text(&locale, "svc_back_to_list").to_string(), format!("svc_page:{page}"))]).await;
+                } else {
+                    let _ = send_message(client, token, &chat_id, &text, None).await;
+                }
             }
+            return;
+        }
+        // Пагинация каталога услуг (см. send_service_catalog_page ниже) —
+        // стрелки "◄"/"►" под списком.
+        if let Some(page_str) = data.strip_prefix("svc_page:") {
+            let _ = answer_callback_query(client, token, &cb_id, None).await;
+            let page: usize = page_str.parse().unwrap_or(0);
+            let locale = db.lock().unwrap().get_agent_by_chat_id(&chat_id).map(|a| a.locale).unwrap_or_else(|| "ru".to_string());
+            send_service_catalog_page(db, client, token, &chat_id, &locale, page).await;
             return;
         }
         if data == "consent:agree" {
@@ -1286,7 +1309,7 @@ async fn send_agent_materials(db: &Arc<Mutex<Db>>, client: &reqwest::Client, tok
 }
 
 // Полная карточка одной услуги — по нажатию на инлайн-кнопку каталога (см.
-// send_service_catalog ниже) или на такую же кнопку прямо на шаге выбора
+// send_service_catalog_page ниже) или на такую же кнопку прямо на шаге выбора
 // услуг при записи продажи (пользователь: "нажать на услугу посмотреть
 // описание прежде чем выбрать её"). Отдельным сообщением, а не алертом
 // answerCallbackQuery — у алерта Telegram жёсткий лимит ~200 символов,
@@ -1320,6 +1343,35 @@ async fn send_menu_with_fallback(client: &reqwest::Client, token: &str, chat_id:
     }
 }
 
+// То же самое, что send_menu, но с возможностью сгруппировать несколько
+// кнопок В ОДНУ строку (нужно для навигации "◄ ►" по страницам каталога
+// услуг рядом — send_menu кладёт ровно одну кнопку на строку и этого не
+// умеет, но менять её сигнатуру не стали — используется в других местах,
+// где по одной кнопке в строке как раз то, что нужно).
+async fn send_menu_rows(client: &reqwest::Client, token: &str, chat_id: &str, text: &str, rows: Vec<Vec<(String, String)>>) -> Result<(), TelegramError> {
+    let mut body = json!({ "chat_id": chat_id, "text": text });
+    if !rows.is_empty() {
+        let keyboard: Vec<Vec<serde_json::Value>> = rows
+            .into_iter()
+            .map(|row| row.into_iter().map(|(label, callback_data)| json!({ "text": label, "callback_data": callback_data })).collect())
+            .collect();
+        body["reply_markup"] = json!({ "inline_keyboard": keyboard });
+    }
+    let resp = client.post(api_url(token, "sendMessage")).json(&body).send().await.map_err(|e| TelegramError(e.to_string()))?;
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        return Err(TelegramError(format!("sendMessage: {status} {text}")));
+    }
+    Ok(())
+}
+
+async fn send_menu_rows_with_fallback(client: &reqwest::Client, token: &str, chat_id: &str, text: &str, rows: Vec<Vec<(String, String)>>) {
+    if send_menu_rows(client, token, chat_id, text, rows).await.is_err() {
+        let _ = send_message(client, token, chat_id, text, None).await;
+    }
+}
+
 // Bot API нигде явно не документирует лимит длины InlineKeyboardButton.text
 // (в отличие от callback_data — там жёсткие 1-64 байта), но на практике
 // именно необычно длинная кнопка — самое вероятное объяснение того, что
@@ -1345,20 +1397,55 @@ fn truncate_label(s: &str, max_chars: usize) -> String {
 // услуга дополнительно своей инлайн-кнопкой — по нажатию бот присылает её
 // карточку (service_info_text) через callback "svc_info:{id}", общий для
 // этого меню и для шага "services" в start_agent_new_lead.
-async fn send_service_catalog(db: &Arc<Mutex<Db>>, client: &reqwest::Client, token: &str, chat_id: &str, locale: &str) {
+// По 10 услуг на страницу (пользователь: "с возможностью листать по 10
+// услуг на страницу") — нумерация СКВОЗНАЯ через все страницы (1..N), а не
+// с 1 на каждой странице заново, чтобы номер услуги не "плавал" при
+// перелистывании. "◄"/"►" — только там, где есть куда листать.
+const SERVICES_PAGE_SIZE: usize = 10;
+
+async fn send_service_catalog_page(db: &Arc<Mutex<Db>>, client: &reqwest::Client, token: &str, chat_id: &str, locale: &str, page: usize) {
     let services = db.lock().unwrap().list_house_services_internal();
     if services.is_empty() {
         let _ = send_message(client, token, chat_id, bot_text(locale, "no_services"), None).await;
         return;
     }
-    let list_text = services.iter().enumerate().map(|(i, s)| format!("{}. {}", i + 1, s.name)).collect::<Vec<_>>().join("\n");
-    let buttons: Vec<(String, String)> = services
+    let total_pages = services.len().div_ceil(SERVICES_PAGE_SIZE).max(1);
+    let page = page.min(total_pages - 1);
+    let start = page * SERVICES_PAGE_SIZE;
+    let end = (start + SERVICES_PAGE_SIZE).min(services.len());
+    let page_items = &services[start..end];
+
+    let list_text = page_items
         .iter()
         .enumerate()
-        .map(|(i, s)| (format!("{}. {}", i + 1, truncate_label(&s.name, 40)), format!("svc_info:{}", s.id)))
+        .map(|(i, s)| format!("{}. {}", start + i + 1, s.name))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let page_label = match locale {
+        "uz" => format!("Sahifa {}/{}", page + 1, total_pages),
+        "uz-cyrl" => format!("Саҳифа {}/{}", page + 1, total_pages),
+        _ => format!("Страница {}/{}", page + 1, total_pages),
+    };
+    let text = format!("{}\n\n{}\n\n{}", bot_text(locale, "services_catalog_title"), list_text, page_label);
+
+    let mut rows: Vec<Vec<(String, String)>> = page_items
+        .iter()
+        .enumerate()
+        .map(|(i, s)| vec![(format!("{}. {}", start + i + 1, truncate_label(&s.name, 40)), format!("svc_info:{}:{page}", s.id))])
         .collect();
-    let text = format!("{}\n\n{}", bot_text(locale, "services_catalog_title"), list_text);
-    send_menu_with_fallback(client, token, chat_id, &text, buttons).await;
+
+    if total_pages > 1 {
+        let mut nav: Vec<(String, String)> = Vec::new();
+        if page > 0 {
+            nav.push(("◄".to_string(), format!("svc_page:{}", page - 1)));
+        }
+        if page + 1 < total_pages {
+            nav.push(("►".to_string(), format!("svc_page:{}", page + 1)));
+        }
+        rows.push(nav);
+    }
+
+    send_menu_rows_with_fallback(client, token, chat_id, &text, rows).await;
 }
 
 // Со сводкой оформлено/не оформлено — по просьбе пользователя ("нужно

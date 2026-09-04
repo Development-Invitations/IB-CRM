@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '2.0.0';
+export const APP_VERSION = '2.0.1';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,12 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '2.0.1',
+      items: [
+        'Каталог услуг в боте теперь листается по 10 услуг на страницу — со стрелками «◄»/«►» внизу списка; открыв услугу, можно вернуться к тому же списку кнопкой «Назад к списку»',
+      ],
+    },
     {
       version: '2.0.0',
       items: [
@@ -781,6 +787,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '2.0.1',
+      items: [
+        "Botdagi xizmatlar katalogi endi har sahifada 10 tadan xizmat bilan varaqlanadi — ro'yxat ostida \"◄\"/\"►\" tugmalari bilan; xizmatni ochgandan so'ng \"Ro'yxatga qaytish\" tugmasi orqali xuddi o'sha ro'yxatga qaytish mumkin",
+      ],
+    },
+    {
       version: '2.0.0',
       items: [
         "Bloklangan xodimni endi CRM'dan o'chirish mumkin — faqat u allaqachon bloklangan bo'lsa; agar uning loyihalari, reglamentlari, ularda ishtiroki yoki blog yozuvlari qolgan bo'lsa, o'chirish rad etiladi (xodim tarixni yo'qotmaslik uchun bloklangan holida qoladi)",
@@ -1545,6 +1557,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '2.0.1',
+      items: [
+        'Ботдаги хизматлар каталоги энди ҳар саҳифада 10 тадан хизмат билан варақланади — рўйхат остида "◄"/"►" тугмалари билан; хизматни очгандан сўнг "Рўйхатга қайтиш" тугмаси орқали худди ўша рўйхатга қайтиш мумкин',
+      ],
+    },
     {
       version: '2.0.0',
       items: [

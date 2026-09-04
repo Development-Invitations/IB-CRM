@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '1.9.6';
+export const APP_VERSION = '1.9.7';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,13 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '1.9.7',
+      items: [
+        'Исправлено: в Настройках выпадающий список (например, выбор темы) при открытой секции обрезался следующей секцией снизу — теперь раскрывается поверх остальных, как положено',
+        'Страница «Настройки» (и обычная, и партнёрская) теперь занимает всю ширину экрана, а не узкую колонку слева',
+      ],
+    },
     {
       version: '1.9.6',
       items: [
@@ -747,6 +754,13 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '1.9.7',
+      items: [
+        "Tuzatildi: Sozlamalarda ochiq bo'lim ichidagi tushuvchi ro'yxat (masalan, mavzu tanlash) pastdagi keyingi bo'lim bilan kesilib qolardi — endi u boshqalar ustidan to'g'ri ochiladi",
+        "\"Sozlamalar\" sahifasi (oddiy va hamkor sozlamalari ham) endi chap tomondagi tor ustun emas, butun ekran kengligini egallaydi",
+      ],
+    },
+    {
       version: '1.9.6',
       items: [
         "Mijoz yaratishda va mijozga xizmat qo'shishda xizmat tanlash endi nomi/kodi bo'yicha qidiruv va tavsifni ko'rish imkoniyati bo'lgan alohida oyna orqali ochiladi — oddiy tanlov ro'yxati o'rniga",
@@ -1477,6 +1491,13 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '1.9.7',
+      items: [
+        'Тузатилди: Созламаларда очиқ бўлим ичидаги тушувчи рўйхат (масалан, мавзу танлаш) пастдаги кейинги бўлим билан кесилиб қоларди — энди у бошқалар устидан тўғри очилади',
+        '"Созламалар" саҳифаси (оддий ва ҳамкор созламалари ҳам) энди чап томондаги тор устун эмас, бутун экран кенглигини эгаллайди',
+      ],
+    },
     {
       version: '1.9.6',
       items: [

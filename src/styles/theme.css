@@ -1006,12 +1006,17 @@ button.primary:hover { filter: brightness(0.95); }
 
 /* ---- Settings page ---- */
 
-.settings-page { max-width: 520px; }
+/* Раньше .settings-page была искусственно сужена до 520px — при старом
+   дизайне (плоский список секций с текстом на всю ширину) это было уместно,
+   но после перевода всех секций в аккордеон (см. SettingsSection.tsx) узкая
+   колонка стала выглядеть неадаптивно — по просьбе пользователя ("на всю
+   ширину контента") убрано, страница занимает всю доступную ширину, как и
+   остальные разделы CRM. Поля/textarea внутри так и остаются с собственным
+   maxWidth инлайн-стилем, где это нужно — узкой была только сама колонка, не
+   ширина отдельных полей. */
 
 .settings-section {
-  margin-bottom: 28px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 16px;
 }
 
 .settings-section h2 {
@@ -1607,7 +1612,14 @@ button.employees-add-btn {
 .changelog-item {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  overflow: hidden;
+  /* overflow:hidden убран (было раньше) — обрезал не только квадратные углы
+     заголовка, а вообще всё, что выходит за пределы текущей высоты блока, в
+     т.ч. выпадающий список <Select> (custom-select-menu — position:absolute,
+     не участвует в потоке и не растягивает раскрытую секцию). После того как
+     все разделы Настроек стали аккордеоном и туда попали Select-ы (тема
+     оформления, масштаб и т. д.), список вариантов оказывался обрезан
+     следующей секцией снизу. Скруглённые углы шапки при этом не теряются —
+     обеспечиваются отдельно через :has() ниже. */
 }
 
 .changelog-item-header {
@@ -1618,11 +1630,18 @@ button.employees-add-btn {
   padding: 10px 14px;
   background: var(--color-surface-2);
   border: none;
+  border-radius: var(--radius);
   color: var(--color-text);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   text-align: left;
+}
+
+/* Открытая секция — у заголовка снизу есть training-body, поэтому скругляем
+   только верхние углы (нижние скругляет сама .training-body ниже). */
+.changelog-item:has(.training-body) .changelog-item-header {
+  border-radius: var(--radius) var(--radius) 0 0;
 }
 
 .changelog-item-header:hover { background: var(--color-border); }
@@ -1652,6 +1671,7 @@ button.employees-add-btn {
   font-size: 13px;
   line-height: 1.6;
   color: var(--color-text-muted);
+  border-radius: 0 0 var(--radius) var(--radius);
 }
 
 .updates-online-check {

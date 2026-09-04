@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent, ChangeEvent, useRef } from 'react';
-import { Copy, Check, Eye, EyeOff, Send, Clock, Camera, RefreshCw, NotebookText } from 'lucide-react';
+import { Copy, Check, Eye, EyeOff, Send, Clock, Camera, RefreshCw, NotebookText, Palette, Globe, KeyRound, UserCog, Router } from 'lucide-react';
 import { api, type Employee } from '../lib/api';
 import { useLocale, LOCALE_LABELS, type Locale } from '../lib/i18n';
 import { useTheme, THEME_NAMES } from '../lib/theme';
@@ -11,6 +11,7 @@ import { setCachedNotebookSettings } from '../lib/notebookSettingsCache';
 import Avatar from '../components/Avatar';
 import Checkbox from '../components/Checkbox';
 import Select from '../components/Select';
+import SettingsSection from '../components/SettingsSection';
 
 // Настройки партнёра (v0.4.0) — минимальный набор: тема, язык, смена пароля,
 // запрос на смену данных, редактирование фото (все — тот же генерический
@@ -27,6 +28,9 @@ export default function PartnerSettings({ employee: initialEmployee }: { employe
   const reloadEmployee = () => {
     api.getEmployee(employee.id).then((e) => { if (e) setEmployee(e); });
   };
+
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const toggleSection = (id: string) => setOpenSections((prev) => ({ ...prev, [id]: !prev[id] }));
 
   // ---- Пароль ----
   const [currentPassword, setCurrentPassword] = useState('');
@@ -229,20 +233,17 @@ export default function PartnerSettings({ employee: initialEmployee }: { employe
     <div className="settings-page">
       <h1>{t('settings.title')}</h1>
 
-      <section className="settings-section">
-        <h2>{t('settings.appearance')}</h2>
+      <SettingsSection id="appearance" icon={<Palette size={18} />} title={t('settings.appearance')} openSections={openSections} toggleSection={toggleSection}>
         <Select value={theme} options={themeOptions} onChange={(v) => setTheme(v as typeof theme)} />
         <p className="settings-hint">{t('settings.themeHint')}</p>
-      </section>
+      </SettingsSection>
 
-      <section className="settings-section">
-        <h2>{t('settings.language')}</h2>
+      <SettingsSection id="language" icon={<Globe size={18} />} title={t('settings.language')} openSections={openSections} toggleSection={toggleSection}>
         <Select value={locale} options={languageOptions} onChange={(v) => setLocale(v as Locale)} />
         <p className="settings-hint">{t('settings.languageHint')}</p>
-      </section>
+      </SettingsSection>
 
-      <section className="settings-section">
-        <h2>{t('settings.passwordSection')}</h2>
+      <SettingsSection id="password" icon={<KeyRound size={18} />} title={t('settings.passwordSection')} openSections={openSections} toggleSection={toggleSection}>
         <form className="password-form" onSubmit={handleChangePassword}>
           {pwError && <div className="error-text">{pwError}</div>}
           <div className="field">
@@ -261,10 +262,9 @@ export default function PartnerSettings({ employee: initialEmployee }: { employe
             {pwBusy ? t('settings.changePasswordBusy') : t('settings.changePasswordBtn')}
           </button>
         </form>
-      </section>
+      </SettingsSection>
 
-      <section className="settings-section">
-        <h2>{t('employees.avatarUploadLabel')}</h2>
+      <SettingsSection id="avatar" icon={<Camera size={18} />} title={t('employees.avatarUploadLabel')} openSections={openSections} toggleSection={toggleSection}>
         <div className="avatar-upload-row">
           <Avatar name={employee.fullName || employee.login} size={56} src={employee.avatarData} />
           <div className="avatar-upload-actions">
@@ -279,10 +279,9 @@ export default function PartnerSettings({ employee: initialEmployee }: { employe
             <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
           </div>
         </div>
-      </section>
+      </SettingsSection>
 
-      <section className="settings-section">
-        <h2>{t('editRequest.sectionTitle')}</h2>
+      <SettingsSection id="editRequest" icon={<UserCog size={18} />} title={t('editRequest.sectionTitle')} openSections={openSections} toggleSection={toggleSection}>
         {selfEditActive ? (
           <>
             <div className="profile-edit-request-title">
@@ -329,10 +328,9 @@ export default function PartnerSettings({ employee: initialEmployee }: { employe
             </div>
           </div>
         )}
-      </section>
+      </SettingsSection>
 
-      <section className="settings-section">
-        <h2>{t('settings.radmin.title')}</h2>
+      <SettingsSection id="radmin" icon={<Router size={18} />} title={t('settings.radmin.title')} openSections={openSections} toggleSection={toggleSection}>
         <p className="settings-hint">{t('partnerSettings.radminHint')}</p>
 
         <div className="telegram-bot-card">
@@ -370,10 +368,9 @@ export default function PartnerSettings({ employee: initialEmployee }: { employe
         <button className="modal-btn" onClick={loadRadmin} disabled={radminLoading} style={{ marginTop: 10 }}>
           <RefreshCw size={14} /> {t('partnerSettings.radminRefreshBtn')}
         </button>
-      </section>
+      </SettingsSection>
 
-      <section className="settings-section">
-        <h2><NotebookText size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />{t('settings.notebook.title')}</h2>
+      <SettingsSection id="notebook" icon={<NotebookText size={18} />} title={t('settings.notebook.title')} openSections={openSections} toggleSection={toggleSection}>
         <Checkbox checked={notebookEnabled} onChange={setNotebookEnabledState} label={t('settings.notebook.enableLabel')} />
         <div className="field" style={{ marginTop: 10, maxWidth: 320 }}>
           <label>{t('settings.notebook.nameLabel')}</label>
@@ -383,7 +380,7 @@ export default function PartnerSettings({ employee: initialEmployee }: { employe
           {notebookBusy ? t('common.loading') : t('common.save')}
         </button>
         <p className="settings-hint">{t('settings.notebook.hint')}</p>
-      </section>
+      </SettingsSection>
     </div>
   );
 }

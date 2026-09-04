@@ -5,6 +5,7 @@ import { useToast } from '../lib/toast';
 import { formatUzPhone } from '../lib/phone';
 import Modal from './Modal';
 import Select from './Select';
+import ServicePickerModal from './ServicePickerModal';
 
 export default function ClientFormModal({
   open,
@@ -40,6 +41,7 @@ export default function ClientFormModal({
   const [serviceId, setServiceId] = useState('');
   const [houseServices, setHouseServices] = useState<HouseService[]>([]);
   const [houseServiceId, setHouseServiceId] = useState('');
+  const [servicePickerOpen, setServicePickerOpen] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -185,31 +187,22 @@ export default function ClientFormModal({
           <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('clients.notesPlaceholder')} />
         </div>
 
-        {catalogIsHouse ? (
-          <div className="field">
-            <label>{t('clients.serviceLabel')}</label>
-            <Select
-              value={houseServiceId}
-              options={[
-                { value: '', label: t('clients.serviceNotSelected') },
-                ...houseServices.map((s) => ({ value: s.id, label: s.name })),
-              ]}
-              onChange={setHouseServiceId}
-            />
-          </div>
-        ) : (
-          <div className="field">
-            <label>{t('clients.serviceLabel')}</label>
-            <Select
-              value={serviceId}
-              options={[
-                { value: '', label: t('clients.serviceNotSelected') },
-                ...services.map((s) => ({ value: s.id, label: s.name })),
-              ]}
-              onChange={setServiceId}
-            />
-          </div>
-        )}
+        <div className="field">
+          <label>{t('clients.serviceLabel')}</label>
+          <button type="button" className="modal-btn" style={{ width: '100%', justifyContent: 'space-between' }} onClick={() => setServicePickerOpen(true)}>
+            {(catalogIsHouse ? houseServices.find((s) => s.id === houseServiceId) : services.find((s) => s.id === serviceId))?.name ?? t('clients.serviceNotSelected')}
+          </button>
+        </div>
+        <ServicePickerModal
+          open={servicePickerOpen}
+          onClose={() => setServicePickerOpen(false)}
+          services={catalogIsHouse ? houseServices : services}
+          value={catalogIsHouse ? houseServiceId : serviceId}
+          onSelect={(id) => {
+            if (catalogIsHouse) setHouseServiceId(id); else setServiceId(id);
+            setServicePickerOpen(false);
+          }}
+        />
 
         {catalogIsHouse && !houseServiceId && (
           <div className="field">

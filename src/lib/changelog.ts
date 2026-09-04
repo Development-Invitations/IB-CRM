@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '1.9.5';
+export const APP_VERSION = '1.9.6';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,14 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '1.9.6',
+      items: [
+        'Выбор услуги при создании клиента и при добавлении услуги клиенту теперь открывает отдельную модалку с поиском по названию/коду и просмотром описания — вместо обычного выпадающего списка',
+        'Все разделы в «Настройках» (и обычных, и партнёрских) свёрнуты в аккордеон, чтобы страница была компактнее и читабельнее — у каждого раздела появилась своя иконка',
+        'Раздел «Обучение» в Настройках дополнен более практичными описаниями — что конкретно можно сделать в каждом разделе, а не только что это такое',
+      ],
+    },
     {
       version: '1.9.5',
       items: [
@@ -739,6 +747,14 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '1.9.6',
+      items: [
+        "Mijoz yaratishda va mijozga xizmat qo'shishda xizmat tanlash endi nomi/kodi bo'yicha qidiruv va tavsifni ko'rish imkoniyati bo'lgan alohida oyna orqali ochiladi — oddiy tanlov ro'yxati o'rniga",
+        "\"Sozlamalar\"dagi barcha bo'limlar (oddiy va hamkor sozlamalarida ham) sahifa ixcham va o'qish qulay bo'lishi uchun akkordionga yig'ildi — har bir bo'lim o'z belgisiga ega bo'ldi",
+        "Sozlamalardagi \"O'qitish\" bo'limi amaliyroq tavsiflar bilan to'ldirildi — har bir bo'limda aniq nima qilish mumkinligi, shunchaki nima ekanligi emas",
+      ],
+    },
+    {
       version: '1.9.5',
       items: [
         "Tuzatildi: botda xizmatlar katalogi va sotuvni yozishdagi xizmatlar ro'yxati xizmat nomlarisiz, faqat sarlavha bilan kelishi mumkin edi — endi ro'yxat \"tavsifni o'qish\" tugmalari ishlaydimi yoki yo'qmi, baribir oddiy matn sifatida ko'rinadi; shuningdek tugmalar yozuvidagi juda uzun xizmat nomlari qisqartirildi — Telegram xabarni butunlay rad etishining ehtimoliy sababi",
@@ -1461,6 +1477,14 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '1.9.6',
+      items: [
+        'Мижоз яратишда ва мижозга хизмат қўшишда хизмат танлаш энди номи/коди бўйича қидирув ва тавсифни кўриш имконияти бўлган алоҳида ойна орқали очилади — оддий танлов рўйхати ўрнига',
+        '"Созламалар"даги барча бўлимлар (оддий ва ҳамкор созламаларида ҳам) саҳифа ихчам ва ўқиш қулай бўлиши учун аккордионга йиғилди — ҳар бир бўлим ўз белгисига эга бўлди',
+        'Созламалардаги "Ўқитиш" бўлими амалийроқ тавсифлар билан тўлдирилди — ҳар бир бўлимда аниқ нима қилиш мумкинлиги, шунчаки нима эканлиги эмас',
+      ],
+    },
     {
       version: '1.9.5',
       items: [

@@ -810,6 +810,10 @@ export const dictionaries = {
       errorRequired: 'Укажите название услуги',
       errorGeneric: 'Не удалось сохранить услугу',
     },
+    servicePicker: {
+      title: 'Выбор услуги',
+      selectBtn: 'Выбрать',
+    },
     houseServices: {
       navLabel: 'Наши услуги',
       title: 'Наши услуги',
@@ -950,15 +954,15 @@ export const dictionaries = {
         steps: {
           employees: {
             title: 'Сотрудники',
-            body: 'Общий справочник сотрудников и партнёрских аккаунтов компании — карточки, должности, подразделения.',
+            body: 'Общий справочник сотрудников и партнёрских аккаунтов компании — карточки, должности, подразделения. Кнопка «+ Добавить» заводит нового сотрудника и сразу выдаёт логин и пароль; поиск сверху находит по имени или номеру.',
           },
           partnerAccounts: {
             title: 'Партнёры',
-            body: 'Здесь заводятся организации-партнёры и создаются логины/пароли для их сотрудников.',
+            body: 'Здесь заводятся организации-партнёры и создаются логины/пароли для их сотрудников. У каждого партнёра — свой отдельный вход: он видит только своих клиентов и свои регламенты.',
           },
           houseServices: {
             title: 'Наши услуги',
-            body: 'Общий каталог услуг компании — партнёры выбирают из него при создании своих клиентов.',
+            body: 'Общий каталог услуг компании — партнёры выбирают из него при создании своих клиентов. Есть поиск по названию и коду, а клик по услуге показывает её полное описание.',
           },
           departments: {
             title: 'Подразделения',
@@ -966,27 +970,27 @@ export const dictionaries = {
           },
           clients: {
             title: 'Клиенты',
-            body: 'Общая база клиентов — используется во всех модулях, включая регламенты и проекты.',
+            body: 'Общая база клиентов — используется во всех модулях, включая регламенты и проекты. Клиенту можно прикрепить сразу несколько услуг — вся история (что, когда и по какой цене) видна в его карточке.',
           },
           projects: {
             title: 'Проекты',
-            body: 'Проекты компании и задачи внутри них — с участниками и статусами.',
+            body: 'Проекты компании и задачи внутри них — с участниками и статусами. Открыв проект, вы увидите список участников и общую переписку по задачам прямо внутри него.',
           },
           regulations: {
             title: 'Регламенты',
-            body: 'Задачи и поручения, которые вы ставите сотрудникам или партнёрам, с сроками и статусами.',
+            body: 'Задачи и поручения, которые вы ставите сотрудникам или партнёрам, с сроками и статусами. При смене статуса или приближении срока участникам приходит уведомление.',
           },
           blog: {
             title: 'Блог',
-            body: 'Объявления, обсуждения и полезные материалы для сотрудников и партнёров.',
+            body: 'Объявления, обсуждения и полезные материалы для сотрудников и партнёров. При публикации темы можно выбрать аудиторию: сотрудники, все партнёры или конкретный партнёр.',
           },
           birthdays: {
             title: 'Календарь дней рождений',
-            body: 'Кто и когда празднует — отсортировано по ближайшим датам.',
+            body: 'Кто и когда празднует — отсортировано по ближайшим датам, чтобы не забыть поздравить вовремя.',
           },
           absenceRequests: {
             title: 'Заявки',
-            body: 'Заявки сотрудников на отгул, отпуск или удалённую работу — согласование и отчёт.',
+            body: 'Заявки сотрудников на отгул, отпуск или удалённую работу — согласование и отчёт. Подтвердить или отклонить заявку можно прямо из списка, одним нажатием.',
           },
           topbarPartners: {
             title: 'Быстрый переход к партнёру',
@@ -1002,7 +1006,7 @@ export const dictionaries = {
           },
           topbarSettings: {
             title: 'Настройки',
-            body: 'Оформление, сервер, Telegram-бот, резервные копии и автовыгрузка отчётов — всё для админа в одном месте.',
+            body: 'Оформление, сервер, Telegram-бот, резервные копии и автовыгрузка отчётов — всё для админа в одном месте. Каждый раздел свёрнут — нажмите на него, чтобы раскрыть и изменить настройки.',
           },
         },
       },
@@ -1010,7 +1014,7 @@ export const dictionaries = {
         steps: {
           employees: {
             title: 'Сотрудники',
-            body: 'Справочник коллег компании — здесь же находится и ваш собственный профиль.',
+            body: 'Справочник коллег компании — здесь же находится и ваш собственный профиль. Поиск сверху быстро находит коллегу по имени или номеру.',
           },
           departments: {
             title: 'Подразделения',
@@ -1018,19 +1022,19 @@ export const dictionaries = {
           },
           clients: {
             title: 'Клиенты',
-            body: 'Общая база клиентов, с которой вы будете работать в задачах и регламентах.',
+            body: 'Общая база клиентов, с которой вы будете работать в задачах и регламентах. В карточке клиента видно, какие услуги ему уже оказаны и когда.',
           },
           projects: {
             title: 'Проекты',
-            body: 'Проекты компании и задачи внутри них — с участниками и статусами.',
+            body: 'Проекты компании и задачи внутри них — с участниками и статусами. Открыв проект, вы увидите участников и общую переписку по задачам.',
           },
           regulations: {
             title: 'Регламенты',
-            body: 'Задачи, которые вам поручили или которые ставите вы сами, со сроками выполнения.',
+            body: 'Задачи, которые вам поручили или которые ставите вы сами, со сроками выполнения. Отмечайте выполнение прямо в задаче — постановщик увидит смену статуса сразу.',
           },
           blog: {
             title: 'Блог',
-            body: 'Объявления, обсуждения и полезные материалы компании.',
+            body: 'Объявления, обсуждения и полезные материалы компании. Под каждой темой можно оставить комментарий.',
           },
           birthdays: {
             title: 'Календарь дней рождений',
@@ -1038,7 +1042,7 @@ export const dictionaries = {
           },
           absenceRequests: {
             title: 'Заявки',
-            body: 'Заявка на отгул, отпуск или удалённую работу — и отслеживание её статуса.',
+            body: 'Заявка на отгул, отпуск или удалённую работу — и отслеживание её статуса. Статус (на рассмотрении / одобрено / отклонено) виден сразу в списке.',
           },
           topbarChat: {
             title: 'IB Чат',
@@ -1054,7 +1058,7 @@ export const dictionaries = {
           },
           topbarSettings: {
             title: 'Настройки',
-            body: 'Тема оформления, язык, звук уведомлений, записная книжка и привязка Telegram.',
+            body: 'Тема оформления, язык, звук уведомлений, записная книжка и привязка Telegram. Каждый раздел свёрнут — нажмите на него, чтобы раскрыть.',
           },
         },
       },
@@ -1062,7 +1066,7 @@ export const dictionaries = {
         steps: {
           clients: {
             title: 'Клиенты',
-            body: 'Клиенты вашей организации — карточки, история и услуги.',
+            body: 'Клиенты вашей организации — карточки, история и услуги. Видна вся история оказанных услуг по каждому клиенту.',
           },
           regulations: {
             title: 'Регламенты',
@@ -1074,7 +1078,7 @@ export const dictionaries = {
           },
           services: {
             title: 'Услуги',
-            body: 'Каталог услуг вашей организации — цена и процент вознаграждения по каждой.',
+            body: 'Каталог услуг вашей организации — цена и процент вознаграждения по каждой. Здесь же добавляется новая услуга или меняется цена.',
           },
           topbarChat: {
             title: 'IB Чат',
@@ -1086,7 +1090,7 @@ export const dictionaries = {
           },
           topbarSettings: {
             title: 'Настройки',
-            body: 'Тема оформления, язык, звук уведомлений, записная книжка и привязка Telegram.',
+            body: 'Тема оформления, язык, звук уведомлений, записная книжка и привязка Telegram. Каждый раздел свёрнут — нажмите на него, чтобы раскрыть.',
           },
         },
       },
@@ -2093,6 +2097,10 @@ export const dictionaries = {
       errorRequired: 'Xizmat nomini kiriting',
       errorGeneric: "Xizmatni saqlab bo'lmadi",
     },
+    servicePicker: {
+      title: 'Xizmat tanlash',
+      selectBtn: 'Tanlash',
+    },
     houseServices: {
       navLabel: 'Bizning xizmatlar',
       title: 'Bizning xizmatlar',
@@ -2233,15 +2241,15 @@ export const dictionaries = {
         steps: {
           employees: {
             title: 'Xodimlar',
-            body: "Kompaniya xodimlari va hamkor akkauntlarining umumiy ma'lumotnomasi — kartochkalar, lavozimlar, bo'limlar.",
+            body: "Kompaniya xodimlari va hamkor akkauntlarining umumiy ma'lumotnomasi — kartochkalar, lavozimlar, bo'limlar. \"+ Qo'shish\" tugmasi yangi xodimni yaratadi va darhol login/parol beradi; yuqoridagi qidiruv ism yoki raqam bo'yicha topadi.",
           },
           partnerAccounts: {
             title: 'Hamkorlar',
-            body: "Bu yerda hamkor tashkilotlar yaratiladi va ularning xodimlari uchun login/parollar beriladi.",
+            body: "Bu yerda hamkor tashkilotlar yaratiladi va ularning xodimlari uchun login/parollar beriladi. Har bir hamkorning alohida kirishi bor — u faqat o'z mijozlari va reglamentlarini ko'radi.",
           },
           houseServices: {
             title: 'Bizning xizmatlar',
-            body: "Kompaniyaning umumiy xizmatlar katalogi — hamkorlar o'z mijozlarini yaratishda shu yerdan tanlaydi.",
+            body: "Kompaniyaning umumiy xizmatlar katalogi — hamkorlar o'z mijozlarini yaratishda shu yerdan tanlaydi. Nomi va kodi bo'yicha qidiruv bor, xizmatga bosish esa uning to'liq tavsifini ko'rsatadi.",
           },
           departments: {
             title: "Bo'limlar",
@@ -2249,27 +2257,27 @@ export const dictionaries = {
           },
           clients: {
             title: 'Mijozlar',
-            body: "Umumiy mijozlar bazasi — reglamentlar va loyihalar ham jumladan, barcha modullarda ishlatiladi.",
+            body: "Umumiy mijozlar bazasi — reglamentlar va loyihalar ham jumladan, barcha modullarda ishlatiladi. Mijozga bir nechta xizmat biriktirish mumkin — barcha tarix (nima, qachon, qanday narxda) uning kartochkasida ko'rinadi.",
           },
           projects: {
             title: 'Loyihalar',
-            body: "Kompaniya loyihalari va ular ichidagi vazifalar — ishtirokchilar va statuslar bilan.",
+            body: "Kompaniya loyihalari va ular ichidagi vazifalar — ishtirokchilar va statuslar bilan. Loyihani ochsangiz, ishtirokchilar ro'yxati va umumiy yozishmani ko'rasiz.",
           },
           regulations: {
             title: 'Reglamentlar',
-            body: "Siz xodimlarga yoki hamkorlarga tayinlaydigan vazifa va topshiriqlar, muddat va status bilan.",
+            body: "Siz xodimlarga yoki hamkorlarga tayinlaydigan vazifa va topshiriqlar, muddat va status bilan. Status o'zgarganda yoki muddat yaqinlashganda ishtirokchilarga bildirishnoma keladi.",
           },
           blog: {
             title: 'Blog',
-            body: "Xodimlar va hamkorlar uchun e'lonlar, muhokamalar va foydali materiallar.",
+            body: "Xodimlar va hamkorlar uchun e'lonlar, muhokamalar va foydali materiallar. Mavzu yaratishda auditoriyani tanlash mumkin: xodimlar, barcha hamkorlar yoki muayyan hamkor.",
           },
           birthdays: {
             title: "Tug'ilgan kunlar taqvimi",
-            body: "Kim va qachon nishonlaydi — eng yaqin sanalar bo'yicha saralangan.",
+            body: "Kim va qachon nishonlaydi — eng yaqin sanalar bo'yicha saralangan, vaqtida tabriklashni unutmaslik uchun.",
           },
           absenceRequests: {
             title: 'Arizalar',
-            body: "Xodimlarning dam olish, ta'til yoki masofadan ishlash arizalari — tasdiqlash va hisobot.",
+            body: "Xodimlarning dam olish, ta'til yoki masofadan ishlash arizalari — tasdiqlash va hisobot. Arizani ro'yxatdan bittagina bosish bilan tasdiqlash yoki rad etish mumkin.",
           },
           topbarPartners: {
             title: 'Hamkorga tezkor o\'tish',
@@ -2285,7 +2293,7 @@ export const dictionaries = {
           },
           topbarSettings: {
             title: 'Sozlamalar',
-            body: "Ko'rinish, server, Telegram-bot, zaxira nusxalar va hisobotlarni avto-yuklab olish — admin uchun hammasi bir joyda.",
+            body: "Ko'rinish, server, Telegram-bot, zaxira nusxalar va hisobotlarni avto-yuklab olish — admin uchun hammasi bir joyda. Har bir bo'lim yig'ilgan — ochish uchun ustiga bosing.",
           },
         },
       },
@@ -2293,7 +2301,7 @@ export const dictionaries = {
         steps: {
           employees: {
             title: 'Xodimlar',
-            body: "Kompaniya hamkasblari ma'lumotnomasi — shu yerda sizning o'z profilingiz ham joylashgan.",
+            body: "Kompaniya hamkasblari ma'lumotnomasi — shu yerda sizning o'z profilingiz ham joylashgan. Yuqoridagi qidiruv hamkasbni ism yoki raqam bo'yicha tez topadi.",
           },
           departments: {
             title: "Bo'limlar",
@@ -2301,19 +2309,19 @@ export const dictionaries = {
           },
           clients: {
             title: 'Mijozlar',
-            body: "Vazifalar va reglamentlarda ishlaydigan umumiy mijozlar bazasi.",
+            body: "Vazifalar va reglamentlarda ishlaydigan umumiy mijozlar bazasi. Mijoz kartochkasida unga qanday xizmatlar va qachon ko'rsatilgani ko'rinadi.",
           },
           projects: {
             title: 'Loyihalar',
-            body: "Kompaniya loyihalari va ular ichidagi vazifalar — ishtirokchilar va statuslar bilan.",
+            body: "Kompaniya loyihalari va ular ichidagi vazifalar — ishtirokchilar va statuslar bilan. Loyihani ochsangiz, ishtirokchilar va vazifalar bo'yicha umumiy yozishmani ko'rasiz.",
           },
           regulations: {
             title: 'Reglamentlar',
-            body: "Sizga topshirilgan yoki o'zingiz qo'ygan vazifalar, bajarish muddati bilan.",
+            body: "Sizga topshirilgan yoki o'zingiz qo'ygan vazifalar, bajarish muddati bilan. Bajarilganini shu yerning o'zida belgilang — topshiriq beruvchi darhol ko'radi.",
           },
           blog: {
             title: 'Blog',
-            body: "Kompaniyaning e'lonlari, muhokamalari va foydali materiallari.",
+            body: "Kompaniyaning e'lonlari, muhokamalari va foydali materiallari. Har bir mavzu ostiga izoh qoldirish mumkin.",
           },
           birthdays: {
             title: "Tug'ilgan kunlar taqvimi",
@@ -2321,7 +2329,7 @@ export const dictionaries = {
           },
           absenceRequests: {
             title: 'Arizalar',
-            body: "Dam olish, ta'til yoki masofadan ishlash uchun ariza — va uning statusini kuzatish.",
+            body: "Dam olish, ta'til yoki masofadan ishlash uchun ariza — va uning statusini kuzatish. Status (ko'rib chiqilmoqda / tasdiqlandi / rad etildi) ro'yxatda darhol ko'rinadi.",
           },
           topbarChat: {
             title: 'IB Chat',
@@ -2337,7 +2345,7 @@ export const dictionaries = {
           },
           topbarSettings: {
             title: 'Sozlamalar',
-            body: "Ko'rinish mavzusi, til, bildirishnoma tovushi, yozuv daftari va Telegram bog'lash.",
+            body: "Ko'rinish mavzusi, til, bildirishnoma tovushi, yozuv daftari va Telegram bog'lash. Har bir bo'lim yig'ilgan — ochish uchun ustiga bosing.",
           },
         },
       },
@@ -2345,7 +2353,7 @@ export const dictionaries = {
         steps: {
           clients: {
             title: 'Mijozlar',
-            body: "Tashkilotingiz mijozlari — kartochkalar, tarix va xizmatlar.",
+            body: "Tashkilotingiz mijozlari — kartochkalar, tarix va xizmatlar. Har bir mijoz bo'yicha ko'rsatilgan xizmatlarning to'liq tarixi ko'rinadi.",
           },
           regulations: {
             title: 'Reglamentlar',
@@ -2357,7 +2365,7 @@ export const dictionaries = {
           },
           services: {
             title: 'Xizmatlar',
-            body: "Tashkilotingiz xizmatlari katalogi — har biri uchun narx va mukofot foizi.",
+            body: "Tashkilotingiz xizmatlari katalogi — har biri uchun narx va mukofot foizi. Shu yerdan yangi xizmat qo'shish yoki narxni o'zgartirish mumkin.",
           },
           topbarChat: {
             title: 'IB Chat',
@@ -2366,6 +2374,10 @@ export const dictionaries = {
           topbarNotifications: {
             title: 'Bildirishnomalar',
             body: "Yangi xabarlar, vazifalar va reglamentlar bo'yicha yangilanishlar — barchasi shu yerda.",
+          },
+          topbarSettings: {
+            title: 'Sozlamalar',
+            body: "Ko'rinish mavzusi, til, bildirishnoma tovushi va yozuv daftari. Har bir bo'lim yig'ilgan — ochish uchun ustiga bosing.",
           },
         },
       },
@@ -3373,6 +3385,10 @@ export const dictionaries = {
       errorRequired: 'Хизмат номини киритинг',
       errorGeneric: 'Хизматни сақлаб бўлмади',
     },
+    servicePicker: {
+      title: 'Хизмат танлаш',
+      selectBtn: 'Танлаш',
+    },
     houseServices: {
       navLabel: 'Бизнинг хизматлар',
       title: 'Бизнинг хизматлар',
@@ -3513,15 +3529,15 @@ export const dictionaries = {
         steps: {
           employees: {
             title: 'Ходимлар',
-            body: 'Компания ходимлари ва ҳамкор аккаунтларининг умумий маълумотномаси — карточкалар, лавозимлар, бўлимлар.',
+            body: 'Компания ходимлари ва ҳамкор аккаунтларининг умумий маълумотномаси — карточкалар, лавозимлар, бўлимлар. "+ Қўшиш" тугмаси янги ходимни яратади ва дарҳол логин/парол беради; юқоридаги қидирув исм ёки рақам бўйича топади.',
           },
           partnerAccounts: {
             title: 'Ҳамкорлар',
-            body: 'Бу ерда ҳамкор ташкилотлар яратилади ва уларнинг ходимлари учун логин/паролллар берилади.',
+            body: 'Бу ерда ҳамкор ташкилотлар яратилади ва уларнинг ходимлари учун логин/паролллар берилади. Ҳар бир ҳамкорнинг алоҳида кириши бор — у фақат ўз мижозлари ва регламентларини кўради.',
           },
           houseServices: {
             title: 'Бизнинг хизматлар',
-            body: 'Компаниянинг умумий хизматлар каталоги — ҳамкорлар ўз мижозларини яратишда шу ердан танлайди.',
+            body: 'Компаниянинг умумий хизматлар каталоги — ҳамкорлар ўз мижозларини яратишда шу ердан танлайди. Номи ва коди бўйича қидирув бор, хизматга босиш эса унинг тўлиқ тавсифини кўрсатади.',
           },
           departments: {
             title: 'Бўлимлар',
@@ -3529,27 +3545,27 @@ export const dictionaries = {
           },
           clients: {
             title: 'Мижозлар',
-            body: 'Умумий мижозлар базаси — регламентлар ва лойиҳалар ҳам жумладан, барча модулларда ишлатилади.',
+            body: 'Умумий мижозлар базаси — регламентлар ва лойиҳалар ҳам жумладан, барча модулларда ишлатилади. Мижозга бир нечта хизмат бириктириш мумкин — бутун тарих (нима, қачон, қандай нархда) унинг карточкасида кўринади.',
           },
           projects: {
             title: 'Лойиҳалар',
-            body: 'Компания лойиҳалари ва улар ичидаги вазифалар — иштирокчилар ва статуслар билан.',
+            body: 'Компания лойиҳалари ва улар ичидаги вазифалар — иштирокчилар ва статуслар билан. Лойиҳани очсангиз, иштирокчилар рўйхати ва умумий ёзишмани кўрасиз.',
           },
           regulations: {
             title: 'Регламентлар',
-            body: 'Сиз ходимларга ёки ҳамкорларга тайинлайдиган вазифа ва топшириқлар, муддат ва статус билан.',
+            body: 'Сиз ходимларга ёки ҳамкорларга тайинлайдиган вазифа ва топшириқлар, муддат ва статус билан. Статус ўзгарганда ёки муддат яқинлашганда иштирокчиларга билдиришнома келади.',
           },
           blog: {
             title: 'Блог',
-            body: 'Ходимлар ва ҳамкорлар учун эълонлар, муҳокамалар ва фойдали материаллар.',
+            body: 'Ходимлар ва ҳамкорлар учун эълонлар, муҳокамалар ва фойдали материаллар. Мавзу яратишда аудиторияни танлаш мумкин: ходимлар, барча ҳамкорлар ёки муайян ҳамкор.',
           },
           birthdays: {
             title: 'Туғилган кунлар тақвими',
-            body: 'Ким ва қачон нишонлайди — энг яқин саналар бўйича саралаган.',
+            body: 'Ким ва қачон нишонлайди — энг яқин саналар бўйича саралаган, вақтида табриклашни унутмаслик учун.',
           },
           absenceRequests: {
             title: 'Аризалар',
-            body: 'Ходимларнинг дам олиш, таътил ёки масофадан ишлаш аризалари — тасдиқлаш ва ҳисобот.',
+            body: 'Ходимларнинг дам олиш, таътил ёки масофадан ишлаш аризалари — тасдиқлаш ва ҳисобот. Аризани рўйхатдан биттагина босиш билан тасдиқлаш ёки рад этиш мумкин.',
           },
           topbarPartners: {
             title: 'Ҳамкорга тезкор ўтиш',
@@ -3565,7 +3581,7 @@ export const dictionaries = {
           },
           topbarSettings: {
             title: 'Созламалар',
-            body: 'Кўриниш, сервер, Telegram-бот, захира нусхалар ва ҳисоботларни авто-юклаб олиш — админ учун ҳаммаси бир жойда.',
+            body: 'Кўриниш, сервер, Telegram-бот, захира нусхалар ва ҳисоботларни авто-юклаб олиш — админ учун ҳаммаси бир жойда. Ҳар бир бўлим йиғилган — очиш учун устига босинг.',
           },
         },
       },
@@ -3573,7 +3589,7 @@ export const dictionaries = {
         steps: {
           employees: {
             title: 'Ходимлар',
-            body: 'Компания ҳамкасблари маълумотномаси — шу ерда сизнинг ўз профилингиз ҳам жойлашган.',
+            body: 'Компания ҳамкасблари маълумотномаси — шу ерда сизнинг ўз профилингиз ҳам жойлашган. Юқоридаги қидирув ҳамкасбни исм ёки рақам бўйича тез топади.',
           },
           departments: {
             title: 'Бўлимлар',
@@ -3581,19 +3597,19 @@ export const dictionaries = {
           },
           clients: {
             title: 'Мижозлар',
-            body: 'Вазифалар ва регламентларда ишлайдиган умумий мижозлар базаси.',
+            body: 'Вазифалар ва регламентларда ишлайдиган умумий мижозлар базаси. Мижоз карточкасида унга қандай хизматлар ва қачон кўрсатилгани кўринади.',
           },
           projects: {
             title: 'Лойиҳалар',
-            body: 'Компания лойиҳалари ва улар ичидаги вазифалар — иштирокчилар ва статуслар билан.',
+            body: 'Компания лойиҳалари ва улар ичидаги вазифалар — иштирокчилар ва статуслар билан. Лойиҳани очсангиз, иштирокчилар ва вазифалар бўйича умумий ёзишмани кўрасиз.',
           },
           regulations: {
             title: 'Регламентлар',
-            body: 'Сизга топширилган ёки ўзингиз қўйган вазифалар, бажариш муддати билан.',
+            body: 'Сизга топширилган ёки ўзингиз қўйган вазифалар, бажариш муддати билан. Бажарилганини шу ернинг ўзида белгиланг — топшириқ берувчи дарҳол кўради.',
           },
           blog: {
             title: 'Блог',
-            body: 'Компаниянинг эълонлари, муҳокамалари ва фойдали материаллари.',
+            body: 'Компаниянинг эълонлари, муҳокамалари ва фойдали материаллари. Ҳар бир мавзу остига изоҳ қолдириш мумкин.',
           },
           birthdays: {
             title: 'Туғилган кунлар тақвими',
@@ -3601,7 +3617,7 @@ export const dictionaries = {
           },
           absenceRequests: {
             title: 'Аризалар',
-            body: 'Дам олиш, таътил ёки масофадан ишлаш учун ариза — ва унинг статусини кузатиш.',
+            body: 'Дам олиш, таътил ёки масофадан ишлаш учун ариза — ва унинг статусини кузатиш. Статус (кўриб чиқилмоқда / тасдиқланди / рад этилди) рўйхатда дарҳол кўринади.',
           },
           topbarChat: {
             title: 'IB Чат',
@@ -3617,7 +3633,7 @@ export const dictionaries = {
           },
           topbarSettings: {
             title: 'Созламалар',
-            body: 'Кўриниш мавзуси, тил, билдиришнома товуши, ёзув дафтари ва Telegram боғлаш.',
+            body: 'Кўриниш мавзуси, тил, билдиришнома товуши, ёзув дафтари ва Telegram боғлаш. Ҳар бир бўлим йиғилган — очиш учун устига босинг.',
           },
         },
       },
@@ -3625,7 +3641,7 @@ export const dictionaries = {
         steps: {
           clients: {
             title: 'Мижозлар',
-            body: 'Ташкилотингиз мижозлари — карточкалар, тарих ва хизматлар.',
+            body: 'Ташкилотингиз мижозлари — карточкалар, тарих ва хизматлар. Ҳар бир мижоз бўйича кўрсатилган хизматларнинг тўлиқ тарихи кўринади.',
           },
           regulations: {
             title: 'Регламентлар',
@@ -3637,7 +3653,7 @@ export const dictionaries = {
           },
           services: {
             title: 'Хизматлар',
-            body: 'Ташкилотингиз хизматлари каталоги — ҳар бири учун нарх ва мукофот фоизи.',
+            body: 'Ташкилотингиз хизматлари каталоги — ҳар бири учун нарх ва мукофот фоизи. Шу ердан янги хизмат қўшиш ёки нархни ўзгартириш мумкин.',
           },
           topbarChat: {
             title: 'IB Чат',
@@ -3649,7 +3665,7 @@ export const dictionaries = {
           },
           topbarSettings: {
             title: 'Созламалар',
-            body: 'Кўриниш мавзуси, тил, билдиришнома товуши ва профиль маълумотлари.',
+            body: 'Кўриниш мавзуси, тил, билдиришнома товуши ва профиль маълумотлари. Ҳар бир бўлим йиғилган — очиш учун устига босинг.',
           },
         },
       },

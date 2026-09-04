@@ -1,5 +1,10 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { Copy, Check, FolderOpen, Upload, Eye, EyeOff, Download, Database, Image as ImageIcon, X, Bot, FileSpreadsheet, Volume2, Play, NotebookText, GraduationCap, ChevronDown } from 'lucide-react';
+import {
+  Copy, Check, FolderOpen, Upload, Eye, EyeOff, Download, Database, Image as ImageIcon, X, Bot, FileSpreadsheet,
+  Volume2, Play, NotebookText, GraduationCap, ChevronDown, Palette, Monitor, Globe, User, KeyRound, Server,
+  Router, Sparkles, ShieldCheck,
+} from 'lucide-react';
+import SettingsSection from '../components/SettingsSection';
 import { open as openFileDialog, save as saveFileDialog } from '@tauri-apps/plugin-dialog';
 import { open as shellOpen } from '@tauri-apps/plugin-shell';
 import { relaunch } from '@tauri-apps/plugin-process';
@@ -37,6 +42,9 @@ export default function Settings({ employee }: { employee: Employee }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const toggleSection = (id: string) => setOpenSections((prev) => ({ ...prev, [id]: !prev[id] }));
 
   const [zoom, setZoomState] = useState(getStoredZoom());
   const handleZoomChange = (v: string) => {
@@ -278,11 +286,9 @@ export default function Settings({ employee }: { employee: Employee }) {
   };
 
   // Приветствие бота (v1.7.0) — в отличие от согласия выше, всегда
-  // показывается агенту (нет чекбокса "включить"). Обе секции — в аккордионе
-  // (по просьбе пользователя "чтоб много место не занимало"), закрыты по
-  // умолчанию, тот же CSS, что и у "Обучение" ниже (.changelog-accordion).
-  const [agentConsentOpen, setAgentConsentOpen] = useState(false);
-  const [agentWelcomeOpen, setAgentWelcomeOpen] = useState(false);
+  // показывается агенту (нет чекбокса "включить"). Обе секции (как и все
+  // остальные в этом файле, см. SettingsSection выше) — в аккордионе,
+  // закрыты по умолчанию.
   const [welcomeTextRu, setWelcomeTextRu] = useState('');
   const [welcomeTextUz, setWelcomeTextUz] = useState('');
   const [welcomeTextUzCyrl, setWelcomeTextUzCyrl] = useState('');
@@ -703,14 +709,12 @@ export default function Settings({ employee }: { employee: Employee }) {
     <div className="settings-page">
       <h1>{t('settings.title')}</h1>
 
-      <section className="settings-section">
-        <h2>{t('settings.appearance')}</h2>
+      <SettingsSection id="appearance" icon={<Palette size={18} />} title={t('settings.appearance')} openSections={openSections} toggleSection={toggleSection}>
         <Select value={theme} options={themeOptions} onChange={(v) => setTheme(v as typeof theme)} />
         <p className="settings-hint">{t('settings.themeHint')}</p>
-      </section>
+      </SettingsSection>
 
-      <section className="settings-section">
-        <h2>{t('settings.display')}</h2>
+      <SettingsSection id="display" icon={<Monitor size={18} />} title={t('settings.display')} openSections={openSections} toggleSection={toggleSection}>
         <Select
           value={String(zoom)}
           options={ZOOM_LEVELS.map((z) => ({ value: String(z), label: `${z}%` }))}
@@ -730,10 +734,9 @@ export default function Settings({ employee }: { employee: Employee }) {
           />
           <p className="settings-hint">{t('settings.windowModeHint')}</p>
         </div>
-      </section>
+      </SettingsSection>
 
-      <section className="settings-section">
-        <h2><Volume2 size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />{t('settings.notificationSound.title')}</h2>
+      <SettingsSection id="notificationSound" icon={<Volume2 size={18} />} title={t('settings.notificationSound.title')} openSections={openSections} toggleSection={toggleSection}>
         <Checkbox checked={notificationSoundEnabled} onChange={handleToggleNotificationSound} label={t('settings.notificationSound.enableLabel')} />
 
         {notificationSoundEnabled && (
@@ -751,16 +754,14 @@ export default function Settings({ employee }: { employee: Employee }) {
           </div>
         )}
         <p className="settings-hint">{t('settings.notificationSound.hint')}</p>
-      </section>
+      </SettingsSection>
 
-      <section className="settings-section">
-        <h2>{t('settings.language')}</h2>
+      <SettingsSection id="language" icon={<Globe size={18} />} title={t('settings.language')} openSections={openSections} toggleSection={toggleSection}>
         <Select value={locale} options={languageOptions} onChange={(v) => setLocale(v as Locale)} />
         <p className="settings-hint">{t('settings.languageHint')}</p>
-      </section>
+      </SettingsSection>
 
-      <section className="settings-section">
-        <h2>{t('settings.account')}</h2>
+      <SettingsSection id="account" icon={<User size={18} />} title={t('settings.account')} openSections={openSections} toggleSection={toggleSection}>
         <div className="account-row">
           <span className="settings-hint">{t('settings.loginFieldLabel')}</span>
           <span>{employee.login}</span>
@@ -797,10 +798,9 @@ export default function Settings({ employee }: { employee: Employee }) {
             </div>
           </>
         )}
-      </section>
+      </SettingsSection>
 
-      <section className="settings-section">
-        <h2><NotebookText size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />{t('settings.notebook.title')}</h2>
+      <SettingsSection id="notebook" icon={<NotebookText size={18} />} title={t('settings.notebook.title')} openSections={openSections} toggleSection={toggleSection}>
         <Checkbox checked={notebookEnabled} onChange={setNotebookEnabledState} label={t('settings.notebook.enableLabel')} />
         <div className="field" style={{ marginTop: 10, maxWidth: 320 }}>
           <label>{t('settings.notebook.nameLabel')}</label>
@@ -810,10 +810,9 @@ export default function Settings({ employee }: { employee: Employee }) {
           {notebookBusy ? t('common.loading') : t('common.save')}
         </button>
         <p className="settings-hint">{t('settings.notebook.hint')}</p>
-      </section>
+      </SettingsSection>
 
-      <section className="settings-section">
-        <h2>{t('settings.passwordSection')}</h2>
+      <SettingsSection id="password" icon={<KeyRound size={18} />} title={t('settings.passwordSection')} openSections={openSections} toggleSection={toggleSection}>
         <form className="password-form" onSubmit={handleChangePassword}>
           {error && <div className="error-text">{error}</div>}
 
@@ -835,10 +834,9 @@ export default function Settings({ employee }: { employee: Employee }) {
           </button>
         </form>
         <p className="settings-hint">{t('settings.changePasswordHint')}</p>
-      </section>
+      </SettingsSection>
 
-      <section className="settings-section">
-        <h2><GraduationCap size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />{t('settings.training.title')}</h2>
+      <SettingsSection id="training" icon={<GraduationCap size={18} />} title={t('settings.training.title')} openSections={openSections} toggleSection={toggleSection}>
         <p className="settings-hint">{t('settings.training.description')}</p>
         <div className="changelog-accordion" style={{ marginTop: 10 }}>
           {trainingSteps.map((step) => {
@@ -860,11 +858,10 @@ export default function Settings({ employee }: { employee: Employee }) {
             );
           })}
         </div>
-      </section>
+      </SettingsSection>
 
       {isClient && (
-        <section className="settings-section">
-          <h2>{t('settings.server.title')}</h2>
+        <SettingsSection id="serverClient" icon={<Server size={18} />} title={t('settings.server.title')} openSections={openSections} toggleSection={toggleSection}>
           <div className="account-row">
             <span className="settings-hint">{t('settings.server.connectedTo')}</span>
             <span>{connection.getServerUrl()}</span>
@@ -872,12 +869,11 @@ export default function Settings({ employee }: { employee: Employee }) {
           <button className="modal-btn danger" onClick={handleDisconnect} style={{ marginTop: 10 }}>
             {t('settings.server.disconnectBtn')}
           </button>
-        </section>
+        </SettingsSection>
       )}
 
       {!isClient && (
-        <section className="settings-section">
-          <h2>{t('settings.server.connectSectionTitle')}</h2>
+        <SettingsSection id="serverConnect" icon={<Server size={18} />} title={t('settings.server.connectSectionTitle')} openSections={openSections} toggleSection={toggleSection}>
           <p className="settings-hint">{t('settings.server.connectSectionHint')}</p>
           <div className="field" style={{ maxWidth: 320, marginTop: 10 }}>
             <label>{t('firstRun.serverUrlLabel')}</label>
@@ -891,12 +887,11 @@ export default function Settings({ employee }: { employee: Employee }) {
           <button className="modal-btn danger" onClick={handleConnectToServer} disabled={connectBusy} style={{ marginTop: 10 }}>
             {connectBusy ? t('firstRun.connectBusy') : t('firstRun.connectSubmit')}
           </button>
-        </section>
+        </SettingsSection>
       )}
 
       {employee.isAdmin && !isClient && serverSettings && (
-        <section className="settings-section">
-          <h2>{t('settings.server.title')}</h2>
+        <SettingsSection id="serverAdmin" icon={<Server size={18} />} title={t('settings.server.title')} openSections={openSections} toggleSection={toggleSection}>
           <p className="settings-hint">{t('settings.server.hint')}</p>
 
           <div className="account-row">
@@ -956,12 +951,11 @@ export default function Settings({ employee }: { employee: Employee }) {
               <Upload size={14} /> {installerBusy ? t('settings.server.installerSetBusy') : t('settings.server.installerSetBtn')}
             </button>
           </div>
-        </section>
+        </SettingsSection>
       )}
 
       {employee.isAdmin && !isClient && (
-        <section className="settings-section">
-          <h2>{t('settings.backup.title')}</h2>
+        <SettingsSection id="backup" icon={<Database size={18} />} title={t('settings.backup.title')} openSections={openSections} toggleSection={toggleSection}>
           <p className="settings-hint">{t('settings.backup.hint')}</p>
 
           <h3 className="settings-subheading">{t('settings.backup.exportTitle')}</h3>
@@ -985,12 +979,11 @@ export default function Settings({ employee }: { employee: Employee }) {
           <button className="modal-btn danger" onClick={handlePickRestoreFile} disabled={restoreBusy}>
             <Database size={14} /> {restoreBusy ? t('settings.backup.restoreBusy') : t('settings.backup.restoreBtn')}
           </button>
-        </section>
+        </SettingsSection>
       )}
 
       {employee.isAdmin && (
-        <section className="settings-section">
-          <h2>{t('settings.radmin.title')}</h2>
+        <SettingsSection id="radmin" icon={<Router size={18} />} title={t('settings.radmin.title')} openSections={openSections} toggleSection={toggleSection}>
           <p className="settings-hint">{t('settings.radmin.hint')}</p>
 
           <div className="field" style={{ maxWidth: 320, marginTop: 10 }}>
@@ -1028,12 +1021,11 @@ export default function Settings({ employee }: { employee: Employee }) {
           <button className="modal-btn" onClick={handleSaveRadmin} disabled={radminBusy}>
             {radminBusy ? t('common.loading') : t('settings.radmin.saveBtn')}
           </button>
-        </section>
+        </SettingsSection>
       )}
 
       {employee.isAdmin && (
-        <section className="settings-section">
-          <h2>{t('settings.logo.title')}</h2>
+        <SettingsSection id="logo" icon={<ImageIcon size={18} />} title={t('settings.logo.title')} openSections={openSections} toggleSection={toggleSection}>
           <p className="settings-hint">{t('settings.logo.hint')}</p>
 
           <div className="avatar-upload-row" style={{ marginTop: 10 }}>
@@ -1050,12 +1042,11 @@ export default function Settings({ employee }: { employee: Employee }) {
               )}
             </div>
           </div>
-        </section>
+        </SettingsSection>
       )}
 
       {employee.isAdmin && (
-        <section className="settings-section">
-          <h2><Bot size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />{t('settings.telegramBots.title')}</h2>
+        <SettingsSection id="telegramBots" icon={<Bot size={18} />} title={t('settings.telegramBots.title')} openSections={openSections} toggleSection={toggleSection}>
           <p className="settings-hint">{t('settings.telegramBots.hint')}</p>
 
           <div className="telegram-bot-card">
@@ -1076,12 +1067,11 @@ export default function Settings({ employee }: { employee: Employee }) {
           <button className="modal-btn" onClick={handleSaveTelegramBots} disabled={tgBusy} style={{ marginTop: 10 }}>
             {tgBusy ? t('common.loading') : t('settings.telegramBots.saveBtn')}
           </button>
-        </section>
+        </SettingsSection>
       )}
 
       {employee.isAdmin && (
-        <section className="settings-section">
-          <h2><Bot size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />{t('settings.agentsBot.title')}</h2>
+        <SettingsSection id="agentsBot" icon={<Bot size={18} />} title={t('settings.agentsBot.title')} openSections={openSections} toggleSection={toggleSection}>
           <p className="settings-hint">{t('settings.agentsBot.hint')}</p>
 
           <div className="telegram-bot-card">
@@ -1099,93 +1089,66 @@ export default function Settings({ employee }: { employee: Employee }) {
           <button className="modal-btn" onClick={handleSaveAgentsBot} disabled={tgAgentsBusy} style={{ marginTop: 10 }}>
             {tgAgentsBusy ? t('common.loading') : t('settings.telegramBots.saveBtn')}
           </button>
-        </section>
+        </SettingsSection>
       )}
 
       {employee.isAdmin && (
-        <section className="settings-section">
-          <h2>{t('settings.agentConsent.title')}</h2>
+        <SettingsSection id="agentConsent" icon={<ShieldCheck size={18} />} title={t('settings.agentConsent.title')} openSections={openSections} toggleSection={toggleSection}>
           <p className="settings-hint">{t('settings.agentConsent.hint')}</p>
-          <div className="changelog-accordion" style={{ marginTop: 10 }}>
-            <div className="changelog-item">
-              <button type="button" className="changelog-item-header" onClick={() => setAgentConsentOpen((o) => !o)}>
-                <span>{t('settings.agentConsent.toggleLabel')}</span>
-                <ChevronDown size={16} className={`changelog-chevron ${agentConsentOpen ? 'open' : ''}`} />
-              </button>
-              {agentConsentOpen && (
-                <div className="training-body">
-                  <Checkbox checked={consentEnabled} onChange={setConsentEnabled} label={t('settings.agentConsent.enableLabel')} />
+          <Checkbox checked={consentEnabled} onChange={setConsentEnabled} label={t('settings.agentConsent.enableLabel')} />
 
-                  {consentEnabled && (
-                    <>
-                      <div className="field" style={{ marginTop: 10 }}>
-                        <label>{t('settings.agentConsent.textRuLabel')}</label>
-                        <textarea rows={4} value={consentTextRu} onChange={(e) => setConsentTextRu(e.target.value)} />
-                      </div>
-                      <div className="field" style={{ marginTop: 10 }}>
-                        <label>{t('settings.agentConsent.textUzLabel')}</label>
-                        <textarea rows={4} value={consentTextUz} onChange={(e) => setConsentTextUz(e.target.value)} />
-                      </div>
-                      <div className="field" style={{ marginTop: 10 }}>
-                        <label>{t('settings.agentConsent.textUzCyrlLabel')}</label>
-                        <textarea rows={4} value={consentTextUzCyrl} onChange={(e) => setConsentTextUzCyrl(e.target.value)} />
-                      </div>
-                    </>
-                  )}
+          {consentEnabled && (
+            <>
+              <div className="field" style={{ marginTop: 10 }}>
+                <label>{t('settings.agentConsent.textRuLabel')}</label>
+                <textarea rows={4} value={consentTextRu} onChange={(e) => setConsentTextRu(e.target.value)} />
+              </div>
+              <div className="field" style={{ marginTop: 10 }}>
+                <label>{t('settings.agentConsent.textUzLabel')}</label>
+                <textarea rows={4} value={consentTextUz} onChange={(e) => setConsentTextUz(e.target.value)} />
+              </div>
+              <div className="field" style={{ marginTop: 10 }}>
+                <label>{t('settings.agentConsent.textUzCyrlLabel')}</label>
+                <textarea rows={4} value={consentTextUzCyrl} onChange={(e) => setConsentTextUzCyrl(e.target.value)} />
+              </div>
+            </>
+          )}
 
-                  <div className="field" style={{ marginTop: 10, maxWidth: 420 }}>
-                    <label>{t('settings.agentConsent.chatLinkLabel')}</label>
-                    <input value={agentChatLink} onChange={(e) => setAgentChatLink(e.target.value)} placeholder={t('settings.agentConsent.chatLinkPlaceholder')} />
-                    <p className="settings-hint">{t('settings.agentConsent.chatLinkHint')}</p>
-                  </div>
-
-                  <button className="modal-btn" onClick={handleSaveAgentConsent} disabled={consentBusy} style={{ marginTop: 10 }}>
-                    {consentBusy ? t('common.loading') : t('settings.telegramBots.saveBtn')}
-                  </button>
-                </div>
-              )}
-            </div>
+          <div className="field" style={{ marginTop: 10, maxWidth: 420 }}>
+            <label>{t('settings.agentConsent.chatLinkLabel')}</label>
+            <input value={agentChatLink} onChange={(e) => setAgentChatLink(e.target.value)} placeholder={t('settings.agentConsent.chatLinkPlaceholder')} />
+            <p className="settings-hint">{t('settings.agentConsent.chatLinkHint')}</p>
           </div>
-        </section>
+
+          <button className="modal-btn" onClick={handleSaveAgentConsent} disabled={consentBusy} style={{ marginTop: 10 }}>
+            {consentBusy ? t('common.loading') : t('settings.telegramBots.saveBtn')}
+          </button>
+        </SettingsSection>
       )}
 
       {employee.isAdmin && (
-        <section className="settings-section">
-          <h2>{t('settings.agentWelcome.title')}</h2>
+        <SettingsSection id="agentWelcome" icon={<Sparkles size={18} />} title={t('settings.agentWelcome.title')} openSections={openSections} toggleSection={toggleSection}>
           <p className="settings-hint">{t('settings.agentWelcome.hint')}</p>
-          <div className="changelog-accordion" style={{ marginTop: 10 }}>
-            <div className="changelog-item">
-              <button type="button" className="changelog-item-header" onClick={() => setAgentWelcomeOpen((o) => !o)}>
-                <span>{t('settings.agentWelcome.toggleLabel')}</span>
-                <ChevronDown size={16} className={`changelog-chevron ${agentWelcomeOpen ? 'open' : ''}`} />
-              </button>
-              {agentWelcomeOpen && (
-                <div className="training-body">
-                  <div className="field">
-                    <label>{t('settings.agentWelcome.textRuLabel')}</label>
-                    <textarea rows={4} value={welcomeTextRu} onChange={(e) => setWelcomeTextRu(e.target.value)} />
-                  </div>
-                  <div className="field" style={{ marginTop: 10 }}>
-                    <label>{t('settings.agentWelcome.textUzLabel')}</label>
-                    <textarea rows={4} value={welcomeTextUz} onChange={(e) => setWelcomeTextUz(e.target.value)} />
-                  </div>
-                  <div className="field" style={{ marginTop: 10 }}>
-                    <label>{t('settings.agentWelcome.textUzCyrlLabel')}</label>
-                    <textarea rows={4} value={welcomeTextUzCyrl} onChange={(e) => setWelcomeTextUzCyrl(e.target.value)} />
-                  </div>
-                  <button className="modal-btn" onClick={handleSaveAgentWelcome} disabled={welcomeBusy} style={{ marginTop: 10 }}>
-                    {welcomeBusy ? t('common.loading') : t('settings.telegramBots.saveBtn')}
-                  </button>
-                </div>
-              )}
-            </div>
+          <div className="field">
+            <label>{t('settings.agentWelcome.textRuLabel')}</label>
+            <textarea rows={4} value={welcomeTextRu} onChange={(e) => setWelcomeTextRu(e.target.value)} />
           </div>
-        </section>
+          <div className="field" style={{ marginTop: 10 }}>
+            <label>{t('settings.agentWelcome.textUzLabel')}</label>
+            <textarea rows={4} value={welcomeTextUz} onChange={(e) => setWelcomeTextUz(e.target.value)} />
+          </div>
+          <div className="field" style={{ marginTop: 10 }}>
+            <label>{t('settings.agentWelcome.textUzCyrlLabel')}</label>
+            <textarea rows={4} value={welcomeTextUzCyrl} onChange={(e) => setWelcomeTextUzCyrl(e.target.value)} />
+          </div>
+          <button className="modal-btn" onClick={handleSaveAgentWelcome} disabled={welcomeBusy} style={{ marginTop: 10 }}>
+            {welcomeBusy ? t('common.loading') : t('settings.telegramBots.saveBtn')}
+          </button>
+        </SettingsSection>
       )}
 
       {employee.isAdmin && !isClient && (
-        <section className="settings-section">
-          <h2><FileSpreadsheet size={18} style={{ verticalAlign: 'text-bottom', marginRight: 6 }} />{t('settings.reportExport.title')}</h2>
+        <SettingsSection id="reportExport" icon={<FileSpreadsheet size={18} />} title={t('settings.reportExport.title')} openSections={openSections} toggleSection={toggleSection}>
           <p className="settings-hint">{t('settings.reportExport.hint')}</p>
 
           <div className="telegram-bot-card">
@@ -1263,7 +1226,7 @@ export default function Settings({ employee }: { employee: Employee }) {
               </div>
             )}
           </div>
-        </section>
+        </SettingsSection>
       )}
 
       <Modal

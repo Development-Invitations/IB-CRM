@@ -4,6 +4,7 @@ import { useLocale } from '../lib/i18n';
 import { useToast } from '../lib/toast';
 import Modal from './Modal';
 import Select from './Select';
+import ServicePickerModal from './ServicePickerModal';
 
 // Добавление ЕЩЁ ОДНОЙ услуги уже существующему клиенту (v1.5.0) — в отличие
 // от ClientFormModal (первая/текущая услуга клиента), эта модалка только
@@ -30,6 +31,7 @@ export default function AddClientServiceModal({
   const [services, setServices] = useState<PartnerService[]>([]);
   const [serviceId, setServiceId] = useState('');
   const [catalogIsHouse, setCatalogIsHouse] = useState(true);
+  const [servicePickerOpen, setServicePickerOpen] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -105,15 +107,20 @@ export default function AddClientServiceModal({
 
       <div className="field">
         <label>{t('clients.serviceLabel')}</label>
-        <Select
-          value={catalogIsHouse ? houseServiceId : serviceId}
-          options={[
-            { value: '', label: t('clients.serviceNotSelected') },
-            ...(catalogIsHouse ? houseServices : services).map((s) => ({ value: s.id, label: s.name })),
-          ]}
-          onChange={catalogIsHouse ? setHouseServiceId : setServiceId}
-        />
+        <button type="button" className="modal-btn" style={{ width: '100%', justifyContent: 'space-between' }} onClick={() => setServicePickerOpen(true)}>
+          {(catalogIsHouse ? houseServices.find((s) => s.id === houseServiceId) : services.find((s) => s.id === serviceId))?.name ?? t('clients.serviceNotSelected')}
+        </button>
       </div>
+      <ServicePickerModal
+        open={servicePickerOpen}
+        onClose={() => setServicePickerOpen(false)}
+        services={catalogIsHouse ? houseServices : services}
+        value={catalogIsHouse ? houseServiceId : serviceId}
+        onSelect={(id) => {
+          if (catalogIsHouse) setHouseServiceId(id); else setServiceId(id);
+          setServicePickerOpen(false);
+        }}
+      />
     </Modal>
   );
 }

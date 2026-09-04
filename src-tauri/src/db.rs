@@ -326,8 +326,10 @@ pub struct ProjectChatMessageRecord {
     pub project_id: String,
     pub sender_id: String,
     pub sender_name: String,
+    pub sender_is_blocked: bool,
     pub target_employee_id: String,
     pub target_name: String,
+    pub target_is_blocked: bool,
     pub content: String,
     pub attachment_data: Option<String>,
     pub attachment_name: Option<String>,
@@ -344,6 +346,7 @@ pub struct ProjectChatReplyRecord {
     pub message_id: String,
     pub author_id: String,
     pub author_name: String,
+    pub author_is_blocked: bool,
     pub content: String,
     pub created_at: String,
     pub edited_at: Option<String>,
@@ -385,8 +388,10 @@ pub struct RegulationEntryRecord {
     pub regulation_id: String,
     pub author_id: String,
     pub author_name: String,
+    pub author_is_blocked: bool,
     pub target_employee_id: String,
     pub target_name: String,
+    pub target_is_blocked: bool,
     pub content: String,
     pub attachment_data: Option<String>,
     pub attachment_name: Option<String>,
@@ -425,6 +430,7 @@ pub struct RegulationReplyRecord {
     pub entry_id: String,
     pub author_id: String,
     pub author_name: String,
+    pub author_is_blocked: bool,
     pub content: String,
     pub created_at: String,
     pub edited_at: Option<String>,
@@ -542,6 +548,7 @@ pub struct BlogTopicRecord {
     pub content: Option<String>,
     pub created_by: String,
     pub created_by_name: String,
+    pub created_by_is_blocked: bool,
     pub pinned: bool,
     pub created_at: String,
     pub comment_count: i64,
@@ -553,6 +560,7 @@ pub struct BlogCommentRecord {
     pub topic_id: String,
     pub author_id: String,
     pub author_name: String,
+    pub author_is_blocked: bool,
     pub content: String,
     pub reply_to_id: Option<String>,
     pub created_at: String,
@@ -1712,6 +1720,53 @@ impl Db {
             .execute("UPDATE employees SET is_blocked = ?1 WHERE id = ?2", params![blocked as i64, employee_id])
             .map_err(|e| e.to_string())?;
         self.get_employee(employee_id).ok_or_else(|| "Сотрудник не найден".to_string())
+    }
+
+    // Удаление сотрудника (v2.0.0) — по прямой просьбе пользователя, только
+    // для уже заблокированных (иначе легко случайно удалить действующего
+    // сотрудника вместо блокировки). Внешние ключи в этой базе ВКЛЮЧЕНЫ —
+    // проверено смоук-тестом: попытка удалить сотрудника, на которого
+    // ссылается любая другая таблица (владелец/участник проекта или
+    // регламента, автор сообщения в чате проекта/регламента, автор темы или
+    // комментария в блоге и т. д.), сама вернёт "FOREIGN KEY constraint
+    // failed" — ловим эту ошибку и превращаем в понятный текст, вместо того
+    // чтобы вручную перечислять каждую таблицу со ссылкой на employees.id
+    // (список таких таблиц будет расти вместе с проектом, а FK-проверка СУБД
+    // накроет их все автоматически, в том числе будущие). Если сотрудник уже
+    // оставил такой след — он остаётся заблокированным (см. is_blocked-флаг,
+    // прокинутый в Projects/Regulations/Blog — там его записи по-прежнему
+    // видны, но помечены "заблокирован").
+    pub fn delete_employee(&self, admin_id: &str, employee_id: &str) -> Result<(), String> {
+        if !self.is_admin(admin_id) {
+            return Err("Недостаточно прав".into());
+        }
+        if employee_id == admin_id {
+            return Err("Нельзя удалить самого себя".into());
+        }
+        let emp = self.get_employee(employee_id).ok_or_else(|| "Сотрудник не найден".to_string())?;
+        if !emp.is_blocked {
+            return Err("Сначала заблокируйте сотрудника".into());
+        }
+        // Безопасно чистим то, что относится ТОЛЬКО к самому сотруднику (не
+        // видно другим, не теряет ничью историю), плюс отвязываем возможные
+        // ссылки на него как на руководителя/заместителя — это нужно сделать
+        // ДО удаления, иначе они же и вызовут FK-ошибку ниже.
+        self.conn.execute("DELETE FROM notifications WHERE employee_id = ?1", params![employee_id]).ok();
+        self.conn.execute("DELETE FROM absence_requests WHERE employee_id = ?1", params![employee_id]).ok();
+        self.conn.execute("DELETE FROM edit_requests WHERE employee_id = ?1", params![employee_id]).ok();
+        self.conn.execute("UPDATE employees SET manager_id = NULL WHERE manager_id = ?1", params![employee_id]).ok();
+        self.conn.execute("UPDATE employees SET deputy_id = NULL WHERE deputy_id = ?1", params![employee_id]).ok();
+        self.conn.execute("UPDATE departments SET head_employee_id = NULL WHERE head_employee_id = ?1", params![employee_id]).ok();
+        self.conn.execute("UPDATE departments SET deputy_employee_id = NULL WHERE deputy_employee_id = ?1", params![employee_id]).ok();
+        self.conn.execute("DELETE FROM employees WHERE id = ?1", params![employee_id]).map_err(|e| {
+            let msg = e.to_string();
+            if msg.contains("FOREIGN KEY") {
+                "Нельзя удалить: у сотрудника есть проекты, регламенты, участие в них, сообщения в чатах или записи в блоге — он останется заблокированным".to_string()
+            } else {
+                msg
+            }
+        })?;
+        Ok(())
     }
 
     // ---- Рабочий график сотрудника ----
@@ -4077,7 +4132,7 @@ impl Db {
 
     pub fn list_project_chat(&self, project_id: &str) -> Vec<ProjectChatMessageRecord> {
         let mut stmt = match self.conn.prepare(
-            "SELECT m.id, m.project_id, m.sender_id, e.full_name, m.target_employee_id, t.full_name,
+            "SELECT m.id, m.project_id, m.sender_id, e.full_name, e.is_blocked, m.target_employee_id, t.full_name, t.is_blocked,
                     m.content, m.attachment_data, m.attachment_name, m.deadline, m.status, m.created_at,
                     (SELECT COUNT(*) FROM project_chat_replies r WHERE r.message_id = m.id),
                     m.edited_at, m.is_deleted
@@ -4090,22 +4145,24 @@ impl Db {
             Err(_) => return Vec::new(),
         };
         stmt.query_map(params![project_id], |row| {
-            let is_deleted: bool = row.get(14)?;
+            let is_deleted: bool = row.get(16)?;
             Ok(ProjectChatMessageRecord {
                 id: row.get(0)?,
                 project_id: row.get(1)?,
                 sender_id: row.get(2)?,
                 sender_name: row.get(3)?,
-                target_employee_id: row.get(4)?,
-                target_name: row.get(5)?,
-                content: if is_deleted { String::new() } else { row.get(6)? },
-                attachment_data: if is_deleted { None } else { row.get(7)? },
-                attachment_name: if is_deleted { None } else { row.get(8)? },
-                deadline: row.get(9)?,
-                status: row.get(10)?,
-                created_at: row.get(11)?,
-                reply_count: row.get(12)?,
-                edited_at: row.get(13)?,
+                sender_is_blocked: row.get(4)?,
+                target_employee_id: row.get(5)?,
+                target_name: row.get(6)?,
+                target_is_blocked: row.get(7)?,
+                content: if is_deleted { String::new() } else { row.get(8)? },
+                attachment_data: if is_deleted { None } else { row.get(9)? },
+                attachment_name: if is_deleted { None } else { row.get(10)? },
+                deadline: row.get(11)?,
+                status: row.get(12)?,
+                created_at: row.get(13)?,
+                reply_count: row.get(14)?,
+                edited_at: row.get(15)?,
                 is_deleted,
             })
         })
@@ -4161,8 +4218,10 @@ impl Db {
             project_id: project_id.to_string(),
             sender_id: actor_id.to_string(),
             sender_name: sender_name.unwrap_or_default(),
+            sender_is_blocked: false,
             target_employee_id: target_employee_id.to_string(),
             target_name: target_name.unwrap_or_default(),
+            target_is_blocked: false,
             content: content.trim().to_string(),
             attachment_data: attachment_data.map(str::to_string),
             attachment_name: attachment_name.map(str::to_string),
@@ -4301,7 +4360,7 @@ impl Db {
 
     pub fn list_project_chat_replies(&self, message_id: &str) -> Vec<ProjectChatReplyRecord> {
         let mut stmt = match self.conn.prepare(
-            "SELECT r.id, r.message_id, r.author_id, e.full_name, r.content, r.created_at, r.edited_at, r.is_deleted
+            "SELECT r.id, r.message_id, r.author_id, e.full_name, e.is_blocked, r.content, r.created_at, r.edited_at, r.is_deleted
              FROM project_chat_replies r JOIN employees e ON e.id = r.author_id
              WHERE r.message_id = ?1 ORDER BY r.created_at ASC",
         ) {
@@ -4309,15 +4368,16 @@ impl Db {
             Err(_) => return Vec::new(),
         };
         stmt.query_map(params![message_id], |row| {
-            let is_deleted: bool = row.get(7)?;
+            let is_deleted: bool = row.get(8)?;
             Ok(ProjectChatReplyRecord {
                 id: row.get(0)?,
                 message_id: row.get(1)?,
                 author_id: row.get(2)?,
                 author_name: row.get(3)?,
-                content: if is_deleted { String::new() } else { row.get(4)? },
-                created_at: row.get(5)?,
-                edited_at: row.get(6)?,
+                author_is_blocked: row.get(4)?,
+                content: if is_deleted { String::new() } else { row.get(5)? },
+                created_at: row.get(6)?,
+                edited_at: row.get(7)?,
                 is_deleted,
             })
         })
@@ -4354,6 +4414,7 @@ impl Db {
             message_id: message_id.to_string(),
             author_id: actor_id.to_string(),
             author_name: author_name.unwrap_or_default(),
+            author_is_blocked: false,
             content: content.trim().to_string(),
             created_at: String::new(),
             edited_at: None,
@@ -4686,7 +4747,7 @@ impl Db {
 
     pub fn list_regulation_entries(&self, regulation_id: &str) -> Vec<RegulationEntryRecord> {
         let mut stmt = match self.conn.prepare(
-            "SELECT e.id, e.regulation_id, e.author_id, a.full_name, e.target_employee_id, t.full_name,
+            "SELECT e.id, e.regulation_id, e.author_id, a.full_name, a.is_blocked, e.target_employee_id, t.full_name, t.is_blocked,
                     e.content, e.attachment_data, e.attachment_name, e.deadline, e.status,
                     e.created_at, e.updated_at,
                     (SELECT COUNT(*) FROM regulation_replies rr WHERE rr.entry_id = e.id),
@@ -4700,23 +4761,25 @@ impl Db {
             Err(_) => return Vec::new(),
         };
         stmt.query_map(params![regulation_id], |row| {
-            let is_deleted: bool = row.get(15)?;
+            let is_deleted: bool = row.get(17)?;
             Ok(RegulationEntryRecord {
                 id: row.get(0)?,
                 regulation_id: row.get(1)?,
                 author_id: row.get(2)?,
                 author_name: row.get(3)?,
-                target_employee_id: row.get(4)?,
-                target_name: row.get(5)?,
-                content: if is_deleted { String::new() } else { row.get(6)? },
-                attachment_data: if is_deleted { None } else { row.get(7)? },
-                attachment_name: if is_deleted { None } else { row.get(8)? },
-                deadline: row.get(9)?,
-                status: row.get(10)?,
-                created_at: row.get(11)?,
-                updated_at: row.get(12)?,
-                reply_count: row.get(13)?,
-                edited_at: row.get(14)?,
+                author_is_blocked: row.get(4)?,
+                target_employee_id: row.get(5)?,
+                target_name: row.get(6)?,
+                target_is_blocked: row.get(7)?,
+                content: if is_deleted { String::new() } else { row.get(8)? },
+                attachment_data: if is_deleted { None } else { row.get(9)? },
+                attachment_name: if is_deleted { None } else { row.get(10)? },
+                deadline: row.get(11)?,
+                status: row.get(12)?,
+                created_at: row.get(13)?,
+                updated_at: row.get(14)?,
+                reply_count: row.get(15)?,
+                edited_at: row.get(16)?,
                 is_deleted,
             })
         })
@@ -4840,8 +4903,10 @@ impl Db {
             regulation_id: regulation_id.to_string(),
             author_id: actor_id.to_string(),
             author_name: author_name.unwrap_or_default(),
+            author_is_blocked: false,
             target_employee_id: target_employee_id.to_string(),
             target_name: target_name.unwrap_or_default(),
+            target_is_blocked: false,
             content: content.trim().to_string(),
             attachment_data: attachment_data.map(str::to_string),
             attachment_name: attachment_name.map(str::to_string),
@@ -4985,7 +5050,7 @@ impl Db {
 
     pub fn list_regulation_replies(&self, entry_id: &str) -> Vec<RegulationReplyRecord> {
         let mut stmt = match self.conn.prepare(
-            "SELECT rr.id, rr.entry_id, rr.author_id, e.full_name, rr.content, rr.created_at, rr.edited_at, rr.is_deleted
+            "SELECT rr.id, rr.entry_id, rr.author_id, e.full_name, e.is_blocked, rr.content, rr.created_at, rr.edited_at, rr.is_deleted
              FROM regulation_replies rr JOIN employees e ON e.id = rr.author_id
              WHERE rr.entry_id = ?1 ORDER BY rr.created_at ASC",
         ) {
@@ -4993,15 +5058,16 @@ impl Db {
             Err(_) => return Vec::new(),
         };
         stmt.query_map(params![entry_id], |row| {
-            let is_deleted: bool = row.get(7)?;
+            let is_deleted: bool = row.get(8)?;
             Ok(RegulationReplyRecord {
                 id: row.get(0)?,
                 entry_id: row.get(1)?,
                 author_id: row.get(2)?,
                 author_name: row.get(3)?,
-                content: if is_deleted { String::new() } else { row.get(4)? },
-                created_at: row.get(5)?,
-                edited_at: row.get(6)?,
+                author_is_blocked: row.get(4)?,
+                content: if is_deleted { String::new() } else { row.get(5)? },
+                created_at: row.get(6)?,
+                edited_at: row.get(7)?,
                 is_deleted,
             })
         })
@@ -5046,6 +5112,7 @@ impl Db {
             entry_id: entry_id.to_string(),
             author_id: actor_id.to_string(),
             author_name: author_name.unwrap_or_default(),
+            author_is_blocked: false,
             content: content.trim().to_string(),
             created_at: String::new(),
             edited_at: None,
@@ -5814,7 +5881,7 @@ impl Db {
 
     const BLOG_CATEGORIES: [&'static str; 5] = ["announcement", "discussion", "useful", "qna", "custom"];
 
-    const BLOG_TOPIC_SELECT: &'static str = "SELECT t.id, t.category, t.title, t.content, t.created_by, e.full_name, t.pinned, t.created_at,
+    const BLOG_TOPIC_SELECT: &'static str = "SELECT t.id, t.category, t.title, t.content, t.created_by, e.full_name, e.is_blocked, t.pinned, t.created_at,
             (SELECT COUNT(*) FROM blog_comments c WHERE c.topic_id = t.id),
             t.partner_audience
         FROM blog_topics t JOIN employees e ON e.id = t.created_by";
@@ -5827,10 +5894,11 @@ impl Db {
             content: row.get(3)?,
             created_by: row.get(4)?,
             created_by_name: row.get(5)?,
-            pinned: row.get::<_, i64>(6)? != 0,
-            created_at: row.get(7)?,
-            comment_count: row.get(8)?,
-            partner_audience: row.get(9)?,
+            created_by_is_blocked: row.get(6)?,
+            pinned: row.get::<_, i64>(7)? != 0,
+            created_at: row.get(8)?,
+            comment_count: row.get(9)?,
+            partner_audience: row.get(10)?,
         })
     }
 
@@ -5945,7 +6013,7 @@ impl Db {
 
     pub fn list_blog_comments(&self, topic_id: &str) -> Vec<BlogCommentRecord> {
         let mut stmt = match self.conn.prepare(
-            "SELECT c.id, c.topic_id, c.author_id, e.full_name, c.content, c.reply_to_id, c.created_at
+            "SELECT c.id, c.topic_id, c.author_id, e.full_name, e.is_blocked, c.content, c.reply_to_id, c.created_at
              FROM blog_comments c JOIN employees e ON e.id = c.author_id
              WHERE c.topic_id = ?1 ORDER BY c.created_at ASC",
         ) {
@@ -5958,9 +6026,10 @@ impl Db {
                 topic_id: row.get(1)?,
                 author_id: row.get(2)?,
                 author_name: row.get(3)?,
-                content: row.get(4)?,
-                reply_to_id: row.get(5)?,
-                created_at: row.get(6)?,
+                author_is_blocked: row.get(4)?,
+                content: row.get(5)?,
+                reply_to_id: row.get(6)?,
+                created_at: row.get(7)?,
             })
         })
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
@@ -5994,6 +6063,7 @@ impl Db {
             topic_id: topic_id.to_string(),
             author_id: actor_id.to_string(),
             author_name: author_name.unwrap_or_default(),
+            author_is_blocked: false,
             content: content.trim().to_string(),
             reply_to_id: reply_to_id.map(str::to_string),
             created_at: String::new(),
@@ -7427,3 +7497,4 @@ pub struct ReportExportSettingsRecord {
     pub time_hhmm: String,
     pub folder: String,
 }
+

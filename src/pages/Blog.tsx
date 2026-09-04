@@ -7,6 +7,7 @@ import { useToast } from '../lib/toast';
 import { parseSqliteUtc } from '../lib/date';
 import { sanitizeBlogHtml, isBlankHtml } from '../lib/sanitizeHtml';
 import { extractToc } from '../lib/toc';
+import { employeeDisplayName } from '../lib/employeeDisplay';
 import Modal from '../components/Modal';
 import Select from '../components/Select';
 import RichEditor from '../components/RichEditor';
@@ -239,7 +240,7 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
         <div className="blog-topic-body">
           <div className="blog-topic-main">
             <div className="blog-topic-meta">
-              <strong>{selected.createdByName}</strong>
+              <strong>{employeeDisplayName(selected.createdByName, selected.createdByIsBlocked, currentEmployee.isAdmin, t('employees.blockedLabel'))}</strong>
               <span className="settings-hint">{parseSqliteUtc(selected.createdAt).toLocaleString()}</span>
             </div>
 
@@ -278,7 +279,7 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
                       <div className="reg-chat-bubble">
                         <div className="reg-entry-header">
                           <div className="reg-entry-meta">
-                            <strong>{c.authorName}</strong>
+                            <strong>{employeeDisplayName(c.authorName, c.authorIsBlocked, currentEmployee.isAdmin, t('employees.blockedLabel'))}</strong>
                             <span className="settings-hint">{parseSqliteUtc(c.createdAt).toLocaleString()}</span>
                           </div>
                           {!currentEmployee.isPartner && (
@@ -290,7 +291,7 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
                           )}
                         </div>
                         {parent && (
-                          <div className="blog-reply-to">↪ {t('blog.replyingTo', { name: parent.authorName })}</div>
+                          <div className="blog-reply-to">↪ {t('blog.replyingTo', { name: employeeDisplayName(parent.authorName, parent.authorIsBlocked, currentEmployee.isAdmin, t('employees.blockedLabel')) })}</div>
                         )}
                         <div className="reg-entry-content blog-comment-content" onClick={handleContentClick} dangerouslySetInnerHTML={{ __html: sanitizeBlogHtml(c.content) }} />
                       </div>
@@ -304,7 +305,7 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
               <div className="reg-add-entry blog-comment-composer">
                 {replyTo && (
                   <div className="blog-reply-banner">
-                    {t('blog.replyingTo', { name: replyTo.authorName })}
+                    {t('blog.replyingTo', { name: employeeDisplayName(replyTo.authorName, replyTo.authorIsBlocked, currentEmployee.isAdmin, t('employees.blockedLabel')) })}
                     <button className="reg-action-btn" onClick={() => setReplyTo(null)}><X size={12} /></button>
                   </div>
                 )}
@@ -412,7 +413,7 @@ export default function Blog({ currentEmployee }: { currentEmployee: Employee })
               <tr key={tp.id} className="employees-row" onClick={() => setSelected(tp)}>
                 <td><span className={`absence-status blog-category-${tp.category}`}>{t(CATEGORY_LABEL_KEYS[tp.category])}</span></td>
                 <td>{tp.pinned && <Pin size={12} style={{ marginRight: 6, opacity: 0.7 }} />}{tp.title}</td>
-                <td>{tp.createdByName}</td>
+                <td>{employeeDisplayName(tp.createdByName, tp.createdByIsBlocked, currentEmployee.isAdmin, t('employees.blockedLabel'))}</td>
                 <td>{parseSqliteUtc(tp.createdAt).toLocaleDateString()}</td>
                 <td>{tp.commentCount}</td>
               </tr>

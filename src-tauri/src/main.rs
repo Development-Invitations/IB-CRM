@@ -454,6 +454,14 @@ struct SetEmployeeBlockedPayload {
     blocked: bool,
 }
 
+#[derive(serde::Deserialize)]
+struct DeleteEmployeePayload {
+    #[serde(rename = "adminId")]
+    admin_id: String,
+    #[serde(rename = "employeeId")]
+    employee_id: String,
+}
+
 #[derive(Clone, serde::Serialize)]
 struct Project {
     id: String,
@@ -505,10 +513,14 @@ struct ProjectChatMessage {
     sender_id: String,
     #[serde(rename = "senderName")]
     sender_name: String,
+    #[serde(rename = "senderIsBlocked")]
+    sender_is_blocked: bool,
     #[serde(rename = "targetEmployeeId")]
     target_employee_id: String,
     #[serde(rename = "targetName")]
     target_name: String,
+    #[serde(rename = "targetIsBlocked")]
+    target_is_blocked: bool,
     content: String,
     #[serde(rename = "attachmentData")]
     attachment_data: Option<String>,
@@ -535,6 +547,8 @@ struct ProjectChatReply {
     author_id: String,
     #[serde(rename = "authorName")]
     author_name: String,
+    #[serde(rename = "authorIsBlocked")]
+    author_is_blocked: bool,
     content: String,
     #[serde(rename = "createdAt")]
     created_at: String,
@@ -603,10 +617,14 @@ struct RegulationEntry {
     author_id: String,
     #[serde(rename = "authorName")]
     author_name: String,
+    #[serde(rename = "authorIsBlocked")]
+    author_is_blocked: bool,
     #[serde(rename = "targetEmployeeId")]
     target_employee_id: String,
     #[serde(rename = "targetName")]
     target_name: String,
+    #[serde(rename = "targetIsBlocked")]
+    target_is_blocked: bool,
     content: String,
     #[serde(rename = "attachmentData")]
     attachment_data: Option<String>,
@@ -668,6 +686,8 @@ struct RegulationReply {
     author_id: String,
     #[serde(rename = "authorName")]
     author_name: String,
+    #[serde(rename = "authorIsBlocked")]
+    author_is_blocked: bool,
     content: String,
     #[serde(rename = "createdAt")]
     created_at: String,
@@ -956,6 +976,8 @@ struct BlogTopic {
     created_by: String,
     #[serde(rename = "createdByName")]
     created_by_name: String,
+    #[serde(rename = "createdByIsBlocked")]
+    created_by_is_blocked: bool,
     pinned: bool,
     #[serde(rename = "createdAt")]
     created_at: String,
@@ -974,6 +996,8 @@ struct BlogComment {
     author_id: String,
     #[serde(rename = "authorName")]
     author_name: String,
+    #[serde(rename = "authorIsBlocked")]
+    author_is_blocked: bool,
     content: String,
     #[serde(rename = "replyToId")]
     reply_to_id: Option<String>,
@@ -2561,8 +2585,10 @@ fn to_project_chat_message(m: db::ProjectChatMessageRecord) -> ProjectChatMessag
         project_id: m.project_id,
         sender_id: m.sender_id,
         sender_name: m.sender_name,
+        sender_is_blocked: m.sender_is_blocked,
         target_employee_id: m.target_employee_id,
         target_name: m.target_name,
+        target_is_blocked: m.target_is_blocked,
         content: m.content,
         attachment_data: m.attachment_data,
         attachment_name: m.attachment_name,
@@ -2581,6 +2607,7 @@ fn to_project_chat_reply(r: db::ProjectChatReplyRecord) -> ProjectChatReply {
         message_id: r.message_id,
         author_id: r.author_id,
         author_name: r.author_name,
+        author_is_blocked: r.author_is_blocked,
         content: r.content,
         created_at: r.created_at,
         edited_at: r.edited_at,
@@ -2608,7 +2635,8 @@ fn to_reg_member(m: db::RegulationMemberRecord) -> RegulationMember {
 fn to_reg_entry(e: db::RegulationEntryRecord) -> RegulationEntry {
     RegulationEntry {
         id: e.id, regulation_id: e.regulation_id, author_id: e.author_id, author_name: e.author_name,
-        target_employee_id: e.target_employee_id, target_name: e.target_name,
+        author_is_blocked: e.author_is_blocked,
+        target_employee_id: e.target_employee_id, target_name: e.target_name, target_is_blocked: e.target_is_blocked,
         content: e.content, attachment_data: e.attachment_data, attachment_name: e.attachment_name,
         deadline: e.deadline, status: e.status, created_at: e.created_at, updated_at: e.updated_at, reply_count: e.reply_count,
         edited_at: e.edited_at, is_deleted: e.is_deleted,
@@ -2632,7 +2660,8 @@ fn to_my_project_task(t: db::MyProjectTaskRecord) -> MyProjectTask {
 
 fn to_reg_reply(r: db::RegulationReplyRecord) -> RegulationReply {
     RegulationReply {
-        id: r.id, entry_id: r.entry_id, author_id: r.author_id, author_name: r.author_name, content: r.content, created_at: r.created_at,
+        id: r.id, entry_id: r.entry_id, author_id: r.author_id, author_name: r.author_name, author_is_blocked: r.author_is_blocked,
+        content: r.content, created_at: r.created_at,
         edited_at: r.edited_at, is_deleted: r.is_deleted,
     }
 }
@@ -2740,7 +2769,7 @@ fn to_position(p: db::PositionRecord) -> Position {
 fn to_blog_topic(t: db::BlogTopicRecord) -> BlogTopic {
     BlogTopic {
         id: t.id, category: t.category, title: t.title, content: t.content,
-        created_by: t.created_by, created_by_name: t.created_by_name,
+        created_by: t.created_by, created_by_name: t.created_by_name, created_by_is_blocked: t.created_by_is_blocked,
         pinned: t.pinned, created_at: t.created_at, comment_count: t.comment_count,
         partner_audience: t.partner_audience,
     }
@@ -2748,7 +2777,7 @@ fn to_blog_topic(t: db::BlogTopicRecord) -> BlogTopic {
 
 fn to_blog_comment(c: db::BlogCommentRecord) -> BlogComment {
     BlogComment {
-        id: c.id, topic_id: c.topic_id, author_id: c.author_id, author_name: c.author_name,
+        id: c.id, topic_id: c.topic_id, author_id: c.author_id, author_name: c.author_name, author_is_blocked: c.author_is_blocked,
         content: c.content, reply_to_id: c.reply_to_id, created_at: c.created_at,
     }
 }
@@ -3019,6 +3048,12 @@ fn update_employee(payload: UpdateEmployeePayload, state: tauri::State<AppState>
 fn set_employee_blocked(payload: SetEmployeeBlockedPayload, state: tauri::State<AppState>) -> Result<Employee, String> {
     let db = state.0.lock().unwrap();
     db.set_employee_blocked(&payload.admin_id, &payload.employee_id, payload.blocked).map(to_employee)
+}
+
+#[tauri::command]
+fn delete_employee(payload: DeleteEmployeePayload, state: tauri::State<AppState>) -> Result<(), String> {
+    let db = state.0.lock().unwrap();
+    db.delete_employee(&payload.admin_id, &payload.employee_id)
 }
 
 #[tauri::command]
@@ -4754,6 +4789,7 @@ fn main() {
             admin_reset_password,
             update_employee,
             set_employee_blocked,
+            delete_employee,
             list_positions,
             create_position,
             list_departments,

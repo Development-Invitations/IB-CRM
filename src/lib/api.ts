@@ -187,8 +187,10 @@ export type ProjectChatMessage = {
   projectId: string;
   senderId: string;
   senderName: string;
+  senderIsBlocked: boolean;
   targetEmployeeId: string;
   targetName: string;
+  targetIsBlocked: boolean;
   content: string;
   attachmentData: string | null;
   attachmentName: string | null;
@@ -205,6 +207,7 @@ export type ProjectChatReply = {
   messageId: string;
   authorId: string;
   authorName: string;
+  authorIsBlocked: boolean;
   content: string;
   createdAt: string;
   editedAt: string | null;
@@ -250,8 +253,10 @@ export type RegulationEntry = {
   regulationId: string;
   authorId: string;
   authorName: string;
+  authorIsBlocked: boolean;
   targetEmployeeId: string;
   targetName: string;
+  targetIsBlocked: boolean;
   content: string;
   attachmentData: string | null;
   attachmentName: string | null;
@@ -290,6 +295,7 @@ export type RegulationReply = {
   entryId: string;
   authorId: string;
   authorName: string;
+  authorIsBlocked: boolean;
   content: string;
   createdAt: string;
   editedAt: string | null;
@@ -397,6 +403,7 @@ export type BlogTopic = {
   content: string | null;
   createdBy: string;
   createdByName: string;
+  createdByIsBlocked: boolean;
   pinned: boolean;
   createdAt: string;
   commentCount: number;
@@ -408,6 +415,7 @@ export type BlogComment = {
   topicId: string;
   authorId: string;
   authorName: string;
+  authorIsBlocked: boolean;
   content: string;
   replyToId: string | null;
   createdAt: string;
@@ -731,6 +739,9 @@ export const api = {
 
   setEmployeeBlocked: (payload: { adminId: string; employeeId: string; blocked: boolean }) =>
     invoke<Employee>('set_employee_blocked', { payload }),
+
+  deleteEmployee: (payload: { adminId: string; employeeId: string }) =>
+    invoke<void>('delete_employee', { payload }),
 
   listPartners: () => invoke<Partner[]>('list_partners'),
 

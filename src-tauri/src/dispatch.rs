@@ -102,6 +102,10 @@ pub fn dispatch(cmd: &str, payload: Value, db: &Db, db_arc: &Arc<Mutex<Db>>, app
             let p: crate::SetEmployeeBlockedPayload = from_payload(payload)?;
             db.set_employee_blocked(&p.admin_id, &p.employee_id, p.blocked).map(crate::to_employee).map(to_json)
         }
+        "delete_employee" => {
+            let p: crate::DeleteEmployeePayload = from_payload(payload)?;
+            db.delete_employee(&p.admin_id, &p.employee_id).map(to_json)
+        }
         "self_update_employee" => {
             let p: crate::SelfUpdateEmployeePayload = from_payload(payload)?;
             db.self_update_employee(&p.employee_id, &p.full_name, p.phone.as_deref()).map(crate::to_employee).map(to_json)

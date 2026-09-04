@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Pencil, ArrowRight, MessageCircle, Lock, Unlock } from 'lucide-react';
+import { Plus, Search, Pencil, ArrowRight, MessageCircle, Lock, Unlock, Trash2 } from 'lucide-react';
 import { api, type Employee, type Position, type Department, type AbsenceRequest, type Regulation } from '../lib/api';
 import { dmChannelId } from '../lib/chat';
 import { useLocale } from '../lib/i18n';
@@ -9,6 +9,7 @@ import { parseSqliteUtc, formatLocalDate } from '../lib/date';
 import { formatWorkDays } from '../lib/schedule';
 import { ABSENCE_TYPE_LABEL_KEYS, formatDate } from '../lib/absenceTypes';
 import Drawer from '../components/Drawer';
+import Modal from '../components/Modal';
 import EmployeeFormModal from '../components/EmployeeFormModal';
 import Avatar from '../components/Avatar';
 import StatusBadge from '../components/StatusBadge';
@@ -31,6 +32,8 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [blockBusy, setBlockBusy] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   useEffect(() => {
     if (selected) {
@@ -110,6 +113,22 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
     }
   };
 
+  const handleDeleteEmployee = async () => {
+    if (!selected) return;
+    setDeleteBusy(true);
+    try {
+      await api.deleteEmployee({ adminId: currentEmployee.id, employeeId: selected.id });
+      setEmployees((prev) => prev.filter((e) => e.id !== selected.id));
+      setDeleteConfirmOpen(false);
+      setSelected(null);
+      showToast('success', t('employees.deleteSuccess'));
+    } catch (err: any) {
+      showToast('error', typeof err === 'string' ? err : t('employees.errorGeneric'));
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   return (
     <div className="employees-page">
       <div className="employees-header">
@@ -185,6 +204,11 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
                 <button className="modal-btn danger" onClick={handleToggleBlock} disabled={blockBusy}>
                   {selected.isBlocked ? <Unlock size={14} /> : <Lock size={14} />}
                   {blockBusy ? t('common.loading') : selected.isBlocked ? t('employees.unblockBtn') : t('employees.blockBtn')}
+                </button>
+              )}
+              {currentEmployee.isAdmin && selected.isBlocked && selected.id !== currentEmployee.id && (
+                <button className="modal-btn danger" onClick={() => setDeleteConfirmOpen(true)}>
+                  <Trash2 size={14} /> {t('employees.deleteBtn')}
                 </button>
               )}
               <button
@@ -353,6 +377,24 @@ export default function Employees({ currentEmployee }: { currentEmployee: Employ
         currentEmployeeId={currentEmployee.id}
         onSaved={load}
       />
+
+      <Modal
+        open={deleteConfirmOpen}
+        title={t('employees.deleteConfirmTitle')}
+        onClose={() => setDeleteConfirmOpen(false)}
+        actions={
+          <>
+            <button className="modal-btn" onClick={() => setDeleteConfirmOpen(false)} disabled={deleteBusy}>
+              {t('common.cancel')}
+            </button>
+            <button className="modal-btn danger" onClick={handleDeleteEmployee} disabled={deleteBusy}>
+              {deleteBusy ? t('common.loading') : t('employees.deleteBtn')}
+            </button>
+          </>
+        }
+      >
+        {t('employees.deleteConfirmBody', { name: selected?.fullName || selected?.login || '' })}
+      </Modal>
     </div>
   );
 }

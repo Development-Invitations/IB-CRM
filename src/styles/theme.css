@@ -1667,11 +1667,14 @@ button.employees-add-btn {
 /* ---- Текстовое обучение (аккордеон "Обучение" в Настройках) ---- */
 
 .training-body {
-  padding: 4px 14px 14px;
+  padding: 14px 18px 18px;
   font-size: 13px;
   line-height: 1.6;
   color: var(--color-text-muted);
   border-radius: 0 0 var(--radius) var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .updates-online-check {

@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '1.9.10';
+export const APP_VERSION = '2.0.0';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,15 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '2.0.0',
+      items: [
+        'Заблокированного сотрудника теперь можно удалить из CRM — доступно только когда он уже заблокирован; если у него остались проекты, регламенты, участие в них или записи в блоге, удаление будет отклонено (сотрудник останется заблокированным, чтобы не потерять историю)',
+        'Заблокированный сотрудник больше не появляется в Календаре дней рождений — ни для кого',
+        'В Регламентах, Проектах и Блоге сообщения/задачи/темы заблокированного сотрудника остаются на месте, но его имя видит только админ — остальным вместо имени показывается пометка «Заблокирован»',
+        'Исправлены отступы в развёрнутых разделах Настроек',
+      ],
+    },
     {
       version: '1.9.10',
       items: [
@@ -772,6 +781,15 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '2.0.0',
+      items: [
+        "Bloklangan xodimni endi CRM'dan o'chirish mumkin — faqat u allaqachon bloklangan bo'lsa; agar uning loyihalari, reglamentlari, ularda ishtiroki yoki blog yozuvlari qolgan bo'lsa, o'chirish rad etiladi (xodim tarixni yo'qotmaslik uchun bloklangan holida qoladi)",
+        "Bloklangan xodim endi Tug'ilgan kunlar taqvimida hech kim uchun ko'rinmaydi",
+        "Reglamentlar, Loyihalar va Blogda bloklangan xodimning xabarlari/vazifalari/mavzulari joyida qoladi, lekin uning ismini faqat admin ko'radi — boshqalarga ism o'rniga \"Bloklangan\" belgisi ko'rsatiladi",
+        "Sozlamalarning ochiq bo'limlaridagi bo'shliqlar (padding) tuzatildi",
+      ],
+    },
+    {
       version: '1.9.10',
       items: [
         "MSI o'rnatuvchisi nima uchun yig'ilmayotganining haqiqiy sababi topildi: kompaniya nomi va tavsifidagi kirill harflari MSI standart kod sahifasiga sig'masdi — NSIS uchun qilingani kabi WiX uchun ham rus tili ko'rsatildi",
@@ -1527,6 +1545,15 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '2.0.0',
+      items: [
+        'Блокланган ходимни энди CRM\'дан ўчириш мумкин — фақат у аллақачон блокланган бўлса; агар унинг лойиҳалари, регламентлари, уларда иштироки ёки блог ёзувлари қолган бўлса, ўчириш рад этилади (ходим тарихни йўқотмаслик учун блокланган ҳолида қолади)',
+        'Блокланган ходим энди Туғилган кунлар тақвимида ҳеч ким учун кўринмайди',
+        'Регламентлар, Лойиҳалар ва Блогда блокланган ходимнинг хабарлари/вазифалари/мавзулари жойида қолади, лекин унинг исмини фақат админ кўради — бошқаларга исм ўрнига "Блокланган" белгиси кўрсатилади',
+        'Созламаларнинг очиқ бўлимларидаги бўшлиқлар тузатилди',
+      ],
+    },
     {
       version: '1.9.10',
       items: [

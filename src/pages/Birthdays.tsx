@@ -36,6 +36,10 @@ function computeUpcoming(employees: Employee[]): UpcomingBirthday[] {
   const list: UpcomingBirthday[] = [];
 
   for (const employee of employees) {
+    // Заблокированный сотрудник нигде не должен "светиться" для остальных —
+    // включая календарь дней рождений (пользователь: "если заблокирован то
+    // нигде его быть не должно в Календаре").
+    if (employee.isBlocked) continue;
     if (!employee.birthDate) continue;
     const [birthYear, month, day] = employee.birthDate.split('-').map(Number);
     if (!birthYear || !month || !day) continue;

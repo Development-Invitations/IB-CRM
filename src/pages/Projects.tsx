@@ -9,6 +9,7 @@ import { useToast } from '../lib/toast';
 import { parseSqliteUtc } from '../lib/date';
 import { prepareAttachment, classifyAttachment } from '../lib/attachment';
 import { buildProjectMessageLink, linkifyEntryContent } from '../lib/entryLink';
+import { employeeDisplayName } from '../lib/employeeDisplay';
 import Modal from '../components/Modal';
 import Select from '../components/Select';
 import SearchableSelect from '../components/SearchableSelect';
@@ -189,7 +190,7 @@ function ChatMessage({
       <div className="reg-chat-bubble">
         <div className="reg-entry-header">
           <div className="reg-entry-meta">
-            <strong>{m.senderName}</strong>
+            <strong>{employeeDisplayName(m.senderName, m.senderIsBlocked, currentEmployee.isAdmin, t('employees.blockedLabel'))}</strong>
             <span className="settings-hint">{parseSqliteUtc(m.createdAt).toLocaleString()}</span>
             {!m.isDeleted && m.editedAt && <span className="settings-hint">{t('common.editedLabel')}</span>}
           </div>
@@ -291,7 +292,7 @@ function ChatMessage({
                   return (
                     <div key={r.id} className="reg-reply">
                       <div className="reg-reply-meta">
-                        <strong>{r.authorName}</strong>
+                        <strong>{employeeDisplayName(r.authorName, r.authorIsBlocked, currentEmployee.isAdmin, t('employees.blockedLabel'))}</strong>
                         <span className="settings-hint">{parseSqliteUtc(r.createdAt).toLocaleString()}</span>
                         {!r.isDeleted && r.editedAt && <span className="settings-hint">{t('common.editedLabel')}</span>}
                         {isOwnReply && !r.isDeleted && (

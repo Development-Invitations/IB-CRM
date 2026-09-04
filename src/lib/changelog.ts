@@ -3,7 +3,7 @@ import type { Locale } from './i18n';
 // Версию тут держим в ручной синхронизации с package.json,
 // src-tauri/Cargo.toml и src-tauri/tauri.conf.json — при следующем бампе
 // версии поправить все четыре места.
-export const APP_VERSION = '1.9.9';
+export const APP_VERSION = '1.9.10';
 
 export type ChangelogEntry = {
   version: string;
@@ -15,6 +15,12 @@ export type ChangelogEntry = {
 // Локализовано на все 3 языка интерфейса — берётся по текущему locale.
 export const changelog: Record<Locale, ChangelogEntry[]> = {
   ru: [
+    {
+      version: '1.9.10',
+      items: [
+        'Найдена настоящая причина, по которой MSI-инсталлятор не собирался: кириллица в названии компании и описании не помещалась в кодовую страницу MSI по умолчанию — указана русская локаль для WiX, как уже было сделано для NSIS',
+      ],
+    },
     {
       version: '1.9.9',
       items: [
@@ -766,6 +772,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
   ],
   uz: [
     {
+      version: '1.9.10',
+      items: [
+        "MSI o'rnatuvchisi nima uchun yig'ilmayotganining haqiqiy sababi topildi: kompaniya nomi va tavsifidagi kirill harflari MSI standart kod sahifasiga sig'masdi — NSIS uchun qilingani kabi WiX uchun ham rus tili ko'rsatildi",
+      ],
+    },
+    {
       version: '1.9.9',
       items: [
         "Texnik reliz: MSI o'rnatuvchisini yig'ishning batafsil logi yoqildi — WiX nima uchun yiqilayotganining haqiqiy sababini ko'rish uchun, oddiy \"failed to run light.exe\" o'rniga",
@@ -1515,6 +1527,12 @@ export const changelog: Record<Locale, ChangelogEntry[]> = {
     },
   ],
   'uz-cyrl': [
+    {
+      version: '1.9.10',
+      items: [
+        'MSI ўрнатувчиси нима учун йиғилмаётганининг ҳақиқий сабаби топилди: компания номи ва тавсифидаги кирилл ҳарфлари MSI стандарт код саҳифасига сиғмасди — NSIS учун қилингани каби WiX учун ҳам рус тили кўрсатилди',
+      ],
+    },
     {
       version: '1.9.9',
       items: [

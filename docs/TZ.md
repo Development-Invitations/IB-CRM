@@ -5153,3 +5153,31 @@ code 1` и НИ ОДНОЙ строки реального вывода WiX ме
 
 `cargo check --offline`, `npx tsc --noEmit -p tsconfig.json` — чисто. Версия поднята до 1.9.9,
 пользователь попросил поправить и пересобрать.
+
+### v1.9.10 — настоящая причина падения WiX найдена: кодовая страница MSI
+
+Флаг `-vv` из 1.9.9 сработал — впервые виден реальный текст ошибки, а не обёрточное "failed to run
+light.exe":
+
+```
+error LGHT0311 : A string was provided with characters that are not available in the specified
+database code page '1252'. Either change these characters to ones that exist in the database's code
+page, or update the database's code page by modifying one of the following attributes:
+Product/@Codepage, Module/@Codepage, Patch/@Codepage, PatchCreation/@Codepage, or
+WixLocalization/@Codepage.
+```
+
+Причина не имеет никакого отношения ни к антивирусу, ни к самому WiX-тулингу, ни к раннеру —
+MSI-таблицы (summary information stream) по умолчанию используют кодовую страницу Windows-1252
+(латиница), а `tauri.conf.json::bundle.publisher`/`copyright`/`shortDescription`/`longDescription`
+содержат кириллицу ("IB - Команда", "Корпоративная CRM для IB OOO...") — она физически не
+представима в CP-1252. NSIS этой проблемы не имел (у него нет привязки к единой кодовой странице
+MSI-базы), поэтому баг проявлялся только в WiX-сборке.
+
+Исправлено ровно тем же способом, что уже стоит для NSIS (`nsis.languages: ["Russian"]`) —
+`bundle.windows.wix.language: ["ru-RU"]`. У ru-RU-локали WiX своя кодовая страница (1251,
+кириллическая), поддерживающая все используемые строки, без необходимости убирать русский текст из
+метаданных или городить собственный `.wxs`-шаблон ради одного атрибута.
+
+`node -e "JSON.parse(...)"` — конфиг валиден, `cargo check --offline`, `npx tsc --noEmit
+-p tsconfig.json` — чисто. Версия поднята до 1.9.10.
